@@ -42,8 +42,17 @@ export default async function handler(req, res) {
         return res.status(200).json(result.settings);
       }
 
+      case 'DELETE': {
+        // Reset all settings to defaults
+        const result = await userSettingsRepository.resetSettings(userEmail);
+        return res.status(200).json({
+          message: 'Settings reset to defaults',
+          settings: result.settings
+        });
+      }
+
       default:
-        res.setHeader('Allow', ['GET', 'PUT', 'PATCH']);
+        res.setHeader('Allow', ['GET', 'PUT', 'PATCH', 'DELETE']);
         return res.status(405).json({ error: `Method ${req.method} not allowed` });
     }
   } catch (error) {

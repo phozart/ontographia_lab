@@ -34,9 +34,10 @@ import { initializeStencilStyles } from './styling/StencilStyleManager';
 import LoadingScreen from '../ui/LoadingScreen';
 
 // Default settings (used before API response)
+// All packs enabled by default - users can customize via the "+N more" menu
 const DEFAULT_SETTINGS = {
   toolbarPosition: 'top',
-  enabledPacks: ['core', 'process-flow'],
+  enabledPacks: ['core', 'process-flow', 'cld', 'uml-class', 'mind-map', 'product-design', 'erd', 'togaf', 'itil', 'capability-map'],
   showContextualToolbarOnSelect: true, // Show floating style toolbar when selecting elements
 };
 

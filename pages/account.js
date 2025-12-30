@@ -25,6 +25,8 @@ import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
 import BadgeIcon from '@mui/icons-material/Badge';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import SettingsBackupRestoreIcon from '@mui/icons-material/SettingsBackupRestore';
+import TuneIcon from '@mui/icons-material/Tune';
 
 import AppSidebar from '../components/ui/AppSidebar';
 import { RoleBadge, StatusBadge } from '../components/ui/StatusBadge';
@@ -49,6 +51,8 @@ export default function AccountPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [resettingSettings, setResettingSettings] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState({ type: '', text: '' });
 
   // Redirect if not logged in
   if (status === 'loading') {
@@ -128,6 +132,33 @@ export default function AccountPage() {
 
   const handleLogout = () => {
     signOut({ callbackUrl: '/' });
+  };
+
+  const handleResetSettings = async () => {
+    if (!confirm('Reset all preferences to defaults? This will restore all stencil packs and diagram settings.')) {
+      return;
+    }
+
+    setResettingSettings(true);
+    setSettingsMessage({ type: '', text: '' });
+
+    try {
+      const res = await fetch('/api/user/settings', {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSettingsMessage({ type: 'error', text: data.error || 'Failed to reset settings' });
+      } else {
+        setSettingsMessage({ type: 'success', text: 'Settings reset to defaults. Refresh the page to see changes.' });
+      }
+    } catch (err) {
+      setSettingsMessage({ type: 'error', text: 'An error occurred. Please try again.' });
+    } finally {
+      setResettingSettings(false);
+    }
   };
 
   return (
@@ -372,6 +403,51 @@ export default function AccountPage() {
                 </Box>
               </Box>
             )}
+          </Paper>
+
+          {/* Preferences Section */}
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              mb: 3,
+              bgcolor: 'var(--panel)',
+              border: '1px solid var(--border)',
+              borderRadius: 2,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+              <TuneIcon sx={{ color: 'var(--text-muted)' }} />
+              <Typography variant="h6" sx={{ fontWeight: 600, color: 'var(--text)' }}>
+                Preferences
+              </Typography>
+            </Box>
+
+            {settingsMessage.text && (
+              <Alert severity={settingsMessage.type} sx={{ mb: 2 }}>
+                {settingsMessage.text}
+              </Alert>
+            )}
+
+            <Typography variant="body2" sx={{ color: 'var(--text-muted)', mb: 2 }}>
+              Reset diagram studio preferences including enabled stencil packs, grid settings, and toolbar positions.
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<SettingsBackupRestoreIcon />}
+              onClick={handleResetSettings}
+              disabled={resettingSettings}
+              sx={{
+                borderColor: 'var(--border)',
+                color: 'var(--text)',
+                '&:hover': {
+                  borderColor: 'var(--accent)',
+                  bgcolor: 'var(--accent-light)',
+                },
+              }}
+            >
+              {resettingSettings ? 'Resetting...' : 'Reset to Defaults'}
+            </Button>
           </Paper>
 
           {/* Logout Section */}
