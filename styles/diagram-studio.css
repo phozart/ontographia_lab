@@ -1,0 +1,4451 @@
+/* ============================================
+   DIAGRAM STUDIO
+   Unified diagramming component styles
+   ============================================ */
+
+/* ============ GLOBAL SCROLL FIXES ============ */
+/* Prevent browser back/forward navigation on horizontal swipe - only on scrollable panels */
+.ds-stencils,
+.ds-properties-content,
+.ds-outline-tab,
+.frame-list {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ============ MAIN CONTAINER ============ */
+
+.ds-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.ds-container.embedded {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Layout with sidebar */
+.ds-container.ds-with-sidebar {
+  flex-direction: row;
+}
+
+.ds-workspace {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Main content layout */
+.ds-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Top Bar Actions - Right side of topbar */
+.ds-topbar-actions {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 101;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Legacy: Floating Top Right Area */
+.ds-floating-top-right {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-floating-top-right > * {
+  background: var(--ds-surface-floating, rgba(255, 255, 255, 0.95));
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+
+/* ============ TOP BAR ============ */
+
+.ds-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.ds-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ds-topbar-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Logo in TopBar */
+.ds-topbar-logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.ds-logo-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #0e74a3 0%, #0284c7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ds-logo-icon span {
+  color: white;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.ds-topbar-logo:hover .ds-logo-icon {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(14, 116, 163, 0.4);
+}
+
+/* Breadcrumb separator */
+.ds-breadcrumb-sep {
+  color: var(--text-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+/* Document Title */
+.ds-doc-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ds-doc-title input {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 8px;
+  min-width: 150px;
+  max-width: 300px;
+}
+
+.ds-doc-title input:hover {
+  border-color: var(--border);
+}
+
+.ds-doc-title input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg);
+}
+
+/* Save Status */
+.ds-save-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ds-save-status.dirty {
+  color: var(--accent);
+}
+
+.ds-save-status.saving {
+  color: #f59e0b;
+}
+
+.ds-save-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Toolbar Buttons */
+.ds-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-toolbar-btn:hover {
+  background: var(--bg-alt);
+  border-color: var(--border);
+}
+
+.ds-toolbar-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ds-toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ds-toolbar-btn.icon-only {
+  padding: 6px;
+}
+
+/* Toolbar Divider */
+.ds-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* Zoom Controls */
+.ds-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.ds-zoom-controls button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.ds-zoom-controls button:hover {
+  background: var(--bg-alt);
+  color: var(--text);
+}
+
+.ds-zoom-controls span {
+  min-width: 48px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ============ MAIN LAYOUT ============ */
+
+.ds-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
+}
+
+/* ============ RESIZABLE PANELS ============ */
+
+.ds-resizable-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.2s ease, height 0.2s ease, opacity 0.2s ease;
+}
+
+.ds-resizable-panel.collapsed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ds-resizable-panel.resizing {
+  transition: none;
+  user-select: none;
+}
+
+.ds-resizable-panel-left {
+  border-right: 1px solid var(--border);
+}
+
+.ds-resizable-panel-right {
+  border-left: 1px solid var(--border);
+}
+
+.ds-resizable-panel-bottom {
+  border-top: 1px solid var(--border);
+}
+
+.ds-resizable-panel-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Resize Handles */
+.ds-resize-handle {
+  position: absolute;
+  background: transparent;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+.ds-resize-handle:hover,
+.ds-resize-handle:focus {
+  background: var(--accent-soft);
+}
+
+.ds-resize-handle:focus {
+  outline: none;
+}
+
+.ds-resize-handle-left {
+  right: 0;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  cursor: ew-resize;
+}
+
+.ds-resize-handle-right {
+  left: 0;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  cursor: ew-resize;
+}
+
+.ds-resize-handle-bottom {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  cursor: ns-resize;
+}
+
+.ds-resize-handle-indicator {
+  position: absolute;
+  background: var(--border);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ds-resize-handle:hover .ds-resize-handle-indicator,
+.ds-resize-handle:focus .ds-resize-handle-indicator {
+  opacity: 1;
+}
+
+.ds-resize-handle-left .ds-resize-handle-indicator,
+.ds-resize-handle-right .ds-resize-handle-indicator {
+  width: 2px;
+  height: 32px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.ds-resize-handle-bottom .ds-resize-handle-indicator {
+  width: 32px;
+  height: 2px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Collapse Button */
+.ds-collapse-button {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 40px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0 6px 6px 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  z-index: 11;
+  transition: all 0.15s ease;
+}
+
+.ds-resizable-panel-left .ds-collapse-button {
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ds-resizable-panel-right .ds-collapse-button {
+  left: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 6px 0 0 6px;
+}
+
+.ds-resizable-panel-bottom .ds-collapse-button {
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 20px;
+  border-radius: 6px 6px 0 0;
+}
+
+.ds-collapse-button:hover {
+  background: var(--bg-alt);
+  color: var(--text);
+}
+
+/* Panel Group */
+.ds-panel-group {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.ds-panel-group-horizontal {
+  flex-direction: row;
+}
+
+.ds-panel-group-vertical {
+  flex-direction: column;
+}
+
+/* ============ LEFT PALETTE ============ */
+
+.ds-palette {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ds-palette-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-palette-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Mode Selector */
+.ds-mode-selector {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-mode-selector select {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ds-mode-selector select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Stencils */
+.ds-stencils {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.ds-stencil-group {
+  margin-bottom: 16px;
+}
+
+.ds-stencil-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.ds-stencil-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ds-stencil-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: grab;
+  transition: all 0.15s ease;
+  min-width: 64px;
+}
+
+.ds-stencil-item:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.ds-stencil-item:active {
+  cursor: grabbing;
+}
+
+.ds-stencil-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-stencil-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.ds-stencil-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============ CANVAS CONTAINER ============ */
+
+.ds-canvas-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ============ CANVAS AREA ============ */
+
+.ds-canvas-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas-bg, #ffffff);
+  min-height: 400px;
+}
+
+/* Drag-over visual feedback */
+.ds-canvas-area.drag-over {
+  outline: 3px dashed var(--accent, #6EC5D8);
+  outline-offset: -3px;
+  background: var(--canvas-bg-hover, rgba(110, 197, 216, 0.05));
+}
+
+.ds-canvas-area.drag-over::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(110, 197, 216, 0.08);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.ds-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ds-canvas-inner {
+  position: relative;
+  transform-origin: 0 0;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+/* Grid */
+.ds-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Connections Layer */
+.ds-connections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 2;
+}
+
+/* Connection groups capture their own events */
+.ds-connection-group {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.ds-connections path {
+  pointer-events: stroke;
+}
+
+/* Wider invisible click target for connections - must have pointer-events */
+.ds-connection-hitarea {
+  pointer-events: all !important;
+  cursor: pointer;
+}
+
+/* Selected connection styling */
+.ds-connection-group.selected {
+  filter: drop-shadow(0 0 3px var(--selection, #4FB3CE));
+}
+
+/* ============ NODES ============ */
+
+.ds-node {
+  position: absolute;
+  user-select: none;
+  cursor: move;
+  transition: box-shadow 0.15s ease;
+  z-index: 5;
+  isolation: isolate;
+}
+
+.ds-node:hover {
+  z-index: 10;
+}
+
+.ds-node.connect-mode {
+  cursor: crosshair;
+}
+
+.ds-node.connect-mode:hover {
+  box-shadow: 0 0 0 3px var(--accent);
+}
+
+.ds-node.connect-mode .ds-port {
+  opacity: 1;
+}
+
+.ds-node.selected {
+  /* Selection indicator via border color only - no z-index change to preserve layering */
+}
+
+.ds-node.dragging {
+  opacity: 0.9;
+  z-index: 100;
+  transition: none !important; /* Prevent flickering during drag */
+  will-change: transform; /* GPU acceleration for smooth dragging */
+}
+
+/* Locked elements - visual indicator and cursor */
+.ds-node.locked {
+  cursor: not-allowed;
+}
+
+.ds-node.locked .ds-node-content {
+  opacity: 0.85;
+}
+
+.ds-node.locked.selected .ds-node-content {
+  border-style: dashed;
+}
+
+/* Frame nodes - render below other elements */
+.ds-node[data-type="frame"] {
+  z-index: 1 !important;
+  transition: none !important; /* Frames shouldn't have transitions */
+  will-change: auto; /* Don't use will-change by default to prevent layer issues */
+}
+
+.ds-node[data-type="frame"] * {
+  transition: none !important; /* No transitions on frame children either */
+}
+
+.ds-node[data-type="frame"].selected {
+  /* Frame selection - no z-index change to preserve layering */
+}
+
+.ds-node[data-type="frame"].dragging {
+  z-index: 50 !important;
+  will-change: transform; /* Only use will-change during drag */
+  pointer-events: none; /* Prevent interaction during drag */
+}
+
+/* Elements inside a frame that's being dragged should also have no transitions */
+.ds-node[data-type="frame"].dragging ~ .ds-node {
+  transition: none !important;
+}
+
+.ds-node-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--panel);
+  border: 2px solid var(--border);
+}
+
+.ds-node.selected .ds-node-content {
+  border-color: var(--selection, #4FB3CE);
+}
+
+/* Custom rendered nodes - selection indicator */
+.ds-node-custom-render.selected {
+  outline: 2px solid var(--selection, #4FB3CE);
+  outline-offset: -1px;
+  border-radius: 4px;
+}
+
+.ds-node-custom-render .ds-node-content {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* Node Shapes */
+.ds-node-rect .ds-node-content {
+  border-radius: 8px;
+}
+
+.ds-node-circle .ds-node-content {
+  border-radius: 50%;
+}
+
+.ds-node-diamond {
+  /* transform is set via inline style to support rotation */
+}
+
+.ds-node-diamond .ds-node-content {
+  transform: rotate(45deg);
+  border-radius: 4px;
+}
+
+.ds-node-diamond .ds-node-inner {
+  transform: rotate(-45deg);
+}
+
+/* Node Label */
+.ds-node-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.ds-node-label input {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  text-align: center;
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 100%;
+}
+
+/* Node Ports */
+.ds-port {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  cursor: crosshair;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, width 0.1s ease, height 0.1s ease;
+}
+
+.ds-node:hover .ds-port,
+.ds-node.selected .ds-port {
+  opacity: 0.8;
+}
+
+.ds-node.connect-mode .ds-port {
+  opacity: 1;
+}
+
+.ds-port:hover {
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(14, 116, 163, 0.3);
+  opacity: 1;
+}
+
+/* Port positions - using negative margins to keep centered while growing */
+.ds-port-top { top: -7px; left: 50%; margin-left: -7px; }
+.ds-port-bottom { bottom: -7px; left: 50%; margin-left: -7px; }
+.ds-port-left { left: -7px; top: 50%; margin-top: -7px; }
+.ds-port-right { right: -7px; top: 50%; margin-top: -7px; }
+
+.ds-port-top:hover { top: -9px; margin-left: -9px; }
+.ds-port-bottom:hover { bottom: -9px; margin-left: -9px; }
+.ds-port-left:hover { left: -9px; margin-top: -9px; }
+.ds-port-right:hover { right: -9px; margin-top: -9px; }
+
+/* Port tooltip */
+.ds-port::after {
+  content: attr(data-port);
+  position: absolute;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 10px;
+  border-radius: 3px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.ds-port-top::after { bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 4px; }
+.ds-port-bottom::after { top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; }
+.ds-port-left::after { right: 100%; top: 50%; transform: translateY(-50%); margin-right: 4px; }
+.ds-port-right::after { left: 100%; top: 50%; transform: translateY(-50%); margin-left: 4px; }
+
+.ds-port:hover::after {
+  opacity: 1;
+}
+
+/* ============ CONNECTION PORTS (Circles at Edge Centers) ============ */
+/* Clean design: 4 circular ports at cardinal points for creating connections
+   These are clearly CIRCLES to differentiate from resize handles (SQUARES) */
+
+.ds-edge-handle {
+  position: absolute;
+  /* Hit area larger than visual for easy targeting */
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: crosshair;
+  z-index: 15;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: auto;
+}
+
+/* Show ports on node hover or selection */
+.ds-node:hover .ds-edge-handle,
+.ds-node.selected .ds-edge-handle {
+  opacity: 1;
+}
+
+/* Inner circle - the visual connection port */
+.ds-edge-handle-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%; /* Perfect CIRCLE */
+  background: white;
+  border: 2px solid var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  position: relative;
+}
+
+/* Hovered port - shows + icon inside */
+.ds-edge-handle:hover .ds-edge-handle-dot,
+.ds-edge-handle.hovered .ds-edge-handle-dot {
+  width: 20px;
+  height: 20px;
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(79, 179, 206, 0.2), 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* + icon appears inside port on hover */
+.ds-edge-handle:hover .ds-edge-handle-dot::before,
+.ds-edge-handle:hover .ds-edge-handle-dot::after,
+.ds-edge-handle.hovered .ds-edge-handle-dot::before,
+.ds-edge-handle.hovered .ds-edge-handle-dot::after {
+  content: '';
+  position: absolute;
+  background: white;
+  border-radius: 1px;
+}
+
+.ds-edge-handle:hover .ds-edge-handle-dot::before,
+.ds-edge-handle.hovered .ds-edge-handle-dot::before {
+  width: 10px;
+  height: 2px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.ds-edge-handle:hover .ds-edge-handle-dot::after,
+.ds-edge-handle.hovered .ds-edge-handle-dot::after {
+  width: 2px;
+  height: 10px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Port positions - centered on each edge */
+.ds-edge-handle-top {
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ds-edge-handle-bottom {
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ds-edge-handle-left {
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ds-edge-handle-right {
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Quick-add button - HIDDEN (now integrated into the port hover state)
+   The + icon is shown directly in the port when hovered */
+.ds-edge-quickadd {
+  display: none;
+}
+
+/* Connect mode - always show ports with pulse animation */
+.ds-node.connect-mode .ds-edge-handle {
+  opacity: 1;
+}
+
+.ds-node.connect-mode .ds-edge-handle-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+  animation: ds-port-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes ds-port-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(14, 116, 163, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(14, 116, 163, 0);
+  }
+}
+
+/* Tooltip on hover */
+.ds-edge-handle::after {
+  content: 'Click to create • Drag to connect';
+  position: absolute;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease 0.3s;
+  z-index: 100;
+}
+
+.ds-edge-handle-top::after { bottom: 100%; margin-bottom: 8px; left: 50%; transform: translateX(-50%); }
+.ds-edge-handle-bottom::after { top: 100%; margin-top: 8px; left: 50%; transform: translateX(-50%); }
+.ds-edge-handle-left::after { right: 100%; margin-right: 8px; top: 50%; transform: translateY(-50%); }
+.ds-edge-handle-right::after { left: 100%; margin-left: 8px; top: 50%; transform: translateY(-50%); }
+
+.ds-edge-handle:hover::after,
+.ds-edge-handle.hovered::after {
+  opacity: 1;
+}
+
+/* Hide legacy ports by default - only show during active connecting */
+.ds-node .ds-port {
+  display: none;
+}
+
+/* Show ports only when actively dragging a connection (for drop targets) */
+.ds-node.connect-target .ds-port {
+  display: block;
+  opacity: 1;
+}
+
+/* Visual feedback for connection drop targets */
+.ds-node.connect-target {
+  cursor: crosshair;
+}
+
+.ds-node.connect-target:hover {
+  box-shadow: 0 0 0 3px var(--accent), 0 0 12px rgba(14, 116, 163, 0.3);
+}
+
+/* ============ CONNECTIONS ============ */
+
+.ds-connection {
+  stroke: var(--text-muted);
+  stroke-width: 2;
+  fill: none;
+  transition: stroke 0.15s ease;
+}
+
+.ds-connection:hover,
+.ds-connection-group.hovered .ds-connection {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
+/* Endpoint handles on hover */
+.ds-connection-group.hovered circle,
+.ds-connection-group.selected circle {
+  transition: r 0.15s ease, opacity 0.15s ease;
+}
+
+.ds-connection.selected {
+  stroke: var(--selection, #4FB3CE);
+  stroke-width: 3;
+}
+
+.ds-connection-label {
+  font-size: 11px;
+  fill: var(--text);
+}
+
+.ds-connection-label-bg {
+  fill: var(--bg);
+  rx: 4;
+}
+
+/* ============ RIGHT PANEL ============ */
+
+.ds-properties {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ds-properties-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-properties-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Property Tabs */
+.ds-properties-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 12px;
+}
+
+.ds-properties-tab {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-properties-tab:hover {
+  color: var(--text);
+}
+
+.ds-properties-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* Property Content */
+.ds-properties-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.ds-property-group {
+  margin-bottom: 20px;
+}
+
+.ds-property-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.ds-property-row {
+  margin-bottom: 12px;
+}
+
+.ds-property-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.ds-property-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.ds-property-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ds-property-textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+/* Empty State */
+.ds-properties-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 20px;
+}
+
+.ds-properties-empty-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.ds-properties-empty-text {
+  font-size: 13px;
+}
+
+/* ============ LIST FIELD (for attributes/methods) ============ */
+
+.ds-list-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ds-list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ds-list-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.ds-list-item-input {
+  flex: 1;
+  font-size: 12px !important;
+  padding: 4px 8px !important;
+  font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.ds-list-item-remove {
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+
+.ds-list-item:hover .ds-list-item-remove {
+  opacity: 1;
+}
+
+.ds-list-add {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+/* ============ BOTTOM PANEL (VALIDATION) ============ */
+
+.ds-validation {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ds-validation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-validation-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ds-validation-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  background: var(--bg);
+  border-radius: 12px;
+}
+
+.ds-validation-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.ds-validation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ds-validation-item:hover {
+  background: var(--bg-alt);
+}
+
+.ds-validation-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.ds-validation-icon.error { color: #ef4444; }
+.ds-validation-icon.warn { color: #f59e0b; }
+.ds-validation-icon.info { color: #3b82f6; }
+
+.ds-validation-message {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.ds-validation-element {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ============ MINIMAP ============ */
+
+.ds-minimap {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  width: 180px;
+  height: 120px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+}
+
+.ds-minimap-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.ds-minimap-viewport {
+  position: absolute;
+  border: 2px solid var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
+  cursor: move;
+}
+
+/* ============ CONTEXT MENU ============ */
+
+.ds-context-menu {
+  position: fixed;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.ds-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+}
+
+.ds-context-menu-item:hover {
+  background: var(--bg-alt);
+}
+
+.ds-context-menu-item.danger {
+  color: #ef4444;
+}
+
+.ds-context-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* ============ CONNECTION TOOLBAR ============ */
+
+.ds-connection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+}
+
+.ds-conn-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ds-conn-toolbar-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 4px;
+}
+
+.ds-conn-toolbar-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.ds-conn-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-conn-toolbar-btn:hover {
+  background: var(--bg-alt);
+  border-color: var(--accent);
+}
+
+.ds-conn-toolbar-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.ds-conn-toolbar-btn--danger {
+  color: var(--text-muted);
+}
+
+.ds-conn-toolbar-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.ds-conn-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ============ ALIGNMENT TOOLBAR ============ */
+
+.ds-alignment-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  white-space: nowrap;
+}
+
+.ds-align-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ds-align-toolbar-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 4px;
+}
+
+.ds-align-toolbar-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.ds-align-toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-align-toolbar-btn:hover {
+  background: var(--bg-alt);
+  border-color: var(--accent);
+}
+
+.ds-align-toolbar-btn:active {
+  background: var(--accent);
+  color: white;
+}
+
+.ds-align-toolbar-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.ds-align-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* ============ MINIMAP ============ */
+
+.ds-minimap {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  width: 180px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  overflow: hidden;
+  user-select: none;
+}
+
+.ds-minimap-collapsed {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.ds-minimap-collapsed:hover {
+  background: var(--bg-alt);
+}
+
+.ds-minimap-expand-icon {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ds-minimap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+.ds-minimap-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ds-minimap-collapse-btn {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.15s ease;
+}
+
+.ds-minimap-collapse-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.ds-minimap-canvas {
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.ds-minimap-canvas svg {
+  display: block;
+}
+
+.ds-minimap-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ============ EXPORT MENU ============ */
+
+.ds-export-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  min-width: 140px;
+  z-index: 100;
+  overflow: hidden;
+}
+
+/* ============ TEMPLATE SELECTOR ============ */
+
+.ds-template-selector {
+  padding: 20px;
+}
+
+.ds-template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.ds-template-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-template-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ds-template-preview {
+  width: 100%;
+  height: 100px;
+  background: var(--bg-alt);
+  border-radius: 4px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 24px;
+}
+
+.ds-template-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.ds-template-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ============ LOADING & EMPTY STATES ============ */
+
+.ds-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+}
+
+.ds-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ds-spin 0.8s linear infinite;
+}
+
+@keyframes ds-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ds-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted);
+}
+
+.ds-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.ds-empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.ds-empty-desc {
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* ============ TOOLTIPS ============ */
+
+.ds-tooltip {
+  position: absolute;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: white;
+  background: var(--text);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1000;
+  white-space: nowrap;
+}
+
+.ds-tooltip::after {
+  content: '';
+  position: absolute;
+  border: 5px solid transparent;
+}
+
+.ds-tooltip.bottom::after {
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom-color: var(--text);
+}
+
+/* ============ RESPONSIVE ============ */
+
+@media (max-width: 768px) {
+  .ds-topbar {
+    padding: 0 8px;
+  }
+
+  .ds-toolbar-btn span {
+    display: none;
+  }
+
+  .ds-resizable-panel-left,
+  .ds-resizable-panel-right {
+    display: none;
+  }
+
+  .ds-container.embedded .ds-topbar {
+    height: 40px;
+  }
+}
+
+/* ============ QUICK CREATE BUTTONS ============ */
+
+.ds-quick-create {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  border: 2px solid white;
+  font-size: 18px;
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.ds-node:hover .ds-quick-create,
+.ds-node.selected .ds-quick-create {
+  opacity: 0.7;
+}
+
+.ds-quick-create:hover {
+  opacity: 1 !important;
+  transform: scale(1.2);
+}
+
+.ds-quick-create-right {
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ds-quick-create-right:hover {
+  transform: translateY(-50%) scale(1.2);
+}
+
+.ds-quick-create-left {
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ds-quick-create-left:hover {
+  transform: translateY(-50%) scale(1.2);
+}
+
+.ds-quick-create-bottom {
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ds-quick-create-bottom:hover {
+  transform: translateX(-50%) scale(1.2);
+}
+
+.ds-quick-create-top {
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ds-quick-create-top:hover {
+  transform: translateX(-50%) scale(1.2);
+}
+
+/* ============ NODE RESIZE HANDLES ============ */
+/* Clean design: Only 4 corner handles (squares) for resize
+   Edge centers are reserved for connection ports (circles) */
+
+.ds-node .ds-resize-handle {
+  position: absolute;
+  z-index: 20;
+  /* Hit area larger than visual */
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Visual indicator - white square with accent border */
+.ds-node .ds-resize-handle::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border: 2px solid var(--accent);
+  border-radius: 2px; /* Slightly rounded but clearly SQUARE */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+/* Hover state - enlarge and fill */
+.ds-node .ds-resize-handle:hover::after {
+  transform: scale(1.25);
+  background: var(--accent);
+}
+
+/* Corner handles - positioned at corners with offset */
+.ds-node .ds-resize-nw {
+  left: -8px;
+  top: -8px;
+  cursor: nwse-resize;
+}
+
+.ds-node .ds-resize-ne {
+  right: -8px;
+  top: -8px;
+  cursor: nesw-resize;
+}
+
+.ds-node .ds-resize-sw {
+  left: -8px;
+  bottom: -8px;
+  cursor: nesw-resize;
+}
+
+.ds-node .ds-resize-se {
+  right: -8px;
+  bottom: -8px;
+  cursor: nwse-resize;
+}
+
+/* Edge resize handles - HIDDEN by default to avoid confusion with connection ports
+   Edge resizing still works via dragging the node border */
+.ds-node .ds-resize-e,
+.ds-node .ds-resize-w,
+.ds-node .ds-resize-s,
+.ds-node .ds-resize-n {
+  display: none;
+}
+
+/* Show resize handles only when selected */
+.ds-node:not(.selected) .ds-resize-handle {
+  display: none;
+}
+
+/* Keep edge handles hidden even when selected */
+.ds-node.selected .ds-resize-e,
+.ds-node.selected .ds-resize-w,
+.ds-node.selected .ds-resize-s,
+.ds-node.selected .ds-resize-n {
+  display: none;
+}
+
+/* ============ ROTATION HANDLE ============ */
+
+.ds-rotation-handle {
+  position: absolute;
+  left: 50%;
+  bottom: -40px;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 2px solid var(--accent, #6EC5D8);
+  border-radius: 50%;
+  cursor: grab;
+  z-index: 25;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  color: var(--accent, #6EC5D8);
+}
+
+.ds-rotation-handle:hover {
+  transform: translateX(-50%) scale(1.15);
+  background: var(--accent, #6EC5D8);
+  color: white;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.ds-rotation-handle:active {
+  cursor: grabbing;
+  transform: translateX(-50%) scale(1.1);
+}
+
+/* Rotation handle connector line to element */
+.ds-rotation-handle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -16px;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 16px;
+  background: var(--accent, #6EC5D8);
+  opacity: 0.5;
+}
+
+/* Hide rotation handle - we use floating handle via portal instead */
+.ds-rotation-handle {
+  display: none !important;
+}
+
+/* Rotation angle indicator (shown during drag) */
+.ds-rotation-indicator {
+  position: fixed;
+  padding: 4px 10px;
+  background: var(--accent, #6EC5D8);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+}
+
+/* ============ WAYPOINT HANDLES ============ */
+
+.ds-connection-group circle[style*="cursor: move"] {
+  transition: transform 0.1s ease;
+}
+
+.ds-connection-group circle[style*="cursor: move"]:hover {
+  transform: scale(1.3);
+  transform-origin: center;
+}
+
+/* ============ ACCORDION SECTIONS ============ */
+
+.ds-properties-accordion {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.ds-accordion-section {
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-accordion-section:last-child {
+  border-bottom: none;
+}
+
+.ds-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg-surface);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  transition: background 0.15s ease;
+}
+
+.ds-accordion-header:hover {
+  background: var(--bg-alt);
+}
+
+.ds-accordion-header.open {
+  background: var(--panel);
+}
+
+.ds-accordion-content {
+  padding: 12px 16px;
+  background: var(--panel);
+}
+
+/* ============ SPACE PAN MODE ============ */
+
+.ds-canvas-area.space-pan {
+  cursor: grab;
+}
+
+.ds-canvas-area.space-pan.panning {
+  cursor: grabbing;
+}
+
+.ds-canvas-area.space-pan .ds-node {
+  cursor: grab;
+}
+
+.ds-canvas-area.space-pan.panning .ds-node {
+  cursor: grabbing;
+}
+
+/* ============ PRODUCT DESIGN CANVASES ============ */
+
+/* Zone Containers */
+.ds-node[data-type*="zone"],
+.ds-node[data-type*="section"],
+.ds-node[data-type*="column"],
+.ds-node[data-type*="phase"],
+.ds-node[data-type*="lane"] {
+  z-index: 1 !important;
+}
+
+.ds-node[data-type*="zone"] .ds-node-content,
+.ds-node[data-type*="section"] .ds-node-content,
+.ds-node[data-type*="column"] .ds-node-content,
+.ds-node[data-type*="phase"] .ds-node-content,
+.ds-node[data-type*="lane"] .ds-node-content {
+  border-radius: 12px;
+  border-width: 2px;
+  border-style: dashed;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 0;
+  overflow: visible;
+}
+
+/* Zone Header */
+.ds-zone-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  background: inherit;
+  border-radius: 10px 10px 0 0;
+  width: 100%;
+  border-bottom: 2px dashed var(--border);
+}
+
+/* Cards in zones should be above zones */
+.ds-node[data-type*="card"],
+.ds-node[data-type*="insight"],
+.ds-node[data-type*="action"],
+.ds-node[data-type*="pain"],
+.ds-node[data-type*="opportunity"],
+.ds-node[data-type*="quote"],
+.ds-node[data-type*="node"] {
+  z-index: 5 !important;
+}
+
+/* Sticky Note Shape */
+.ds-node[data-shape="sticky"] .ds-node-content {
+  border-radius: 4px;
+  box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.1);
+  border: none;
+}
+
+.ds-node[data-shape="sticky"] .ds-node-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 10px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 20px 20px 0;
+  border-color: transparent rgba(0,0,0,0.05) transparent transparent;
+}
+
+/* OST Node Hierarchy Styling */
+.ds-node[data-type="outcome-node"] .ds-node-content {
+  border-radius: 12px;
+  border-width: 3px;
+  font-weight: 700;
+  color: white;
+}
+
+.ds-node[data-type="opportunity-node"] .ds-node-content {
+  border-radius: 10px;
+  border-width: 2px;
+}
+
+.ds-node[data-type="solution-node"] .ds-node-content {
+  border-radius: 8px;
+  border-width: 2px;
+}
+
+.ds-node[data-type="experiment-node"] .ds-node-content {
+  border-radius: 6px;
+  border-width: 2px;
+  border-style: dashed;
+}
+
+/* Persona Header */
+.ds-node[data-type="persona-header"] .ds-node-content {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.ds-persona-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--bg-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+/* Emotion Points */
+.ds-node[data-type="emotion-point"] .ds-node-content {
+  border-radius: 50%;
+  border-width: 3px;
+  border-style: solid;
+}
+
+/* Emotion Score Indicator */
+.ds-emotion-score {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Scored Items (RICE) */
+.ds-node[data-type="scored-item"] .ds-node-content {
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.ds-score-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-left: auto;
+  padding-left: 12px;
+}
+
+/* Touchpoint Cards */
+.ds-node[data-type="touchpoint"] .ds-node-content {
+  border-radius: 8px;
+  border-width: 2px;
+}
+
+/* Canvas Category Pills */
+.ds-canvas-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg-alt);
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ds-canvas-category.discovery { background: #dbeafe; color: #1e40af; }
+.ds-canvas-category.strategy { background: #dcfce7; color: #166534; }
+.ds-canvas-category.prioritization { background: #fef3c7; color: #92400e; }
+.ds-canvas-category.validation { background: #fce7f3; color: #9d174d; }
+.ds-canvas-category.delivery { background: #e9d5ff; color: #6b21a8; }
+.ds-canvas-category.service-design { background: #e0f2fe; color: #0369a1; }
+
+/* Canvas Template Selection Page */
+.ds-canvas-picker {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+
+.ds-canvas-picker-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-canvas-picker-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 8px 0;
+}
+
+.ds-canvas-picker-subtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.ds-canvas-picker-categories {
+  display: flex;
+  gap: 8px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+.ds-category-tab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.ds-category-tab:hover {
+  background: var(--bg-alt);
+  color: var(--text);
+}
+
+.ds-category-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.ds-canvas-picker-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  align-content: start;
+}
+
+.ds-canvas-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ds-canvas-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-2px);
+}
+
+.ds-canvas-card-preview {
+  height: 140px;
+  background: var(--bg-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-canvas-card-content {
+  padding: 16px;
+}
+
+.ds-canvas-card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px 0;
+}
+
+.ds-canvas-card-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+  line-height: 1.4;
+}
+
+/* Zone Drop Indicator */
+.ds-zone-drop-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 3px dashed var(--accent);
+  background: rgba(var(--accent-rgb), 0.1);
+  border-radius: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ds-node[data-type*="zone"].drop-target .ds-zone-drop-indicator {
+  opacity: 1;
+}
+
+/* Zone Item Count Badge */
+.ds-zone-count {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Tree Level Indicators */
+.ds-tree-level-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 2px;
+}
+
+.ds-tree-level-0 { background: #0e74a3; }
+.ds-tree-level-1 { background: #0284c7; }
+.ds-tree-level-2 { background: #10b981; }
+.ds-tree-level-3 { background: #f59e0b; }
+
+/* Add Node Button (for OST) */
+.ds-add-child-btn {
+  position: absolute;
+  bottom: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.ds-node:hover .ds-add-child-btn {
+  opacity: 1;
+}
+
+.ds-add-child-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Canvas Validation Hints */
+.ds-canvas-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Divider Lines (for Service Blueprint) */
+.ds-divider-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--border);
+  z-index: 2;
+}
+
+.ds-divider-line-label {
+  position: absolute;
+  left: 10px;
+  top: -10px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: 4px;
+}
+
+/* Template Preview Grid Layout Icons */
+.ds-template-preview-layout {
+  display: grid;
+  gap: 4px;
+  width: 80px;
+  height: 60px;
+}
+
+.ds-template-preview-layout.matrix-2x2 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.ds-template-preview-layout.columns-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.ds-template-preview-layout.tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-template-preview-cell {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* Emotion Curve Path */
+.ds-emotion-curve {
+  stroke: #f59e0b;
+  stroke-width: 3;
+  fill: none;
+}
+
+/* MoSCoW Column Styling */
+.ds-moscow-column {
+  position: relative;
+}
+
+.ds-moscow-column .ds-zone-header {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ds-moscow-column[data-zone="must"] .ds-zone-header { color: #166534; }
+.ds-moscow-column[data-zone="should"] .ds-zone-header { color: #1e40af; }
+.ds-moscow-column[data-zone="could"] .ds-zone-header { color: #92400e; }
+.ds-moscow-column[data-zone="wont"] .ds-zone-header { color: #991b1b; }
+
+/* ============ CANVAS LIBRARY TABS ============ */
+
+.pdw-canvas-library__tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.pdw-canvas-library__tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -9px;
+}
+
+.pdw-canvas-library__tab:hover {
+  color: var(--text);
+  background: var(--bg-surface);
+}
+
+.pdw-canvas-library__tab.active {
+  color: var(--accent);
+  background: var(--bg-surface);
+  border-bottom-color: var(--accent);
+}
+
+.pdw-canvas-library__tab-count {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--accent);
+  color: white;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.pdw-canvas-library__content {
+  min-height: 400px;
+}
+
+/* ============ MY CANVASES VIEW ============ */
+
+.pdw-my-canvases {
+  padding: 4px;
+}
+
+.pdw-my-canvases__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.pdw-my-canvases__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+  max-width: 400px;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.pdw-my-canvases__search input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+}
+
+.pdw-my-canvases__search input::placeholder {
+  color: var(--text-muted);
+}
+
+.pdw-my-canvases__search svg {
+  font-size: 20px;
+  color: var(--text-muted);
+}
+
+.pdw-my-canvases__search-clear {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.pdw-my-canvases__search-clear:hover {
+  color: var(--text);
+}
+
+.pdw-my-canvases__toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdw-my-canvases__filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pdw-my-canvases__filter-btn:hover,
+.pdw-my-canvases__filter-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.pdw-my-canvases__sort-select {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pdw-my-canvases__create-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: white;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pdw-my-canvases__create-btn:hover {
+  background: var(--accent-hover);
+}
+
+.pdw-my-canvases__filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.pdw-my-canvases__filters label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.pdw-my-canvases__filters select {
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.pdw-my-canvases__filter-clear {
+  font-size: 12px;
+  color: var(--accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.pdw-my-canvases__summary {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.pdw-my-canvases__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.pdw-my-canvases__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.pdw-my-canvases__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.pdw-my-canvases__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.pdw-my-canvases__empty p {
+  margin: 12px 0 20px;
+  font-size: 15px;
+}
+
+.pdw-my-canvases__empty button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  font-size: 14px;
+  color: white;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* ============ MY CANVAS CARD ============ */
+
+.pdw-my-canvas-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.pdw-my-canvas-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.pdw-my-canvas-card__icon {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.pdw-my-canvas-card__icon svg {
+  font-size: 22px;
+}
+
+.pdw-my-canvas-card__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.pdw-my-canvas-card__name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0 0 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdw-my-canvas-card__name-input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+}
+
+.pdw-my-canvas-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pdw-my-canvas-card__type {
+  padding: 2px 8px;
+  background: var(--bg-surface);
+  border-radius: 4px;
+}
+
+.pdw-my-canvas-card__date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pdw-my-canvas-card__actions {
+  position: relative;
+}
+
+.pdw-my-canvas-card__action-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.pdw-my-canvas-card:hover .pdw-my-canvas-card__action-btn {
+  opacity: 1;
+}
+
+.pdw-my-canvas-card__action-btn:hover {
+  background: var(--bg-surface);
+  color: var(--text);
+}
+
+.pdw-my-canvas-card__menu-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+.pdw-my-canvas-card__menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  min-width: 140px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.pdw-my-canvas-card__menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.1s ease;
+}
+
+.pdw-my-canvas-card__menu button:hover {
+  background: var(--bg-surface);
+}
+
+.pdw-my-canvas-card__menu button.danger {
+  color: #dc2626;
+}
+
+.pdw-my-canvas-card__menu button.danger:hover {
+  background: #fef2f2;
+}
+
+.pdw-my-canvas-card__menu button svg {
+  font-size: 18px;
+}
+
+/* ============ CANVAS CREATION WIZARD ============ */
+
+.canvas-wizard-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.canvas-wizard {
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  background: var(--panel);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.canvas-wizard__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 3px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.canvas-wizard__header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.canvas-wizard__icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.canvas-wizard__type {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.canvas-wizard__name-input {
+  display: block;
+  width: 280px;
+  padding: 6px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.canvas-wizard__name-input:focus {
+  border-bottom-color: var(--accent);
+}
+
+.canvas-wizard__header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.canvas-wizard__progress {
+  text-align: right;
+}
+
+.canvas-wizard__progress span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.canvas-wizard__progress-bar {
+  width: 100px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.canvas-wizard__progress-bar > div {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.canvas-wizard__tips-toggle {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.canvas-wizard__tips-toggle:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.canvas-wizard__tips-toggle.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.canvas-wizard__close {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.canvas-wizard__close:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.canvas-wizard__tips {
+  padding: 14px 20px;
+  background: #fffbeb;
+  border-bottom: 1px solid #fef3c7;
+}
+
+.canvas-wizard__tips-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #b45309;
+}
+
+.canvas-wizard__tips-header svg {
+  font-size: 18px;
+}
+
+.canvas-wizard__tips p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #92400e;
+}
+
+.canvas-wizard__tips-inputs,
+.canvas-wizard__tips-outputs {
+  font-size: 13px;
+  color: #78350f;
+  margin-bottom: 4px;
+}
+
+.canvas-wizard__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.canvas-wizard__fields {
+  display: grid;
+  gap: 16px;
+}
+
+.canvas-wizard__fields--quadrant {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.canvas-wizard__fields--lean {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.canvas-wizard__fields--split {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.canvas-wizard__fields--sections,
+.canvas-wizard__fields--persona,
+.canvas-wizard__fields--bmc {
+  grid-template-columns: 1fr;
+}
+
+.canvas-wizard__field {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-left-color: var(--accent);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.canvas-wizard__field label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.canvas-wizard__field-check {
+  font-size: 16px !important;
+  color: #22c55e;
+}
+
+.canvas-wizard__field-hint {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.canvas-wizard__field textarea {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.15s ease;
+}
+
+.canvas-wizard__field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.canvas-wizard__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.canvas-wizard__footer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.canvas-wizard__footer-info > span:first-child {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.canvas-wizard__footer-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.canvas-wizard__footer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.canvas-wizard__btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.canvas-wizard__btn--secondary {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.canvas-wizard__btn--secondary:hover {
+  background: var(--bg);
+  border-color: var(--text-muted);
+}
+
+.canvas-wizard__btn--primary {
+  background: var(--accent);
+  border: none;
+  color: white;
+}
+
+.canvas-wizard__btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.canvas-wizard__btn--primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============ UML CLASS DIAGRAM STYLES ============ */
+
+.uml-class-node {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 2px solid var(--text-muted);
+  border-radius: 4px;
+  overflow: hidden;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.uml-class-header {
+  padding: 6px 10px;
+  text-align: center;
+  color: white;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.uml-class-stereotype {
+  font-size: 10px;
+  font-weight: 400;
+  font-style: italic;
+  opacity: 0.9;
+  margin-bottom: 2px;
+}
+
+.uml-class-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.uml-class-name.abstract {
+  font-style: italic;
+}
+
+.uml-class-section {
+  flex: 1;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  overflow-y: auto;
+  min-height: 24px;
+}
+
+.uml-class-section:last-child {
+  border-bottom: none;
+}
+
+.uml-class-member {
+  padding: 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.uml-class-member.empty {
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.uml-class-member.enum-value {
+  text-align: center;
+  font-weight: 500;
+}
+
+/* UML Package styles */
+.uml-package-node {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 2px solid var(--text-muted);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.uml-package-tab {
+  position: relative;
+  width: 60%;
+  padding: 4px 10px;
+  color: white;
+  font-weight: 600;
+  font-size: 12px;
+  border-radius: 0 0 8px 0;
+}
+
+.uml-package-body {
+  flex: 1;
+  padding: 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.uml-package-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: 'Consolas', monospace;
+}
+
+/* UML Note styles */
+.uml-note-node {
+  width: 100%;
+  height: 100%;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  position: relative;
+  padding: 10px;
+  font-size: 11px;
+  color: #92400e;
+  line-height: 1.4;
+}
+
+.uml-note-corner {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, transparent 50%, #fcd34d 50%);
+  border-left: 1px solid #f59e0b;
+  border-bottom: 1px solid #f59e0b;
+}
+
+.uml-note-content {
+  padding-right: 16px;
+  word-wrap: break-word;
+}
+
+/* ============ ERD ENTITY DIAGRAM STYLES ============ */
+
+.erd-entity-node {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 2px solid var(--text-muted);
+  border-radius: 4px;
+  overflow: hidden;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+}
+
+.erd-entity-node.weak {
+  border-style: double;
+  border-width: 4px;
+}
+
+.erd-entity-node.view {
+  border-style: dashed;
+}
+
+.erd-entity-header {
+  padding: 8px 12px;
+  text-align: center;
+  color: white;
+  font-weight: 700;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.erd-entity-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 500;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.erd-entity-name {
+  vertical-align: middle;
+}
+
+.erd-entity-fields {
+  flex: 1;
+  padding: 6px 0;
+  overflow-y: auto;
+  min-height: 40px;
+}
+
+.erd-field {
+  display: flex;
+  align-items: center;
+  padding: 3px 10px;
+  gap: 6px;
+}
+
+.erd-field:hover {
+  background: var(--bg);
+}
+
+.erd-field.pk {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.erd-field.fk {
+  background: rgba(249, 115, 22, 0.1);
+}
+
+.erd-field-icons {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.erd-pk-icon,
+.erd-fk-icon {
+  font-size: 10px;
+}
+
+.erd-field-spacer {
+  color: var(--text-muted);
+  font-size: 8px;
+}
+
+.erd-field-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erd-field-type {
+  color: var(--text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.erd-field-notnull {
+  color: #ef4444;
+  font-weight: bold;
+  margin-left: 2px;
+}
+
+.erd-field.empty {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  justify-content: center;
+}
+
+.erd-entity-indexes {
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 10px;
+}
+
+.erd-index {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+}
+
+.erd-index-icon {
+  color: var(--accent);
+}
+
+/* ERD Attribute (Chen notation) */
+.erd-attribute-node {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: 2px solid var(--text-muted);
+  border-radius: 50%;
+  font-size: 11px;
+  padding: 6px;
+  text-align: center;
+}
+
+.erd-attribute-node.pk span {
+  text-decoration: underline;
+}
+
+.erd-attribute-node.multivalued {
+  border-width: 4px;
+  border-style: double;
+}
+
+.erd-attribute-node.derived {
+  border-style: dashed;
+}
+
+/* ============ LAYERS PANEL ============ */
+
+.ds-layers-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ds-layers-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.ds-layers-section {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ds-layers-section:last-child {
+  border-bottom: none;
+}
+
+.ds-layers-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.ds-layers-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.ds-layers-add-btn:hover {
+  background: var(--bg-alt);
+  color: var(--accent);
+}
+
+.ds-layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ds-layer-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  margin: 0 4px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.ds-layer-item:hover {
+  background: var(--bg-alt);
+}
+
+.ds-layer-item.default {
+  background: var(--bg-surface);
+}
+
+.ds-layer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.ds-layer-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.ds-layer-btn.ds-layer-delete {
+  opacity: 0;
+  color: #ef4444;
+}
+
+.ds-layer-item:hover .ds-layer-btn.ds-layer-delete {
+  opacity: 1;
+}
+
+.ds-layer-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ds-layer-name-input {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+}
+
+.ds-layer-count {
+  margin-left: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.ds-layers-move {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-top: 4px;
+  border-top: 1px dashed var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ds-layers-move select {
+  flex: 1;
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.ds-group-actions {
+  display: flex;
+  gap: 8px;
+  padding: 4px 12px;
+}
+
+.ds-group-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-group-btn:hover:not(:disabled) {
+  background: var(--bg-alt);
+  border-color: var(--accent);
+}
+
+.ds-group-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ds-groups-list {
+  padding: 0 12px;
+}
+
+.ds-groups-empty {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 8px;
+}
+
+.ds-group-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin: 2px 0;
+  background: var(--bg);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.ds-group-name {
+  flex: 1;
+  color: var(--text);
+}
+
+.ds-group-count {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ============ COLLAPSIBLE PANELS ============ */
+
+.ds-panel-wrapper {
+  display: flex;
+  position: relative;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ds-panel-wrapper.collapsed {
+  width: 48px !important;
+  min-width: 48px;
+  flex-shrink: 0;
+}
+
+.ds-panel-with-toggle {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.ds-panel-toggle {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 10;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.ds-panel-toggle:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ds-panel-toggle.left {
+  right: -10px;
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+
+.ds-panel-toggle.right {
+  left: -10px;
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+.ds-panel-collapsed-toggle {
+  width: 48px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.ds-panel-right .ds-panel-collapsed-toggle {
+  border-right: none;
+  border-left: 1px solid var(--border);
+}
+
+.ds-panel-collapsed-toggle:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Focus Mode Overrides */
+.ds-focus-mode .ds-panel-wrapper {
+  opacity: 0.15;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.ds-focus-mode .ds-panel-wrapper:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ds-focus-mode .ds-topbar {
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.ds-focus-mode .ds-topbar:hover {
+  opacity: 1;
+}
+
+/* ============ COMMENT SYSTEM ============ */
+
+.ds-comment-marker {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  pointer-events: auto;
+}
+
+.ds-comment-marker:hover {
+  transform: translate(-14px, -28px) scale(1.1);
+}
+
+.ds-comment-marker.active .ds-comment-marker-icon svg path {
+  fill: var(--accent-hover);
+}
+
+.ds-comment-marker.resolved {
+  opacity: 0.5;
+}
+
+.ds-comment-marker-icon {
+  position: relative;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+.ds-comment-marker-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  background: var(--error);
+  border-radius: 50%;
+  border: 2px solid white;
+}
+
+.ds-comment-marker-count {
+  position: absolute;
+  bottom: 2px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  background: var(--text);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ds-comment-mode-indicator {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--text);
+  color: white;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  animation: slideUp 0.2s ease;
+}
+
+.ds-comment-mode-indicator kbd {
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: monospace;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+/* Draw Mode Indicator */
+.ds-draw-mode-indicator {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: white;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(14, 116, 163, 0.4);
+  z-index: 1000;
+  animation: slideUp 0.2s ease;
+}
+
+.ds-draw-mode-indicator kbd {
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: monospace;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Drag overlay indicator */
+.ds-drag-indicator {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 16px;
+  background: var(--accent);
+  color: white;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Save Status Indicator */
+.ds-save-status {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 200;
+  transition: all 0.2s ease;
+  pointer-events: none;
+}
+
+.ds-save-status.saved {
+  background: rgba(34, 197, 94, 0.1);
+  color: #16a34a;
+  opacity: 0;
+  animation: ds-save-fade-out 2s ease forwards;
+}
+
+.ds-save-status.unsaved {
+  background: rgba(251, 191, 36, 0.15);
+  color: #b45309;
+}
+
+.ds-save-status.saving {
+  background: rgba(14, 116, 163, 0.1);
+  color: var(--accent);
+}
+
+.ds-save-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: ds-spin 0.8s linear infinite;
+}
+
+@keyframes ds-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ds-save-fade-out {
+  0%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Comment tool active state */
+.ds-canvas-container.comment-mode {
+  cursor: crosshair;
+}
+
+/* ============ CONTEXTUAL TOOLBAR ============ */
+
+.ds-contextual-toolbar {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  z-index: 300;
+  transform: translateX(-50%);
+  animation: ds-toolbar-appear 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+[data-theme="dark"] .ds-contextual-toolbar {
+  background: rgba(26, 26, 46, 0.98);
+  border-color: var(--border);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes ds-toolbar-appear {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.ds-ct-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ds-ct-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-ct-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ds-ct-btn.active {
+  background: var(--accent);
+  color: white;
+}
+
+.ds-ct-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+}
+
+/* Color picker popover */
+.ds-ct-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  padding: 12px;
+  z-index: 400;
+  animation: ds-popover-appear 0.15s ease;
+}
+
+@keyframes ds-popover-appear {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.ds-ct-color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ds-ct-color-option {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ds-ct-color-option:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.ds-ct-color-option.active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--text);
+}
+
+.ds-ct-color-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.ds-ct-color-custom input[type="color"] {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ds-ct-color-custom span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Style variant picker */
+.ds-ct-style-popover {
+  width: 160px;
+  padding: 6px;
+}
+
+.ds-ct-style-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.ds-ct-style-option:hover {
+  background: var(--accent-soft);
+}
+
+.ds-ct-style-option.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ds-ct-style-option span {
+  flex: 1;
+}
+
+/* Font size picker */
+.ds-ct-size-popover {
+  width: 100px;
+  padding: 4px;
+}
+
+.ds-ct-size-option {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.ds-ct-size-option:hover {
+  background: var(--accent-soft);
+}
+
+.ds-ct-size-option.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ============ NEW MACOS-STYLE LAYOUT ============ */
+
+/* New layout container - allows TitleBar and ShapeSidebar to be fixed */
+.ds-container.ds-new-layout {
+  flex-direction: column;
+  position: relative;
+}
+
+/* Workspace adjustments for new layout */
+.ds-container.ds-new-layout .ds-workspace {
+  margin-top: 48px; /* Height of TitleBar */
+  margin-left: 56px; /* Width of ShapeSidebar */
+  height: calc(100% - 48px);
+}
+
+/* Preview mode - hides all UI chrome */
+.ds-container.ds-preview-mode .ds-workspace {
+  margin-top: 0;
+  margin-left: 0;
+  height: 100%;
+}
+
+/* Preview mode exit button */
+.ds-preview-exit-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(30, 30, 50, 0.9);
+  backdrop-filter: blur(8px);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  z-index: 9999;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.ds-preview-exit-btn:hover {
+  background: rgba(50, 50, 70, 0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+.ds-preview-exit-btn svg {
+  opacity: 0.8;
+}
+
+/* Hide floating toolbar in new layout (zoom is in title bar) */
+.ds-container.ds-new-layout .ds-floating-toolbar {
+  display: none;
+}
+
+/* Hide save status indicator in new layout (shown in title bar) */
+.ds-container.ds-new-layout .ds-save-status {
+  display: none;
+}
+
+/* Hide frame navigator panel by default in new layout */
+.ds-container.ds-new-layout .frame-navigator-panel {
+  left: 68px; /* Adjust for sidebar */
+}
+
+/* Overview minimap position adjustment */
+.ds-container.ds-new-layout .ds-minimap {
+  bottom: 16px;
+  right: 16px;
+}

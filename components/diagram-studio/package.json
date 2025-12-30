@@ -1,0 +1,12 @@
+{
+  "name": "@ontographia/space-diagram-studio",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@ontographia/shared": "*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "next": "^16.0.0"
+  }
+}

@@ -1,0 +1,39 @@
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ontographia Lab - App Icon (192px) -->
+  <!-- Gradient Pinwheel with Two-Ring Hub -->
+
+  <!-- Dark background with rounded corners -->
+  <rect width="192" height="192" rx="32" fill="#0d0d1a"/>
+
+  <!-- Subtle ambient glow -->
+  <circle cx="96" cy="96" r="70" fill="url(#iconGlow)" opacity="0.3"/>
+
+  <defs>
+    <radialGradient id="iconGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7A8EE8" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#7A8EE8" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="iconArmA" x1="60" y1="49" x2="97.5" y2="97.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7AD9E8"/>
+      <stop offset="100%" stop-color="#5FB8E6"/>
+    </linearGradient>
+    <linearGradient id="iconArmB" x1="97.5" y1="97.5" x2="165" y2="100.5" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7A8EE8"/>
+      <stop offset="100%" stop-color="#5E6FD6"/>
+    </linearGradient>
+    <linearGradient id="iconArmC" x1="97.5" y1="97.5" x2="71.25" y2="162" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#9C8FE8"/>
+      <stop offset="100%" stop-color="#7A6AD6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Pinwheel centered and scaled (512 -> 192, factor ~0.375, centered at 96) -->
+  <path d="M96 96 C87 81, 74.25 68.25, 61.5 51.75" stroke="url(#iconArmA)" stroke-width="20" stroke-linecap="round" fill="none"/>
+  <path d="M96 96 C115.5 88.5, 138.75 90.75, 164.25 100.5" stroke="url(#iconArmB)" stroke-width="20" stroke-linecap="round" fill="none"/>
+  <path d="M96 96 C96.75 119.25, 85.5 138, 76.5 162" stroke="url(#iconArmC)" stroke-width="20" stroke-linecap="round" fill="none"/>
+
+  <!-- Two-ring center hub (scaled: 36 * 0.375 = 13.5, 7 * 0.375 = 2.625) -->
+  <circle cx="96" cy="96" r="13.5" fill="#6F7FDB" opacity="0.95"/>
+  <circle cx="96" cy="96" r="2.625" fill="#3F466E" opacity="0.95"/>
+</svg>

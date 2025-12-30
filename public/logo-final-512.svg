@@ -1,0 +1,28 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ontographia Lab - Final Logo (512px) -->
+  <!-- Gradient Pinwheel with Two-Ring Hub -->
+
+  <defs>
+    <linearGradient id="armA" x1="160" y1="130" x2="260" y2="260">
+      <stop offset="0%" stop-color="#7AD9E8"/>
+      <stop offset="100%" stop-color="#5FB8E6"/>
+    </linearGradient>
+    <linearGradient id="armB" x1="260" y1="260" x2="440" y2="260">
+      <stop offset="0%" stop-color="#7A8EE8"/>
+      <stop offset="100%" stop-color="#5E6FD6"/>
+    </linearGradient>
+    <linearGradient id="armC" x1="260" y1="260" x2="190" y2="440">
+      <stop offset="0%" stop-color="#9C8FE8"/>
+      <stop offset="100%" stop-color="#7A6AD6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Three curved arms with gradients -->
+  <path d="M256 256 C232 216, 198 182, 164 138" stroke="url(#armA)" stroke-width="54" stroke-linecap="round" fill="none"/>
+  <path d="M256 256 C308 236, 370 242, 438 268" stroke="url(#armB)" stroke-width="54" stroke-linecap="round" fill="none"/>
+  <path d="M256 256 C258 318, 228 368, 204 432" stroke="url(#armC)" stroke-width="54" stroke-linecap="round" fill="none"/>
+
+  <!-- Two-ring center hub -->
+  <circle cx="256" cy="256" r="36" fill="#6F7FDB" opacity="0.95"/>
+  <circle cx="256" cy="256" r="7" fill="#3F466E" opacity="0.95"/>
+</svg>

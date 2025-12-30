@@ -1,0 +1,13 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Ontographia Lab - Final Logo -->
+  <!-- Ethereal Sky Pinwheel -->
+  <!-- Sky Cyan #5CC8E4 | Periwinkle #6E8CD8 | Lavender #9080C8 -->
+
+  <!-- Three curved blades radiating from center -->
+  <path d="M 60 60 Q 30 45, 25 20" stroke="#5CC8E4" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <path d="M 60 60 Q 85 50, 100 70" stroke="#6E8CD8" stroke-width="14" stroke-linecap="round" fill="none"/>
+  <path d="M 60 60 Q 50 90, 35 100" stroke="#9080C8" stroke-width="14" stroke-linecap="round" fill="none"/>
+
+  <!-- Center hub -->
+  <circle cx="60" cy="60" r="11" fill="#6E8CD8"/>
+</svg>

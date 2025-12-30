@@ -1,0 +1,182 @@
+/* Ethereal Sky Palette - Design Specification
+ * "Driving through color — the sky wrapping around you — inside the gradient."
+ *
+ * A palette born from a moment of unexpected beauty — pastel, soft, yet deeply immersive.
+ */
+
+:root {
+  /* === ETHEREAL SKY PRIMARY COLORS === */
+  --sky-deep-cyan: #4FB3CE;      /* Starting point, cool anchor */
+  --sky-steel-blue: #6A9FC9;     /* Transition, depth */
+  --sky-deep-lavender: #9A8AC8;  /* Core accent, twilight feel */
+  --sky-mauve-rose: #C490B0;     /* Warm transition */
+  --sky-warm-peach: #E8A99A;     /* Warmth, glow */
+  --sky-golden-hour: #F0D98A;    /* Highlight, warmest point */
+  --sky-return: #6EC5D8;         /* Cycle completion, infinity */
+
+  /* === GRADIENT DEFINITIONS === */
+  --sky-gradient: linear-gradient(
+    90deg,
+    #4FB3CE 0%,
+    #6A9FC9 18%,
+    #9A8AC8 32%,
+    #C490B0 48%,
+    #E8A99A 62%,
+    #F0D98A 78%,
+    #6EC5D8 100%
+  );
+
+  --sky-gradient-vertical: linear-gradient(
+    180deg,
+    #4FB3CE 0%,
+    #6A9FC9 18%,
+    #9A8AC8 32%,
+    #C490B0 48%,
+    #E8A99A 62%,
+    #F0D98A 78%,
+    #6EC5D8 100%
+  );
+
+  --sky-gradient-diagonal: linear-gradient(
+    135deg,
+    #4FB3CE 0%,
+    #6A9FC9 18%,
+    #9A8AC8 32%,
+    #C490B0 48%,
+    #E8A99A 62%,
+    #F0D98A 78%,
+    #6EC5D8 100%
+  );
+
+  /* === DARK CANVAS BACKGROUNDS === */
+  --sky-canvas-dark: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%);
+  --sky-canvas-darker: #0f0f1a;
+  --sky-canvas-base: #1A1A2E;
+
+  /* === GLASS MORPHISM === */
+  --sky-glass-bg: rgba(255, 255, 255, 0.03);
+  --sky-glass-border: rgba(255, 255, 255, 0.1);
+  --sky-glass-blur: 20px;
+
+  /* === NODE STYLING (40-50% opacity fills) === */
+  --sky-node-cyan: rgba(79, 179, 206, 0.45);
+  --sky-node-steel: rgba(106, 159, 201, 0.45);
+  --sky-node-lavender: rgba(154, 138, 200, 0.45);
+  --sky-node-mauve: rgba(196, 144, 176, 0.45);
+  --sky-node-peach: rgba(232, 169, 154, 0.45);
+  --sky-node-gold: rgba(240, 217, 138, 0.45);
+  --sky-node-return: rgba(110, 197, 216, 0.45);
+
+  /* === ORB STYLING (50-70% opacity for floating orbs) === */
+  --sky-orb-cyan: rgba(79, 179, 206, 0.6);
+  --sky-orb-steel: rgba(106, 159, 201, 0.55);
+  --sky-orb-lavender: rgba(154, 138, 200, 0.6);
+  --sky-orb-mauve: rgba(196, 144, 176, 0.55);
+  --sky-orb-peach: rgba(232, 169, 154, 0.5);
+  --sky-orb-gold: rgba(240, 217, 138, 0.5);
+  --sky-orb-return: rgba(110, 197, 216, 0.6);
+
+  /* === TEXT COLORS === */
+  --sky-text-primary: rgba(255, 255, 255, 0.95);
+  --sky-text-secondary: rgba(255, 255, 255, 0.7);
+  --sky-text-muted: rgba(255, 255, 255, 0.5);
+
+  /* === SHADOWS === */
+  --sky-shadow-glow: 0 0 60px rgba(154, 138, 200, 0.3);
+  --sky-shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+/* === ANIMATED ORB KEYFRAMES === */
+@keyframes ethereal-float-1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(30px, -20px) scale(1.05);
+    opacity: 0.65;
+  }
+}
+
+@keyframes ethereal-float-2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(-25px, 30px) scale(0.95);
+    opacity: 0.45;
+  }
+}
+
+@keyframes ethereal-float-3 {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(20px, 25px);
+    opacity: 0.6;
+  }
+}
+
+@keyframes ethereal-float-4 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translate(-35px, -15px) scale(1.08);
+    opacity: 0.55;
+  }
+}
+
+@keyframes ethereal-float-5 {
+  0%, 100% {
+    transform: translate(0, 0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(15px, -30px);
+    opacity: 0.6;
+  }
+}
+
+@keyframes ethereal-float-6 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.92);
+    opacity: 0.55;
+  }
+}
+
+@keyframes ethereal-shimmer {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes ethereal-pulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .ethereal-orb,
+  .ethereal-animated {
+    animation: none !important;
+  }
+}

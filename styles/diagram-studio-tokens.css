@@ -1,0 +1,775 @@
+/* Ontographia Diagram Studio - Design Tokens */
+/* Modern 2026-style UI with spatial/contextual design */
+
+:root {
+  /* ============ SURFACES ============ */
+  /* Frosted glass effect panels */
+  --ds-surface-panel: rgba(255, 255, 255, 0.92);
+  --ds-surface-overlay: rgba(255, 255, 255, 0.96);
+  --ds-surface-floating: rgba(255, 255, 255, 0.98);
+  --ds-blur: 16px;
+  --ds-blur-strong: 24px;
+
+  /* ============ SHADOWS ============ */
+  /* Ambient soft shadows for floating elements */
+  --ds-shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --ds-shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.06), 0 12px 32px rgba(0, 0, 0, 0.08);
+  --ds-shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.08), 0 24px 48px rgba(0, 0, 0, 0.12);
+  --ds-shadow-floating: 0 16px 48px rgba(0, 0, 0, 0.12), 0 32px 64px rgba(0, 0, 0, 0.08);
+
+  /* ============ ANIMATIONS ============ */
+  /* Spring animations for natural feel */
+  --ds-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ds-spring-slow: 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ds-ease-out: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  --ds-ease-in-out: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ============ ACCENT GRADIENTS ============ */
+  /* Ethereal Sky - Deep Cyan to Steel Blue gradient */
+  --ds-accent-gradient: linear-gradient(135deg, #4FB3CE 0%, #6A9FC9 100%);
+  --ds-accent-gradient-hover: linear-gradient(135deg, #3da0bb 0%, #5a8fb9 100%);
+  --ds-accent-glow: 0 4px 20px rgba(79, 179, 206, 0.35);
+
+  /* Status gradients */
+  --ds-success-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --ds-warning-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --ds-error-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+
+  /* ============ CANVAS ============ */
+  --ds-canvas-bg: #fafbfc;
+  --ds-canvas-grid: #e5e7eb;
+  --ds-canvas-grid-major: #d1d5db;
+  --ds-canvas-origin: #4FB3CE;
+
+  /* ============ PANEL DIMENSIONS ============ */
+  --ds-panel-left-width: 280px;
+  --ds-panel-left-collapsed: 48px;
+  --ds-panel-right-width: 320px;
+  --ds-panel-bottom-height: 180px;
+  --ds-topbar-height: 52px;
+
+  /* ============ BORDER RADIUS ============ */
+  --ds-radius-xs: 4px;
+  --ds-radius-sm: 8px;
+  --ds-radius-md: 12px;
+  --ds-radius-lg: 16px;
+  --ds-radius-xl: 24px;
+  --ds-radius-full: 9999px;
+
+  /* ============ SPACING ============ */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+  --ds-space-10: 40px;
+
+  /* ============ TYPOGRAPHY ============ */
+  --ds-font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  --ds-font-weight-medium: 500;
+  --ds-font-weight-semibold: 600;
+  --ds-font-weight-bold: 700;
+
+  /* ============ Z-INDEX LAYERS ============ */
+  --ds-z-canvas: 1;
+  --ds-z-elements: 10;
+  --ds-z-selected: 20;
+  --ds-z-dragging: 30;
+  --ds-z-panels: 100;
+  --ds-z-toolbar: 200;
+  --ds-z-flyout: 250;
+  --ds-z-overlay: 300;
+  --ds-z-modal: 400;
+  --ds-z-tooltip: 500;
+  --ds-z-command-palette: 600;
+
+  /* ============ MIRO-STYLE COMPONENTS ============ */
+  /* Floating icon bar */
+  --ds-icon-bar-width: 52px;
+  --ds-icon-btn-size: 40px;
+  --ds-icon-size: 24px;
+
+  /* Flyout panel */
+  --ds-flyout-width: 280px;
+  --ds-stencil-item-size: 72px;
+
+  /* Miro-style shadows (lighter, cleaner) */
+  --ds-shadow-toolbar: 0 2px 12px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --ds-shadow-flyout: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --ds-shadow-dropdown: 0 8px 32px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.04);
+
+  /* Hover/active states */
+  --ds-hover-bg: rgba(0, 0, 0, 0.04);
+  --ds-active-bg: rgba(79, 179, 206, 0.1);
+  --ds-active-color: #4FB3CE;
+
+  /* ============ COLLABORATION ============ */
+  --ds-cursor-colors: #ef4444, #f59e0b, #10b981, #3b82f6, #0e74a3, #ec4899;
+  --ds-presence-ring: 2px;
+
+  /* ============ FOCUS RINGS (WCAG 2.1 Accessibility) ============ */
+  --ds-focus-ring-color: #4FB3CE;
+  --ds-focus-ring-offset: 2px;
+  --ds-focus-ring-width: 2px;
+  --ds-focus-ring-shadow: 0 0 0 var(--ds-focus-ring-offset) var(--bg),
+                          0 0 0 calc(var(--ds-focus-ring-offset) + var(--ds-focus-ring-width)) var(--ds-focus-ring-color);
+  --ds-focus-ring-inset: inset 0 0 0 var(--ds-focus-ring-width) var(--ds-focus-ring-color);
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] {
+  --ds-surface-panel: rgba(22, 22, 42, 0.92);
+  --ds-surface-overlay: rgba(22, 22, 42, 0.96);
+  --ds-surface-floating: rgba(26, 26, 50, 0.98);
+
+  --ds-shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --ds-shadow-medium: 0 4px 12px rgba(0, 0, 0, 0.25), 0 12px 32px rgba(0, 0, 0, 0.35);
+  --ds-shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.35), 0 24px 48px rgba(0, 0, 0, 0.4);
+  --ds-shadow-floating: 0 16px 48px rgba(0, 0, 0, 0.4), 0 32px 64px rgba(0, 0, 0, 0.3);
+
+  --ds-accent-glow: 0 4px 20px rgba(129, 140, 248, 0.4);
+
+  --ds-canvas-bg: #0d0d18;
+  --ds-canvas-grid: #1e1e35;
+  --ds-canvas-grid-major: #2a2a45;
+  --ds-canvas-origin: #22d3ee;
+
+  /* Focus rings in dark mode - higher contrast */
+  --ds-focus-ring-color: #38bdf8;
+}
+
+/* ============ DIAGRAM STUDIO COMPONENTS ============ */
+
+/* Floating panel base */
+.ds-floating-panel {
+  background: var(--ds-surface-panel);
+  backdrop-filter: blur(var(--ds-blur));
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="light"] .ds-floating-panel {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Command palette */
+.ds-command-palette {
+  position: fixed;
+  top: 15vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 560px;
+  max-width: 90vw;
+  background: var(--ds-surface-floating);
+  backdrop-filter: blur(var(--ds-blur-strong));
+  border-radius: var(--ds-radius-xl);
+  box-shadow: var(--ds-shadow-floating);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: var(--ds-z-command-palette);
+  overflow: hidden;
+}
+
+.ds-command-palette-input {
+  width: 100%;
+  padding: var(--ds-space-5);
+  font-size: 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.ds-command-palette-input:focus {
+  outline: none;
+}
+
+.ds-command-palette-results {
+  max-height: 400px;
+  overflow-y: auto;
+  padding: var(--ds-space-2);
+}
+
+.ds-command-palette-item {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  border-radius: var(--ds-radius-sm);
+  cursor: pointer;
+  transition: background var(--ds-ease-in-out);
+}
+
+.ds-command-palette-item:hover,
+.ds-command-palette-item.active {
+  background: var(--accent-soft);
+}
+
+.ds-command-palette-item-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ds-radius-sm);
+  background: var(--bg);
+  font-size: 16px;
+}
+
+.ds-command-palette-item-text {
+  flex: 1;
+}
+
+.ds-command-palette-item-name {
+  font-weight: var(--ds-font-weight-medium);
+  color: var(--text);
+}
+
+.ds-command-palette-item-description {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ds-command-palette-shortcut {
+  display: flex;
+  gap: 4px;
+}
+
+.ds-command-palette-key {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-family: var(--ds-font-mono);
+  background: var(--bg);
+  border-radius: 4px;
+  color: var(--text-muted);
+}
+
+/* Contextual toolbar */
+.ds-contextual-toolbar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-1);
+  padding: var(--ds-space-1);
+  background: var(--ds-surface-floating);
+  backdrop-filter: blur(var(--ds-blur));
+  border-radius: var(--ds-radius-md);
+  box-shadow: var(--ds-shadow-medium);
+  z-index: var(--ds-z-toolbar);
+  animation: fadeInScale 0.15s var(--ds-spring);
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.ds-contextual-toolbar-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--ds-ease-in-out);
+}
+
+.ds-contextual-toolbar-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ds-contextual-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 var(--ds-space-1);
+}
+
+/* Collapsible panel toggle */
+.ds-panel-toggle {
+  position: absolute;
+  width: 24px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ds-surface-panel);
+  border: 1px solid var(--border);
+  border-radius: 0 var(--ds-radius-sm) var(--ds-radius-sm) 0;
+  cursor: pointer;
+  transition: all var(--ds-ease-in-out);
+  z-index: var(--ds-z-panels);
+}
+
+.ds-panel-toggle:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ds-panel-toggle.left {
+  right: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ds-panel-toggle.right {
+  left: -24px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: var(--ds-radius-sm) 0 0 var(--ds-radius-sm);
+}
+
+/* Focus mode overlay */
+.ds-focus-mode .ds-palette,
+.ds-focus-mode .ds-right-panel {
+  opacity: 0.1;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.ds-focus-mode .ds-palette:hover,
+.ds-focus-mode .ds-right-panel:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Minimap */
+.ds-minimap {
+  position: absolute;
+  right: var(--ds-space-4);
+  bottom: var(--ds-space-4);
+  width: 180px;
+  height: 120px;
+  background: var(--ds-surface-panel);
+  backdrop-filter: blur(var(--ds-blur));
+  border-radius: var(--ds-radius-md);
+  box-shadow: var(--ds-shadow-soft);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  z-index: var(--ds-z-panels);
+}
+
+.ds-minimap-viewport {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+  background: var(--accent-soft);
+  cursor: move;
+}
+
+/* Zoom controls */
+.ds-zoom-controls {
+  position: absolute;
+  right: var(--ds-space-4);
+  bottom: 140px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-1);
+  background: var(--ds-surface-panel);
+  backdrop-filter: blur(var(--ds-blur));
+  border-radius: var(--ds-radius-md);
+  box-shadow: var(--ds-shadow-soft);
+  padding: var(--ds-space-1);
+  z-index: var(--ds-z-panels);
+}
+
+.ds-zoom-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--ds-ease-in-out);
+}
+
+.ds-zoom-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.ds-zoom-level {
+  font-size: 11px;
+  text-align: center;
+  padding: var(--ds-space-1);
+  color: var(--text-muted);
+  font-family: var(--ds-font-mono);
+}
+
+/* Collaboration cursors */
+.ds-remote-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: var(--ds-z-overlay);
+  transform: translate(-2px, -2px);
+}
+
+.ds-remote-cursor-pointer {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid currentColor;
+  transform: rotate(-45deg);
+}
+
+.ds-remote-cursor-label {
+  position: absolute;
+  left: 14px;
+  top: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: white;
+  background: currentColor;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* Comments */
+.ds-comment-marker {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  background: var(--ds-accent-gradient);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: var(--ds-shadow-soft);
+  cursor: pointer;
+  z-index: var(--ds-z-overlay);
+  transition: transform var(--ds-spring);
+}
+
+.ds-comment-marker:hover {
+  transform: rotate(-45deg) scale(1.1);
+}
+
+.ds-comment-marker-count {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+}
+
+.ds-comment-thread {
+  position: absolute;
+  width: 320px;
+  background: var(--ds-surface-floating);
+  backdrop-filter: blur(var(--ds-blur));
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-floating);
+  z-index: var(--ds-z-overlay);
+  overflow: hidden;
+}
+
+/* User avatar stack */
+.ds-avatar-stack {
+  display: flex;
+}
+
+.ds-avatar-stack .ds-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--panel);
+  margin-left: -8px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+}
+
+.ds-avatar-stack .ds-avatar:first-child {
+  margin-left: 0;
+}
+
+/* Status indicator */
+.ds-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 2px var(--panel);
+}
+
+.ds-status-dot.away {
+  background: var(--warning);
+}
+
+.ds-status-dot.offline {
+  background: var(--text-light);
+}
+
+/* Quick add menu (radial) */
+.ds-quick-add {
+  position: fixed;
+  width: 240px;
+  height: 240px;
+  background: transparent;
+  z-index: var(--ds-z-overlay);
+  pointer-events: none;
+}
+
+.ds-quick-add-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 48px;
+  height: 48px;
+  background: var(--ds-accent-gradient);
+  border-radius: 50%;
+  box-shadow: var(--ds-accent-glow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.ds-quick-add-item {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  background: var(--ds-surface-floating);
+  border-radius: 50%;
+  box-shadow: var(--ds-shadow-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform var(--ds-spring), box-shadow var(--ds-ease-in-out);
+}
+
+.ds-quick-add-item:hover {
+  transform: scale(1.1);
+  box-shadow: var(--ds-shadow-elevated);
+}
+
+/* Panel transition animations */
+.ds-panel-enter {
+  opacity: 0;
+  transform: translateX(-20px);
+}
+
+.ds-panel-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: all var(--ds-spring);
+}
+
+.ds-panel-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.ds-panel-exit-active {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: all var(--ds-ease-out);
+}
+
+/* Properties panel slide-in animation */
+.ds-panel-slide-in {
+  animation: slideInFromRight 0.2s ease-out;
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Floating UI layout - full width workspace */
+.ds-floating-layout {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+
+.ds-floating-layout .ds-workspace {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.ds-floating-layout .ds-main {
+  margin-left: 0;
+  width: 100%;
+}
+
+/* ============ FOCUS RING STYLES (WCAG 2.1 Accessibility) ============ */
+
+/* Base focus-visible styles for all interactive elements */
+.ds-focusable:focus-visible,
+.ds-contextual-toolbar-btn:focus-visible,
+.ds-zoom-btn:focus-visible,
+.ds-panel-toggle:focus-visible,
+.ds-command-palette-item:focus-visible,
+.ds-quick-add-item:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring-shadow);
+}
+
+/* Focus ring utility class */
+.ds-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring-shadow);
+}
+
+/* Focus ring with inset style (for filled elements) */
+.ds-focus-ring-inset:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring-inset);
+}
+
+/* Focus ring for circular elements */
+.ds-focus-ring-round:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--ds-focus-ring-offset) var(--bg),
+              0 0 0 calc(var(--ds-focus-ring-offset) + var(--ds-focus-ring-width)) var(--ds-focus-ring-color);
+  border-radius: 50%;
+}
+
+/* Skip navigation link for keyboard users */
+.ds-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: var(--ds-space-2);
+  z-index: calc(var(--ds-z-modal) + 10);
+  padding: var(--ds-space-3) var(--ds-space-4);
+  background: var(--ds-surface-floating);
+  color: var(--accent);
+  border-radius: var(--ds-radius-sm);
+  box-shadow: var(--ds-shadow-elevated);
+  font-weight: var(--ds-font-weight-semibold);
+  text-decoration: none;
+}
+
+.ds-skip-link:focus {
+  left: var(--ds-space-4);
+}
+
+/* Focus styles for canvas elements (SVG) */
+.ds-canvas-element:focus-visible {
+  outline: var(--ds-focus-ring-width) solid var(--ds-focus-ring-color);
+  outline-offset: var(--ds-focus-ring-offset);
+}
+
+/* Focus styles for stencil items in flyout */
+.ds-stencil-item:focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring-inset);
+  border-radius: var(--ds-radius-sm);
+}
+
+/* Focus styles for dropdown items */
+.ds-dropdown-item:focus-visible,
+.ds-menu-item:focus-visible {
+  outline: none;
+  background: var(--ds-active-bg);
+  box-shadow: var(--ds-focus-ring-inset);
+}
+
+/* Focus styles for input fields */
+.ds-input:focus-visible,
+.ds-textarea:focus-visible,
+.ds-select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--ds-focus-ring-color);
+  box-shadow: 0 0 0 1px var(--ds-focus-ring-color);
+}
+
+/* Focus styles for color pickers */
+.ds-color-swatch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 var(--ds-focus-ring-offset) var(--bg),
+              0 0 0 calc(var(--ds-focus-ring-offset) + var(--ds-focus-ring-width)) var(--ds-focus-ring-color);
+  transform: scale(1.1);
+}
+
+/* Focus indicator for diagram nodes (keyboard selection) */
+.ds-node-focus-indicator {
+  stroke: var(--ds-focus-ring-color);
+  stroke-width: 3;
+  stroke-dasharray: 4 2;
+  fill: none;
+  pointer-events: none;
+  animation: focusPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes focusPulse {
+  0%, 100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.5;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --ds-focus-ring-width: 3px;
+    --ds-focus-ring-color: #000000;
+  }
+
+  [data-theme="dark"] {
+    --ds-focus-ring-color: #ffffff;
+  }
+}
+
+/* Reduced motion - disable focus pulse animation */
+@media (prefers-reduced-motion: reduce) {
+  .ds-node-focus-indicator {
+    animation: none;
+    stroke-opacity: 1;
+  }
+}
+
+/* Focus visible polyfill fallback for older browsers */
+.js-focus-visible :focus:not(.focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+.js-focus-visible .focus-visible {
+  outline: none;
+  box-shadow: var(--ds-focus-ring-shadow);
+}
