@@ -496,13 +496,23 @@ export default function Connection({
     };
   }, [target, packRegistry]);
 
-  // Build obstacles list from all OTHER elements (excluding source and target)
+  // Build obstacles list from all OTHER elements (excluding source, target, and frames)
   // Per CLAUDE.md: Nodes are hard obstacles, connectors MUST route around them
+  // Frames are background grouping elements - connections should route through them freely
   const obstacles = useMemo(() => {
     if (!source || !target) return [];
 
     return elements
-      .filter(el => el && el.id !== source.id && el.id !== target.id)
+      .filter(el => {
+        if (!el || el.id === source.id || el.id === target.id) return false;
+        // Exclude frames - they are background containers, not obstacles
+        if (el.type === 'frame') return false;
+        // Also check stencil definition for isFrame flag
+        const pack = packRegistry?.get?.(el.packId);
+        const stencil = pack?.stencils?.find(s => s.id === el.type);
+        if (stencil?.isFrame) return false;
+        return true;
+      })
       .map(el => {
         if (typeof el.x !== 'number' || typeof el.y !== 'number') {
           return null;

@@ -747,6 +747,25 @@
   /* Frame selection - no z-index change to preserve layering */
 }
 
+/* Frames use default cursor - they are background containers, not draggable nodes */
+.ds-node[data-type="frame"] {
+  cursor: default;
+}
+
+.ds-node[data-type="frame"].selected {
+  cursor: move;
+}
+
+/* In connect mode, frames should not intercept connection targets - allow pointer events to pass through */
+.ds-node[data-type="frame"].connect-mode {
+  pointer-events: none;
+}
+
+/* But the border should still be clickable for selection */
+.ds-node[data-type="frame"].connect-mode .ds-node-content {
+  pointer-events: none;
+}
+
 .ds-node[data-type="frame"].dragging {
   z-index: 50 !important;
   will-change: transform; /* Only use will-change during drag */
@@ -817,9 +836,9 @@
   font-weight: 500;
   color: var(--text);
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
   max-width: 100%;
 }
 
@@ -832,6 +851,17 @@
   border: none;
   outline: none;
   width: 100%;
+}
+
+/* Remove focus styling from node label inputs */
+.ds-node-label-input,
+.ds-node-label-input:focus,
+.ds-node-label-input:focus-visible,
+.ds-node-label input:focus,
+.ds-node-label input:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Node Ports */

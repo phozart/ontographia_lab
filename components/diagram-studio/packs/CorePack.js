@@ -336,7 +336,7 @@ const CorePack = {
   templates: [],
   nodeProperties: [],
   renderNode,
-  defaultLineStyle: 'straight',
+  defaultLineStyle: 'step', // Elbow rounded (orthogonal) lines for core shapes
 };
 
 export default CorePack;

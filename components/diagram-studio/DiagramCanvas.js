@@ -307,6 +307,7 @@ function Node({
   onConnectStart,
   onConnectEnd,
   onLabelChange,
+  onAutoResize,
   onQuickCreate,
   packRegistry,
   readOnly,
@@ -327,7 +328,63 @@ function Node({
   const [hoveredHandle, setHoveredHandle] = useState(null); // Track which connection handle is hovered
   const [localLabel, setLocalLabel] = useState(element.label || element.name || '');
   const inputRef = useRef(null);
+  const contentRef = useRef(null); // Ref to measure content for auto-resize
   const hoverTimeoutRef = useRef(null); // For debouncing handle hover
+  const localLabelRef = useRef(localLabel); // Track current label for save on unmount
+
+  // Keep ref in sync with localLabel
+  useEffect(() => {
+    localLabelRef.current = localLabel;
+  }, [localLabel]);
+
+  // Save label when editing ends (handles case where input is removed before blur fires)
+  const wasEditingRef = useRef(isEditingLabel);
+  useEffect(() => {
+    // If editing just stopped, save the label and trigger auto-resize
+    if (wasEditingRef.current && !isEditingLabel) {
+      const currentLabel = localLabelRef.current;
+      const labelChanged = currentLabel !== (element.label || element.name || '');
+
+      // Save label if changed
+      if (labelChanged) {
+        onLabelChange?.(element.id, currentLabel);
+      }
+
+      // ALWAYS check for auto-resize when editing ends (even if label didn't change)
+      // This ensures existing overflow is fixed
+      if (onAutoResize && !stencil?.isFrame && !stencil?.isContainer) {
+        const textToMeasure = currentLabel || element.label || element.name || 'Untitled';
+        const measureDiv = document.createElement('div');
+        measureDiv.style.cssText = `
+          position: absolute;
+          visibility: hidden;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          font-size: ${element.fontSize || 13}px;
+          font-weight: ${element.fontWeight || 'normal'};
+          font-family: ${element.fontFamily || 'system-ui, -apple-system, sans-serif'};
+          padding: 8px;
+          width: ${(element.size?.width || 120) - 16}px;
+          line-height: 1.4;
+        `;
+        measureDiv.textContent = textToMeasure;
+        document.body.appendChild(measureDiv);
+        const measuredHeight = measureDiv.scrollHeight;
+        document.body.removeChild(measureDiv);
+        const minHeight = stencil?.defaultSize?.height || 60;
+        const requiredHeight = Math.max(minHeight, measuredHeight + 16);
+        const currentHeight = element.size?.height || 60;
+        if (requiredHeight > currentHeight) {
+          onAutoResize(element.id, {
+            width: element.size?.width || 120,
+            height: Math.ceil(requiredHeight / 10) * 10,
+          });
+        }
+      }
+    }
+    wasEditingRef.current = isEditingLabel;
+  }, [isEditingLabel, element.id, element.label, element.name, element.fontSize, element.fontWeight, element.fontFamily, element.size, stencil, onLabelChange, onAutoResize]);
 
   // Check if this element type supports connections (frames don't)
   const supportsConnections = !stencil?.noConnections && element.type !== 'frame';
@@ -536,11 +593,58 @@ function Node({
     }
   };
 
+  // Auto-resize element to fit text content
+  const checkAndAutoResize = useCallback((labelText) => {
+    if (!onAutoResize) return;
+
+    // Skip auto-resize for frames and containers
+    if (stencil?.isFrame || stencil?.isContainer) return;
+
+    const textToMeasure = labelText || localLabel || 'Untitled';
+
+    // Create a temporary element to measure text
+    const measureDiv = document.createElement('div');
+    measureDiv.style.cssText = `
+      position: absolute;
+      visibility: hidden;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      font-size: ${element.fontSize || 13}px;
+      font-weight: ${element.fontWeight || 'normal'};
+      font-family: ${element.fontFamily || 'system-ui, -apple-system, sans-serif'};
+      padding: 8px;
+      width: ${size.width - 16}px;
+      max-width: ${size.width - 16}px;
+      line-height: 1.4;
+    `;
+    measureDiv.textContent = textToMeasure;
+    document.body.appendChild(measureDiv);
+
+    const measuredHeight = measureDiv.scrollHeight;
+    document.body.removeChild(measureDiv);
+
+    // Add padding for the content area
+    const minHeight = stencil?.defaultSize?.height || 60;
+    const requiredHeight = Math.max(minHeight, measuredHeight + 16); // 16px padding total
+
+    // Only resize if we need more height (grow, don't shrink below min)
+    if (requiredHeight > size.height) {
+      onAutoResize(element.id, {
+        width: size.width,
+        height: Math.ceil(requiredHeight / 10) * 10, // Round up to nearest 10
+      });
+    }
+  }, [element.id, element.fontSize, element.fontWeight, element.fontFamily, localLabel, size, stencil, onAutoResize]);
+
   const handleLabelKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onLabelChange?.(element.id, localLabel);
+      const currentLabel = localLabel;
+      onLabelChange?.(element.id, currentLabel);
       onEditingLabelDone?.(element.id, false);
+      // Check for auto-resize after label change
+      checkAndAutoResize(currentLabel);
     } else if (e.key === 'Escape') {
       setLocalLabel(element.label || element.name || '');
       onEditingLabelDone?.(element.id, false);
@@ -548,8 +652,11 @@ function Node({
   };
 
   const handleLabelBlur = () => {
-    onLabelChange?.(element.id, localLabel);
+    const currentLabel = localLabel;
+    onLabelChange?.(element.id, currentLabel);
     onEditingLabelDone?.(element.id, false);
+    // Check for auto-resize after label change
+    checkAndAutoResize(currentLabel);
   };
 
   // Helper to calculate relative luminance and determine if color is light or dark
@@ -612,9 +719,13 @@ function Node({
   const showAccentBar = element.showAccentBar || false;
   const bgOpacity = element.opacity ?? 1;
 
-  // Map vertical align to flexbox
+  // Map vertical align to flexbox justifyContent (main axis for column direction)
   const justifyMap = { 'top': 'flex-start', 'flex-start': 'flex-start', 'center': 'center', 'middle': 'center', 'bottom': 'flex-end', 'flex-end': 'flex-end' };
   const justifyContent = justifyMap[verticalAlign] || 'center';
+
+  // Map horizontal text align to flexbox alignItems (cross axis for column direction)
+  const alignMap = { 'left': 'flex-start', 'center': 'center', 'right': 'flex-end' };
+  const alignItems = alignMap[textAlign] || 'center';
 
   // Show edge handles on hover (for creating connections) - NOT tied to selection
   // In connect mode, the whole border is clickable so we don't need specific handles
@@ -653,7 +764,7 @@ function Node({
   ) : (
     <span
       className="ds-node-label"
-      style={{ fontSize, fontWeight, fontFamily: fontFamily || 'inherit', textAlign, color: textColor }}
+      style={{ fontSize, fontWeight, fontFamily: fontFamily || 'inherit', textAlign, color: textColor, width: '100%' }}
     >
       {element.label || element.name || 'Untitled'}
     </span>
@@ -710,6 +821,7 @@ function Node({
         />
       )}
       <div
+        ref={contentRef}
         className="ds-node-content"
         style={hasCustomRenderer ? {
           // Custom renderer handles its own styling - no background/border
@@ -728,6 +840,7 @@ function Node({
             ? `0 2px 8px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04)`
             : 'none',
           justifyContent: justifyContent,
+          alignItems: alignItems,
           paddingLeft: showAccentBar ? 16 : undefined,
         }}
       >
@@ -742,46 +855,87 @@ function Node({
         ))}
         {/* Editing overlay for custom rendered nodes */}
         {isEditingLabel && hasCustomRenderer && (
-          <div
-            className="ds-node-edit-overlay"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(255,255,255,0.95)',
-              borderRadius: 6,
-              padding: 8,
-              zIndex: 10,
-            }}
-          >
-            <input
-              ref={inputRef}
-              type="text"
-              className="ds-node-label-input"
-              value={localLabel}
-              onChange={(e) => setLocalLabel(e.target.value)}
-              onKeyDown={handleLabelKeyDown}
-              onBlur={handleLabelBlur}
-              onClick={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
+          element.type === 'frame' ? (
+            // Frame: edit title in its display position (top-left, above frame)
+            <div
+              className="ds-node-edit-overlay ds-frame-title-edit"
               style={{
-                fontSize: 14,
-                fontWeight: 500,
-                textAlign: 'center',
-                width: '90%',
-                border: '1px solid var(--border)',
-                background: 'white',
-                outline: '2px solid var(--accent)',
-                borderRadius: 4,
-                padding: '6px 8px',
+                position: 'absolute',
+                top: -28,
+                left: 0,
+                zIndex: 10,
               }}
-            />
-          </div>
+            >
+              <input
+                ref={inputRef}
+                type="text"
+                className="ds-node-label-input"
+                value={localLabel}
+                onChange={(e) => setLocalLabel(e.target.value)}
+                onKeyDown={handleLabelKeyDown}
+                onBlur={handleLabelBlur}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textAlign: 'left',
+                  width: 'auto',
+                  minWidth: 100,
+                  maxWidth: 300,
+                  border: 'none',
+                  background: 'white',
+                  outline: 'none',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                  color: element.color || '#64748b',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                }}
+              />
+            </div>
+          ) : (
+            // Other custom nodes: centered overlay
+            <div
+              className="ds-node-edit-overlay"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(255,255,255,0.95)',
+                borderRadius: 6,
+                padding: 8,
+                zIndex: 10,
+              }}
+            >
+              <input
+                ref={inputRef}
+                type="text"
+                className="ds-node-label-input"
+                value={localLabel}
+                onChange={(e) => setLocalLabel(e.target.value)}
+                onKeyDown={handleLabelKeyDown}
+                onBlur={handleLabelBlur}
+                onClick={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  fontSize: 14,
+                  fontWeight: 500,
+                  textAlign: 'center',
+                  width: '90%',
+                  border: 'none',
+                  background: 'transparent',
+                  outline: 'none',
+                  borderRadius: 4,
+                  padding: '6px 8px',
+                }}
+              />
+            </div>
+          )
         )}
       </div>
 
@@ -1978,6 +2132,49 @@ export default function DiagramCanvas({
             updateConnection(conn.id, updates);
           }
         });
+
+        // Mind map auto-reparenting: when a child node crosses its parent's horizontal center,
+        // flip the connection ports to maintain proper left/right branching
+        movedElementIds.forEach(movedId => {
+          const movedElement = elements.find(el => el.id === movedId);
+          if (!movedElement || !isMindMapElement(movedElement)) return;
+
+          // Find connection where this element is the target (has a parent)
+          const parentConnection = connections.find(c => c.targetId === movedId);
+          if (!parentConnection) return;
+
+          const parentElement = elements.find(el => el.id === parentConnection.sourceId);
+          if (!parentElement) return;
+
+          // Get element sizes
+          const parentPack = packRegistry?.get?.(parentElement.packId);
+          const parentStencil = parentPack?.stencils?.find(s => s.id === parentElement.type);
+          const parentSize = parentElement.size || parentStencil?.defaultSize || { width: 120, height: 60 };
+
+          const childPack = packRegistry?.get?.(movedElement.packId);
+          const childStencil = childPack?.stencils?.find(s => s.id === movedElement.type);
+          const childSize = movedElement.size || childStencil?.defaultSize || { width: 120, height: 60 };
+
+          // Calculate centers
+          const parentCenterX = parentElement.x + parentSize.width / 2;
+          const childCenterX = movedElement.x + childSize.width / 2;
+
+          // Determine which side the child is on relative to parent center
+          const childIsOnRight = childCenterX > parentCenterX;
+
+          // Determine the expected ports based on position
+          const expectedSourcePort = childIsOnRight ? 'right' : 'left';
+          const expectedTargetPort = childIsOnRight ? 'left' : 'right';
+
+          // If ports don't match the expected position, flip them
+          if (parentConnection.sourcePort !== expectedSourcePort ||
+              parentConnection.targetPort !== expectedTargetPort) {
+            updateConnection(parentConnection.id, {
+              sourcePort: expectedSourcePort,
+              targetPort: expectedTargetPort,
+            });
+          }
+        });
       }
 
       // Reset refs
@@ -2854,6 +3051,8 @@ export default function DiagramCanvas({
           addElement(newElement);
           recordHistory();
           selectElement(newElement.id);
+          // Return to select mode after creating element
+          setActiveTool('select');
         }
         // Handle regular stencil creation
         else if (selectedStencil) {
@@ -2877,6 +3076,9 @@ export default function DiagramCanvas({
           addElement(newElement);
           recordHistory();
           selectElement(newElement.id);
+          // Return to select mode after creating element
+          setActiveTool('select');
+          setSelectedStencil(null);
         }
       }
       // If didn't drag enough, just cancel the drawing (no element created)
@@ -3124,6 +3326,8 @@ export default function DiagramCanvas({
             }
 
             // Ports auto-update based on element positions (no manual lock)
+            // Mind map connections should never have arrows
+            const isMindMapConnection = isMindMapElement(sourceElement) || isMindMapElement(nearbyEndNode);
             addConnection({
               sourceId,
               targetId,
@@ -3134,6 +3338,7 @@ export default function DiagramCanvas({
               sourcePos: sourceElement ? null : { x: connectSource.x, y: connectSource.y },
               targetPos: nearbyEndNode ? null : { x: endX, y: endY },
               lineStyle: effectiveLineStyle,
+              ...(isMindMapConnection && { sourceMarker: 'none', targetMarker: 'none' }),
             });
             // Return to Select mode after creating a connection
             setActiveTool('select');
@@ -3180,7 +3385,7 @@ export default function DiagramCanvas({
     setRotationIndicator(null);
     setIsRotating?.(false); // Notify context to show toolbar again
     setIsDragging?.(false); // Notify context that dragging ended
-  }, [draggingElement, draggingWaypoint, draggingSegment, draggingEndpoint, draggingCurve, resizing, rotating, marquee, drawing, selectedStencil, stickyNoteColor, elements, packRegistry, selectElements, selectElement, addElement, recordHistory, isConnecting, connectSource, viewport, addConnection, updateConnection, updateElement, lastLineStyle, setIsDragging, setIsRotating]);
+  }, [draggingElement, draggingWaypoint, draggingSegment, draggingEndpoint, draggingCurve, resizing, rotating, marquee, drawing, selectedStencil, stickyNoteColor, elements, packRegistry, selectElements, selectElement, addElement, recordHistory, isConnecting, connectSource, viewport, addConnection, updateConnection, updateElement, lastLineStyle, setIsDragging, setIsRotating, setActiveTool, setSelectedStencil]);
 
   // ============ PAN HANDLING ============
 
@@ -3297,12 +3502,15 @@ export default function DiagramCanvas({
 
     // Check if clicking on canvas background or space key is pressed
     // Simplified condition using proper parentheses for operator precedence
+    // Frames are treated as background - you can click through them to create stencils
+    const clickedNode = e.target.closest('.ds-node');
+    const isClickOnFrame = clickedNode?.dataset?.type === 'frame';
     const isOnCanvasBackground =
       e.target === canvasRef.current ||
       e.target.classList.contains('ds-grid') ||
       isSpacePressed ||
       (e.target.closest('.ds-canvas-inner') === e.target.closest('.ds-canvas')?.querySelector('.ds-canvas-inner') &&
-       !e.target.closest('.ds-node') &&
+       (!clickedNode || isClickOnFrame) &&
        !e.target.closest('.ds-connection-group'));
 
     if (isOnCanvasBackground) {
@@ -3369,6 +3577,8 @@ export default function DiagramCanvas({
             recordHistory();
             addElement(newElement);
             selectElement(newElement.id);
+            // Return to select mode after creating element
+            setActiveTool('select');
           } else {
             // Regular click: start draw-to-size mode
             setDrawing({ startX: x, startY: y, currentX: x, currentY: y, isSticky: true });
@@ -3530,6 +3740,9 @@ export default function DiagramCanvas({
             size: stencil.defaultSize || { width: 120, height: 60 },
             color: stencil.color,
           });
+          // Return to select mode after creating element
+          setActiveTool('select');
+          setSelectedStencil(null);
         }
       }
 
@@ -3554,6 +3767,8 @@ export default function DiagramCanvas({
             size: stencil.defaultSize || { width: 150, height: 150 },
             color: data.color || stencil.color,
           });
+          // Return to select mode after creating element
+          setActiveTool('select');
         }
       }
     } catch (err) {
@@ -3561,7 +3776,7 @@ export default function DiagramCanvas({
     }
 
     onDragEnd?.();
-  }, [viewport, packRegistry, activePack, addElement, onDragEnd]);
+  }, [viewport, packRegistry, activePack, addElement, onDragEnd, setActiveTool, setSelectedStencil]);
 
   // ============ CONNECTION HANDLING ============
 
@@ -3603,6 +3818,8 @@ export default function DiagramCanvas({
           ? findCommonParentFrame(sourceEl, targetEl, elements, packRegistry)
           : null;
 
+        // Mind map connections should never have arrows
+        const isMindMapConnection = isMindMapElement(sourceEl) || isMindMapElement(targetEl);
         addConnection({
           sourceId: connectSource.elementId,
           targetId: elementId,
@@ -3612,6 +3829,7 @@ export default function DiagramCanvas({
           targetRatio: 0.5,
           lineStyle: effectiveLineStyle,
           parentFrameId,
+          ...(isMindMapConnection && { sourceMarker: 'none', targetMarker: 'none' }),
         });
         // Return to Select mode after creating a connection
         setActiveTool('select');
@@ -4189,11 +4407,14 @@ export default function DiagramCanvas({
       return;
     }
 
-    e.stopPropagation();
-
-    // Get element size
+    // Don't start connections from frames or elements that don't support connections
     const pack = packRegistry?.get?.(element.packId);
     const stencil = pack?.stencils?.find(s => s.id === element.type);
+    if (element.type === 'frame' || stencil?.isFrame || stencil?.noConnections) {
+      return;
+    }
+
+    e.stopPropagation();
     const size = element.size || stencil?.defaultSize || { width: 120, height: 60 };
 
     // Calculate start position based on port and ratio
@@ -4256,6 +4477,16 @@ export default function DiagramCanvas({
 
     // Don't connect to self
     if (targetElement.id === connectSource.elementId) {
+      setIsConnecting(false);
+      setConnectSource(null);
+      setConnectMousePos(null);
+      return;
+    }
+
+    // Don't connect to frames or elements that don't support connections
+    const targetPack = packRegistry?.get?.(targetElement.packId);
+    const targetStencil = targetPack?.stencils?.find(s => s.id === targetElement.type);
+    if (targetElement.type === 'frame' || targetStencil?.isFrame || targetStencil?.noConnections) {
       setIsConnecting(false);
       setConnectSource(null);
       setConnectMousePos(null);
@@ -4328,6 +4559,9 @@ export default function DiagramCanvas({
     // Check if both elements are inside a frame (for clipping)
     const parentFrameId = findCommonParentFrame(sourceEl, targetElement, elements, packRegistry);
 
+    // Check if either element is a mind map stencil - mind map connections have no arrows
+    const isMindMapConnection = isMindMapElement(sourceEl) || isMindMapElement(targetElement);
+
     const connectionData = {
       sourceId: connectSource.elementId,
       targetId: targetElement.id,
@@ -4337,6 +4571,7 @@ export default function DiagramCanvas({
       targetRatio,
       lineStyle: defaultLineStyle,
       parentFrameId, // For clipping connection to frame bounds
+      ...(isMindMapConnection && { sourceMarker: 'none', targetMarker: 'none' }),
     };
     addConnection(connectionData);
 
@@ -4434,8 +4669,11 @@ export default function DiagramCanvas({
     // Start editing label on the new element
     if (result?.element) {
       setEditingLabelId(result.element.id);
+      // Ensure we're in select mode after quick-create
+      setActiveTool('select');
+      setSelectedStencil(null);
     }
-  }, [packRegistry, hookQuickCreate]);
+  }, [packRegistry, hookQuickCreate, setActiveTool, setSelectedStencil]);
 
   // ============ CONNECTION EDITING ============
 
@@ -5157,6 +5395,7 @@ export default function DiagramCanvas({
               onConnectStart={handleNodeConnectionStart}
               onConnectEnd={handleNodeConnectionEnd}
               onLabelChange={(id, label) => updateElement(id, { label })}
+              onAutoResize={(id, newSize) => updateElement(id, { size: newSize })}
               onQuickCreate={handleQuickCreate}
               packRegistry={packRegistry}
               readOnly={readOnly}
