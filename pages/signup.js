@@ -43,31 +43,16 @@ const PASSWORD_REQUIREMENTS = [
   { key: 'special', label: 'One special character (!@#$%...)', test: (p) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(p) },
 ];
 
-// Generate a simple math CAPTCHA
-function generateCaptcha() {
-  const operations = ['+', '-', '×'];
-  const op = operations[Math.floor(Math.random() * operations.length)];
-  let a, b, answer;
-
-  switch (op) {
-    case '+':
-      a = Math.floor(Math.random() * 20) + 1;
-      b = Math.floor(Math.random() * 20) + 1;
-      answer = a + b;
-      break;
-    case '-':
-      a = Math.floor(Math.random() * 20) + 10;
-      b = Math.floor(Math.random() * a);
-      answer = a - b;
-      break;
-    case '×':
-      a = Math.floor(Math.random() * 10) + 1;
-      b = Math.floor(Math.random() * 10) + 1;
-      answer = a * b;
-      break;
+// Fetch a server-issued CAPTCHA challenge ({ question, token })
+async function fetchCaptcha() {
+  try {
+    const res = await fetch('/api/auth/captcha', { cache: 'no-store' });
+    if (!res.ok) throw new Error('captcha unavailable');
+    const data = await res.json();
+    return { question: data.question, token: data.token };
+  } catch (e) {
+    return { question: 'Verification unavailable - refresh to retry', token: '' };
   }
-
-  return { question: `${a} ${op} ${b} = ?`, answer: answer.toString() };
 }
 
 export default function SignupPage() {
@@ -84,14 +69,14 @@ export default function SignupPage() {
     acceptedPrivacy: false,
     captchaAnswer: '',
   });
-  const [captcha, setCaptcha] = useState({ question: '', answer: '' });
+  const [captcha, setCaptcha] = useState({ question: '', token: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPasswordRequirements, setShowPasswordRequirements] = useState(false);
 
   // Generate CAPTCHA on mount
   useEffect(() => {
-    setCaptcha(generateCaptcha());
+    fetchCaptcha().then(setCaptcha);
   }, []);
 
   // Redirect if already logged in
@@ -127,7 +112,7 @@ export default function SignupPage() {
   };
 
   const refreshCaptcha = () => {
-    setCaptcha(generateCaptcha());
+    fetchCaptcha().then(setCaptcha);
     setFormData(prev => ({ ...prev, captchaAnswer: '' }));
   };
 
@@ -182,7 +167,7 @@ export default function SignupPage() {
           acceptedTerms: formData.acceptedTerms,
           acceptedPrivacy: formData.acceptedPrivacy,
           captchaAnswer: formData.captchaAnswer,
-          captchaExpected: captcha.answer,
+          captchaToken: captcha.token,
         }),
       });
 

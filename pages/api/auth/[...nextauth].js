@@ -9,6 +9,9 @@ import bcrypt from 'bcryptjs';
 import { query } from '../../../lib/db';
 import { authLimiter } from '../../../lib/rateLimit';
 
+const GENERIC_LOGIN_ERROR = 'Invalid email or password';
+const SUSPENDED_MESSAGE = 'Your account has been suspended. Please contact an administrator.';
+
 export const authOptions = {
   providers: [
     // Email/Password authentication
@@ -31,21 +34,21 @@ export const authOptions = {
             [credentials.email.toLowerCase()]
           );
 
-          if (result.rows.length === 0) {
-            throw new Error('No account found with this email');
-          }
-
           const user = result.rows[0];
 
-          // Check if user has a password (email/password account)
-          if (!user.password_hash) {
-            throw new Error('Please sign in with Google or GitHub');
+          // One generic message for unknown email, OAuth-only account, or bad password
+          if (!user || !user.password_hash) {
+            throw new Error(GENERIC_LOGIN_ERROR);
           }
 
-          // Verify password
           const isValid = await bcrypt.compare(credentials.password, user.password_hash);
           if (!isValid) {
-            throw new Error('Invalid password');
+            throw new Error(GENERIC_LOGIN_ERROR);
+          }
+
+          // Only revealed after the password has been verified
+          if (user.status === 'suspended') {
+            throw new Error(SUSPENDED_MESSAGE);
           }
 
           // Update last login
@@ -92,6 +95,9 @@ export const authOptions = {
         );
 
         if (existing.rows.length > 0) {
+          if (existing.rows[0].status === 'suspended') {
+            return '/login?error=suspended';
+          }
           // Update last login and profile info from OAuth
           await query(
             'UPDATE users SET last_login = NOW(), name = $1, image = $2 WHERE email = $3',

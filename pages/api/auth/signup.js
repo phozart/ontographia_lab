@@ -2,6 +2,7 @@
 // API endpoint for email/password user registration
 
 import bcrypt from 'bcryptjs';
+import { verifyCaptcha } from '../../../lib/captcha';
 import { query } from '../../../lib/db';
 import { authLimiter } from '../../../lib/rateLimit';
 
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, password, name, acceptedTerms, acceptedPrivacy, website, captchaAnswer, captchaExpected } = req.body;
+    const { email, password, name, acceptedTerms, acceptedPrivacy, website, captchaAnswer, captchaToken } = req.body;
 
     // Honeypot check - if 'website' field is filled, it's likely a bot
     if (website) {
@@ -77,13 +78,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // CAPTCHA verification
-    if (!captchaAnswer || !captchaExpected) {
-      return res.status(400).json({ error: 'Please complete the verification challenge' });
-    }
-
-    if (captchaAnswer.toString().toLowerCase() !== captchaExpected.toString().toLowerCase()) {
-      return res.status(400).json({ error: 'Incorrect verification answer. Please try again.' });
+    // CAPTCHA verification (server-issued, signed challenge)
+    const captcha = verifyCaptcha(captchaToken, captchaAnswer);
+    if (!captcha.valid) {
+      return res.status(400).json({
+        error: captchaAnswer && captchaToken
+          ? 'Incorrect or expired verification. Please try again.'
+          : 'Please complete the verification challenge',
+      });
     }
 
     // Validate required fields

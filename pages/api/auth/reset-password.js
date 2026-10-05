@@ -3,6 +3,7 @@
 
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { verifyCaptcha } from '../../../lib/captcha';
 import { query } from '../../../lib/db';
 import { strictLimiter } from '../../../lib/rateLimit';
 
@@ -63,15 +64,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { token, password, captchaAnswer, captchaExpected } = req.body;
+    const { token, password, captchaAnswer, captchaToken } = req.body;
 
-    // CAPTCHA verification
-    if (!captchaAnswer || !captchaExpected) {
-      return res.status(400).json({ error: 'Please complete the verification challenge' });
-    }
-
-    if (captchaAnswer.toString().toLowerCase() !== captchaExpected.toString().toLowerCase()) {
-      return res.status(400).json({ error: 'Incorrect verification answer. Please try again.' });
+    // CAPTCHA verification (server-issued, signed challenge)
+    const captcha = verifyCaptcha(captchaToken, captchaAnswer);
+    if (!captcha.valid) {
+      return res.status(400).json({
+        error: captchaAnswer && captchaToken
+          ? 'Incorrect or expired verification. Please try again.'
+          : 'Please complete the verification challenge',
+      });
     }
 
     if (!token) {
