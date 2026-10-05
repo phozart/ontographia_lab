@@ -42,3 +42,7 @@ docs/
 IMPROVEMENT_SESSION.md
 CLAUDE.md
 mcp.json
+# Architecture docs are tracked (rest of docs/ stays local)
+!docs/
+docs/*
+!docs/architecture/

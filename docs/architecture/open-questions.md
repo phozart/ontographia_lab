@@ -1,5 +1,7 @@
 # Open questions — product-owner decisions
 
+> **Decision (2026-10-05):** the product owner delegated these decisions; all recommended defaults below are **accepted** as the working baseline for implementation. Any of them can be revisited later — change the row and the corresponding policy constant.
+
 Each item is genuinely a product/business decision. The design works with the **recommended default**; changing it is local (noted in "Impact").
 
 ## Priority — needed before the first C slice
