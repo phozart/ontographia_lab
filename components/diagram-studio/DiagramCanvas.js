@@ -38,7 +38,7 @@ import { buildStraightPath } from './connections/geometry/pathBuilders';
 // Extracted hooks (refactored 2025-12-29)
 import { useClipboard, useQuickCreate, useAlignmentGuides } from './hooks';
 import { useCanvasInteractions } from './hooks/composite/useCanvasInteractions';
-import { getZIndexForOrder } from './hooks/interaction/zOrder';
+import { getZIndexForOrder, compareByZOrder } from './hooks/interaction/zOrder';
 import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOptions';
 
 // Extracted utilities (refactored 2025-12-29)
@@ -1967,10 +1967,10 @@ export default function DiagramCanvas({
 
           if (isNearlyHorizontal || isNearlyVertical) {
             // Endpoints are nearly aligned - clear waypoints for snap-to-straight
-            updateConnection(connectionId, { waypoints: [], hasManualWaypoints: false });
+            updateConnection(connectionId, { waypoints: [], hasManualWaypoints: false }, { coalesceKey: `conn-drag:${connectionId}` });
           } else {
             // Mark as manually adjusted so we track user edits
-            updateConnection(connectionId, { waypoints, hasManualWaypoints: true });
+            updateConnection(connectionId, { waypoints, hasManualWaypoints: true }, { coalesceKey: `conn-drag:${connectionId}` });
           }
         }
         return;
@@ -2015,7 +2015,7 @@ export default function DiagramCanvas({
         const curveValue = Math.round(offsetX * perpX + offsetY * perpY);
         // Clamp curve value between -200 and 200
         const clampedCurve = Math.max(-200, Math.min(200, curveValue));
-        updateConnection(connectionId, { curve: clampedCurve });
+        updateConnection(connectionId, { curve: clampedCurve }, { coalesceKey: `conn-drag:${connectionId}` });
         return;
       }
 
@@ -2788,7 +2788,7 @@ export default function DiagramCanvas({
         const newWaypoints = [...(connection.waypoints || [])];
         newWaypoints[waypointIndex] = { x: snapToGrid(x), y: snapToGrid(y) };
         // Mark as manually adjusted so we track user edits
-        updateConnection(connectionId, { waypoints: newWaypoints, hasManualWaypoints: true });
+        updateConnection(connectionId, { waypoints: newWaypoints, hasManualWaypoints: true }, { coalesceKey: `conn-drag:${connectionId}` });
       }
       return;
     }
@@ -2875,10 +2875,10 @@ export default function DiagramCanvas({
 
         if (isNearlyHorizontal || isNearlyVertical) {
           // Endpoints are nearly aligned - clear waypoints for snap-to-straight
-          updateConnection(connectionId, { waypoints: [], hasManualWaypoints: false });
+          updateConnection(connectionId, { waypoints: [], hasManualWaypoints: false }, { coalesceKey: `conn-drag:${connectionId}` });
         } else {
           // Mark as manually adjusted so we track user edits
-          updateConnection(connectionId, { waypoints, hasManualWaypoints: true });
+          updateConnection(connectionId, { waypoints, hasManualWaypoints: true }, { coalesceKey: `conn-drag:${connectionId}` });
         }
       }
       return;
@@ -2900,7 +2900,7 @@ export default function DiagramCanvas({
       const curveValue = Math.round(offsetX * perpX + offsetY * perpY);
       // Clamp curve value between -200 and 200
       const clampedCurve = Math.max(-200, Math.min(200, curveValue));
-      updateConnection(connectionId, { curve: clampedCurve });
+      updateConnection(connectionId, { curve: clampedCurve }, { coalesceKey: `conn-drag:${connectionId}` });
       return;
     }
 
@@ -3185,12 +3185,7 @@ export default function DiagramCanvas({
       // updateElement already snapshotted the pre-drag state; this only matters if something moved
       shouldRecordHistory = movedAny;
     }
-    if (draggingWaypoint) {
-      shouldRecordHistory = true;
-    }
-    if (draggingSegment) {
-      shouldRecordHistory = true;
-    }
+    // Waypoint/segment drags: updateConnection already recorded one coalesced entry
     if (draggingEndpoint) {
       shouldRecordHistory = true;
       // Use the preview position from state, or calculate from mouse event
@@ -5397,7 +5392,7 @@ export default function DiagramCanvas({
           </svg>
 
           {/* Nodes Layer - sorted by zIndex for proper layering, filtered for collapsed */}
-          {[...visibleElements].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0)).map(element => (
+          {[...visibleElements].sort(compareByZOrder).map(element => (
             <Node
               key={element.id}
               element={element}

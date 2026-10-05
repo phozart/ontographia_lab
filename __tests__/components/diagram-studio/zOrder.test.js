@@ -1,4 +1,4 @@
-import { getZIndexForOrder } from '../../../components/diagram-studio/hooks/interaction/zOrder';
+import { getZIndexForOrder, compareByZOrder } from '../../../components/diagram-studio/hooks/interaction/zOrder';
 
 const els = [{ id: 'a', zIndex: 0 }, { id: 'b' }, { id: 'c', zIndex: 3 }];
 
@@ -50,5 +50,21 @@ describe('getZIndexForOrder with frames', () => {
   test('bring-to-front on a frame already just below its children is a no-op', () => {
     const f = { ...frame, zIndex: 4 };
     expect(getZIndexForOrder([f, child, outsideHigh], 'f', 'front')).toBeNull();
+  });
+});
+
+describe('compareByZOrder', () => {
+  const ids = (arr) => [...arr].sort(compareByZOrder).map(e => e.id);
+  test('orders by zIndex', () => {
+    expect(ids([{ id: 'a', zIndex: 2 }, { id: 'b', zIndex: 1 }])).toEqual(['b', 'a']);
+  });
+  test('frame paints behind a non-frame at equal z even when created later', () => {
+    expect(ids([{ id: 'child', type: 'task' }, { id: 'f', type: 'frame' }])).toEqual(['f', 'child']);
+  });
+  test('non-frame ties keep creation order', () => {
+    expect(ids([{ id: 'a' }, { id: 'b' }, { id: 'c' }])).toEqual(['a', 'b', 'c']);
+  });
+  test('higher-z frame still paints above lower-z element', () => {
+    expect(ids([{ id: 'f', type: 'frame', zIndex: 3 }, { id: 'x', zIndex: 1 }])).toEqual(['x', 'f']);
   });
 });

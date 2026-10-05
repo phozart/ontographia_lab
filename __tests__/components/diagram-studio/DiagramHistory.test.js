@@ -83,6 +83,22 @@ describe('undo history', () => {
     expect(result.current.elements[0].size.width).toBe(100);
   });
 
+  test('a connection waypoint/curve drag with a coalesce key is one undo entry', () => {
+    const { result } = renderHook(() => useDiagram(), { wrapper });
+    act(() => {
+      result.current.addElement(node('a'));
+      result.current.addElement(node('b', { x: 400 }));
+    });
+    act(() => { result.current.addConnection({ id: 'c1', sourceId: 'a', targetId: 'b' }); });
+    const base = countUndosFrom(result);
+    for (let i = 1; i <= 8; i++) {
+      act(() => {
+        result.current.updateConnection('c1', { waypoints: [{ x: i * 10, y: 5 }] }, { coalesceKey: 'conn-drag:c1' });
+      });
+    }
+    expect(countUndosFrom(result) - base).toBe(1);
+  });
+
   test('discardElement removes a fresh node and leaves no history trace', () => {
     const { result } = renderHook(() => useDiagram(), { wrapper });
     act(() => { result.current.addElement(node('root')); });

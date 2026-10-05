@@ -309,8 +309,8 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     return newConnection;
   }, [recordHistory]);
 
-  const updateConnection = useCallback((connectionId, updates) => {
-    recordHistory();
+  const updateConnection = useCallback((connectionId, updates, options) => {
+    recordHistory(options?.coalesceKey);
     // Track line style changes to remember for new connections
     if (updates.lineStyle) {
       setLastLineStyle(updates.lineStyle);

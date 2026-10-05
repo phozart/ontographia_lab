@@ -50,3 +50,13 @@ export function getZIndexForOrder(elements, elementId, direction, getSize) {
   }
   return next < current ? next : null;
 }
+
+/**
+ * Render-order comparator: ascending zIndex; at equal z, frames (background containers) first.
+ * Array.prototype.sort is stable, so other ties keep creation order.
+ */
+export function compareByZOrder(a, b) {
+  const dz = (a.zIndex || 0) - (b.zIndex || 0);
+  if (dz !== 0) return dz;
+  return (isFrame(b) ? 1 : 0) - (isFrame(a) ? 1 : 0);
+}
