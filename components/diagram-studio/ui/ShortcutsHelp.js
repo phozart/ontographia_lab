@@ -12,9 +12,9 @@ const SHORTCUT_CATEGORIES = [
     shortcuts: [
       { keys: ['V'], description: 'Select tool' },
       { keys: ['C'], description: 'Connect tool' },
-      { keys: ['Space'], description: 'Pan tool (hold)' },
+      { keys: ['H'], description: 'Pan tool' },
+      { keys: ['Space'], description: 'Pan (hold, then drag)' },
       { keys: ['K'], description: 'Comment mode' },
-      { keys: ['H'], description: 'Toggle comments visibility' },
     ],
   },
   {
@@ -46,8 +46,8 @@ const SHORTCUT_CATEGORIES = [
   {
     name: 'View',
     shortcuts: [
-      { keys: ['Ctrl', '+'], description: 'Zoom in' },
-      { keys: ['Ctrl', '-'], description: 'Zoom out' },
+      { keys: ['+'], description: 'Zoom in' },
+      { keys: ['-'], description: 'Zoom out' },
       { keys: ['0'], description: 'Fit all to screen' },
       { keys: ['Ctrl', '0'], description: 'Zoom to selection' },
       { keys: ['F'], description: 'Fit all to screen' },
