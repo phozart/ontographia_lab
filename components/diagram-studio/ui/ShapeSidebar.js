@@ -7,7 +7,7 @@ import { useDiagram } from '../DiagramContext';
 // Icons
 import SquareOutlinedIcon from '@mui/icons-material/SquareOutlined';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
-import ChangeHistoryIcon from '@mui/icons-material/ChangeHistory';
+import DiamondOutlinedIcon from '@mui/icons-material/DiamondOutlined';
 import CircleOutlinedIcon from '@mui/icons-material/CircleOutlined';
 import AccountTreeOutlinedIcon from '@mui/icons-material/AccountTreeOutlined';
 import HubOutlinedIcon from '@mui/icons-material/HubOutlined';
@@ -20,9 +20,12 @@ import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import CropFreeOutlinedIcon from '@mui/icons-material/CropFreeOutlined';
 import TextFieldsOutlinedIcon from '@mui/icons-material/TextFieldsOutlined';
 import HistoryIcon from '@mui/icons-material/History';
+import ViewQuiltOutlinedIcon from '@mui/icons-material/ViewQuiltOutlined';
+import SupportAgentOutlinedIcon from '@mui/icons-material/SupportAgentOutlined';
+import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
 
 // Map pack IDs to icons
-const PACK_ICONS = {
+export const PACK_ICONS = {
   'core': <SquareOutlinedIcon />,
   'process-flow': <AccountTreeOutlinedIcon />,
   'cld': <CircleOutlinedIcon />,
@@ -31,6 +34,9 @@ const PACK_ICONS = {
   'sticky-notes': <StickyNote2OutlinedIcon />,
   'erd': <StorageOutlinedIcon />,
   'togaf': <BusinessOutlinedIcon />,
+  'product-design': <ViewQuiltOutlinedIcon />,
+  'itil': <SupportAgentOutlinedIcon />,
+  'capability-map': <GridViewOutlinedIcon />,
 };
 
 // Simple shape icons for quick access - stencil data must match CorePack exactly
@@ -86,7 +92,7 @@ const QUICK_SHAPES = [
   },
   {
     id: 'diamond',
-    icon: <ChangeHistoryIcon style={{ transform: 'rotate(180deg)' }} />,
+    icon: <DiamondOutlinedIcon />,
     name: 'Diamond',
     stencilId: 'diamond',
     packId: 'core',
@@ -608,7 +614,7 @@ function StencilFlyout({ pack, onClose, onStencilSelect, onStencilDragStart, onS
                   }}
                   title={stencil.name}
                 >
-                  <div className="ds-stencil-icon">{stencil.icon}</div>
+                  <div className="ds-stencil-icon" style={stencil.tintIcon ? { color: stencil.color } : undefined}>{stencil.icon}</div>
                   <div className="ds-stencil-name">{stencil.name}</div>
                 </div>
               ))}
@@ -778,9 +784,9 @@ function StencilFlyout({ pack, onClose, onStencilSelect, onStencilDragStart, onS
           text-align: center;
           color: rgba(255, 255, 255, 0.5);
           max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+          line-height: 1.25;
+          white-space: normal;
+          overflow-wrap: anywhere;
           pointer-events: none;
         }
 
