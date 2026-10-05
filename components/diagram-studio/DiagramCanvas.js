@@ -1245,6 +1245,7 @@ export default function DiagramCanvas({
     addElement,
     updateElement,
     removeElement,
+    discardElement,
     addConnection,
     updateConnection,
     removeConnection,
@@ -1684,7 +1685,7 @@ export default function DiagramCanvas({
         newRotation = Math.round(newRotation * 10) / 10;
 
         // Update element rotation
-        updateElement(elementId, { rotation: newRotation });
+        updateElement(elementId, { rotation: newRotation }, { coalesceKey: `rotate:${elementId}` }); // one undo entry per rotate gesture
 
         // Update indicator
         setRotationIndicator({
@@ -2051,14 +2052,14 @@ export default function DiagramCanvas({
           x: newX,
           y: newY,
           size: { width: newWidth, height: newHeight },
-        });
+        }, { coalesceKey: `resize:${resizing.elementId}` }); // one undo entry per resize gesture
       }
     };
 
     const handleDocumentMouseUp = (e) => {
       // Handle rotation end
       if (rotating) {
-        recordHistory();
+        // updateElement already recorded one coalesced entry for the gesture
         setRotating(null);
         setRotationIndicator(null);
         setIsRotating?.(false); // Notify context to show toolbar again
@@ -2539,17 +2540,21 @@ export default function DiagramCanvas({
         // Multi-element drag
         Object.keys(positions).forEach(id => {
           const pos = positions[id];
-          updateElement(id, {
-            x: clampToCanvas(wasAlignedX ? (pos.x + offsetX) : snapToGrid(pos.x + offsetX)),
-            y: clampToCanvas(wasAlignedY ? (pos.y + offsetY) : snapToGrid(pos.y + offsetY)),
-          });
+          const nx = clampToCanvas(wasAlignedX ? (pos.x + offsetX) : snapToGrid(pos.x + offsetX));
+          const ny = clampToCanvas(wasAlignedY ? (pos.y + offsetY) : snapToGrid(pos.y + offsetY));
+          const cur = elements.find(e => e.id === id);
+          // A plain click (no movement) must not write or create an undo entry
+          if (cur && cur.x === nx && cur.y === ny) return;
+          updateElement(id, { x: nx, y: ny });
         });
       } else {
         // Single element drag
-        updateElement(element.id, {
-          x: clampToCanvas(wasAlignedX ? current.x : snapToGrid(current.x)),
-          y: clampToCanvas(wasAlignedY ? current.y : snapToGrid(current.y)),
-        });
+        const nx = clampToCanvas(wasAlignedX ? current.x : snapToGrid(current.x));
+        const ny = clampToCanvas(wasAlignedY ? current.y : snapToGrid(current.y));
+        // A plain click (no movement) must not write or create an undo entry
+        if (!(element.x === nx && element.y === ny)) {
+          updateElement(element.id, { x: nx, y: ny });
+        }
       }
 
       // Reset refs
@@ -2635,17 +2640,19 @@ export default function DiagramCanvas({
         // Multi-element drag
         Object.keys(positions).forEach(id => {
           const pos = positions[id];
-          updateElement(id, {
-            x: clampToCanvas(wasAlignedX ? (pos.x + offsetX) : snapToGrid(pos.x + offsetX)),
-            y: clampToCanvas(wasAlignedY ? (pos.y + offsetY) : snapToGrid(pos.y + offsetY)),
-          });
+          const nx = clampToCanvas(wasAlignedX ? (pos.x + offsetX) : snapToGrid(pos.x + offsetX));
+          const ny = clampToCanvas(wasAlignedY ? (pos.y + offsetY) : snapToGrid(pos.y + offsetY));
+          const cur = elements.find(e => e.id === id);
+          if (cur && cur.x === nx && cur.y === ny) return; // plain click: no write, no undo entry
+          updateElement(id, { x: nx, y: ny });
         });
       } else {
         // Single element drag
-        updateElement(element.id, {
-          x: clampToCanvas(wasAlignedX ? current.x : snapToGrid(current.x)),
-          y: clampToCanvas(wasAlignedY ? current.y : snapToGrid(current.y)),
-        });
+        const nx = clampToCanvas(wasAlignedX ? current.x : snapToGrid(current.x));
+        const ny = clampToCanvas(wasAlignedY ? current.y : snapToGrid(current.y));
+        if (!(element.x === nx && element.y === ny)) { // plain click: no write, no undo entry
+          updateElement(element.id, { x: nx, y: ny });
+        }
       }
 
       // Reset refs
@@ -2963,7 +2970,7 @@ export default function DiagramCanvas({
         x: Math.max(0, newX),
         y: Math.max(0, newY),
         size: { width: newWidth, height: newHeight },
-      });
+      }, { coalesceKey: `resize:${elementId}` }); // one undo entry per resize gesture
       return;
     }
 
@@ -2993,7 +3000,7 @@ export default function DiagramCanvas({
       newRotation = Math.round(newRotation * 10) / 10;
 
       // Update element rotation
-      updateElement(elementId, { rotation: newRotation });
+      updateElement(elementId, { rotation: newRotation }, { coalesceKey: `rotate:${elementId}` }); // one undo entry per rotate gesture
 
       // Update indicator
       setRotationIndicator({
@@ -3117,7 +3124,8 @@ export default function DiagramCanvas({
     let shouldRecordHistory = false;
 
     if (draggingElement) {
-      shouldRecordHistory = true;
+      // A plain click on a node must not create an undo entry; record only if it moved
+      let movedAny = false;
       // Clear snap guides when done dragging
       clearSnapGuides();
 
@@ -3155,20 +3163,27 @@ export default function DiagramCanvas({
                 restoreElementStyle(el, id);
               }
               const pos = positions[id];
-              updateElement(id, {
-                x: clampToCanvas(snapToGrid(pos.x + offsetX)),
-                y: clampToCanvas(snapToGrid(pos.y + offsetY)),
-              });
+              const nx = clampToCanvas(snapToGrid(pos.x + offsetX));
+              const ny = clampToCanvas(snapToGrid(pos.y + offsetY));
+              const cur = elements.find(e => e.id === id);
+              if (cur && cur.x === nx && cur.y === ny) return; // plain click: no write, no undo entry
+              movedAny = true;
+              updateElement(id, { x: nx, y: ny });
             });
           } else {
             // Single element drag
-            updateElement(currentDragId, {
-              x: clampToCanvas(snapToGrid(current.x)),
-              y: clampToCanvas(snapToGrid(current.y)),
-            });
+            const nx = clampToCanvas(snapToGrid(current.x));
+            const ny = clampToCanvas(snapToGrid(current.y));
+            const cur = elements.find(e => e.id === currentDragId);
+            if (!(cur && cur.x === nx && cur.y === ny)) { // plain click: no write, no undo entry
+              movedAny = true;
+              updateElement(currentDragId, { x: nx, y: ny });
+            }
           }
         }
       }
+      // updateElement already snapshotted the pre-drag state; this only matters if something moved
+      shouldRecordHistory = movedAny;
     }
     if (draggingWaypoint) {
       shouldRecordHistory = true;
@@ -3245,9 +3260,7 @@ export default function DiagramCanvas({
       }
       setDraggingEndpoint(null);
     }
-    if (resizing) {
-      shouldRecordHistory = true;
-    }
+    // Resize: updateElement already recorded one coalesced entry for the gesture
 
     // Record history only once for all drag operations
     if (shouldRecordHistory) {
@@ -3371,9 +3384,7 @@ export default function DiagramCanvas({
     draggingCurveRef.current = null;
     setResizing(null);
     // Clear rotation state and record history if was rotating
-    if (rotating) {
-      recordHistory();
-    }
+    // Rotation: updateElement already recorded one coalesced entry for the gesture
     setRotating(null);
     setRotationIndicator(null);
     setIsRotating?.(false); // Notify context to show toolbar again
@@ -3850,8 +3861,9 @@ export default function DiagramCanvas({
         });
       }
     });
-    recordHistory();
-  }, [selection.nodeIds, elements, updateElement, readOnly, recordHistory]);
+    // Each updateElement already snapshots the pre-nudge state (identical snapshots are
+    // collapsed by the history layer), so a press is exactly one undo entry.
+  }, [selection.nodeIds, elements, updateElement, readOnly]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -4924,7 +4936,12 @@ export default function DiagramCanvas({
       case 'bring-front':
       case 'send-back':
         if (nodeId) {
-          const nextZ = getZIndexForOrder(elements, nodeId, action === 'bring-front' ? 'front' : 'back');
+          const nextZ = getZIndexForOrder(
+            elements,
+            nodeId,
+            action === 'bring-front' ? 'front' : 'back',
+            (el) => packRegistry?.get?.(el.packId)?.stencils?.find(s => s.id === el.type)?.defaultSize,
+          );
           if (nextZ !== null) updateElement(nodeId, { zIndex: nextZ }); // records history
         }
         break;
@@ -5039,7 +5056,7 @@ export default function DiagramCanvas({
       default:
         break;
     }
-  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar]);
+  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry]);
 
   // ============ RENDER ============
 
@@ -5413,7 +5430,7 @@ export default function DiagramCanvas({
                 const wasFresh = freshNodeIdsRef.current.delete(id);
                 if (cancelled && wasFresh && !readOnly) {
                   const el = elements.find(x => x.id === id);
-                  if (el && !(el.label || '').trim()) removeElement(id);
+                  if (el && !(el.label || '').trim()) discardElement(id);
                 }
               }}
               onShowProperties={onShowProperties}

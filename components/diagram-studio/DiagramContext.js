@@ -46,6 +46,7 @@ const DiagramContext = createContext({
   addElement: () => {},
   updateElement: () => {},
   removeElement: () => {},
+  discardElement: () => {},
 
   // Connection operations
   addConnection: () => {},
@@ -76,6 +77,7 @@ const DiagramContext = createContext({
 // ============ HISTORY MANAGEMENT ============
 
 const MAX_HISTORY_SIZE = 50;
+const COALESCE_WINDOW_MS = 1000;
 
 function createHistorySnapshot(elements, connections) {
   return {
@@ -83,6 +85,14 @@ function createHistorySnapshot(elements, connections) {
     connections: JSON.parse(JSON.stringify(connections)),
     timestamp: Date.now(),
   };
+}
+
+// Cheap structural equality for snapshots (ignores timestamp and updatedAt-only churn is NOT
+// ignored: any real change to elements/connections makes snapshots differ).
+function snapshotsEqual(a, b) {
+  if (!a || !b) return false;
+  return JSON.stringify(a.elements) === JSON.stringify(b.elements) &&
+    JSON.stringify(a.connections) === JSON.stringify(b.connections);
 }
 
 // ============ PROVIDER ============
@@ -153,9 +163,23 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   // ============ HISTORY OPERATIONS ============
 
-  const recordHistory = useCallback(() => {
+  // Continuous gestures (e.g. resize) emit one update per mousemove. Passing the same
+  // coalesce key within COALESCE_WINDOW_MS keeps the whole gesture as a single undo entry.
+  const lastCoalesceRef = useRef({ key: null, time: 0 });
+
+  const recordHistory = useCallback((coalesceKey) => {
+    if (typeof coalesceKey === 'string') {
+      const now = Date.now();
+      const last = lastCoalesceRef.current;
+      lastCoalesceRef.current = { key: coalesceKey, time: now };
+      if (last.key === coalesceKey && now - last.time < COALESCE_WINDOW_MS) return;
+    } else {
+      lastCoalesceRef.current = { key: null, time: 0 };
+    }
     const snapshot = createHistorySnapshot(elements, connections);
     setHistoryPast(prev => {
+      // Skip no-op snapshots identical to the current top of the undo stack
+      if (snapshotsEqual(prev[prev.length - 1], snapshot)) return prev;
       const newPast = [...prev, snapshot];
       if (newPast.length > MAX_HISTORY_SIZE) {
         return newPast.slice(-MAX_HISTORY_SIZE);
@@ -198,6 +222,33 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   // ============ ELEMENT OPERATIONS ============
 
+  // Remove an element (and its connections) without leaving any trace in history:
+  // used when a freshly created element is cancelled before it ever existed "for real".
+  // Undo entries created by the element's creation (mid-creation snapshots, and the
+  // pre-creation snapshot when it equals the restored state) are dropped: creation +
+  // cancel leave nothing to undo.
+  const discardElement = useCallback((elementId) => {
+    const nextElements = elements.filter(el => el.id !== elementId);
+    const nextConnections = connections.filter(
+      conn => conn.sourceId !== elementId && conn.targetId !== elementId
+    );
+    setElementsState(nextElements);
+    setConnectionsState(nextConnections);
+    setSelection(prev => ({
+      nodeIds: prev.nodeIds.filter(id => id !== elementId),
+      connectionIds: prev.connectionIds,
+    }));
+    setHistoryPast(prev => {
+      let end = prev.length;
+      // Drop mid-creation snapshots that still contain the element
+      while (end > 0 && prev[end - 1].elements.some(el => el.id === elementId)) end--;
+      // Drop the pre-creation snapshot too when it equals the state we are returning to,
+      // otherwise the next undo would be a visible no-op
+      if (end > 0 && snapshotsEqual(prev[end - 1], { elements: nextElements, connections: nextConnections })) end--;
+      return end === prev.length ? prev : prev.slice(0, end);
+    });
+  }, [elements, connections]);
+
   const setElements = useCallback((newElements) => {
     recordHistory();
     setElementsState(typeof newElements === 'function' ? newElements(elements) : newElements);
@@ -214,8 +265,8 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     return newElement;
   }, [recordHistory]);
 
-  const updateElement = useCallback((elementId, updates) => {
-    recordHistory();
+  const updateElement = useCallback((elementId, updates, options) => {
+    recordHistory(options?.coalesceKey);
     setElementsState(prev => prev.map(el =>
       el.id === elementId
         ? { ...el, ...updates, updatedAt: new Date().toISOString() }
@@ -769,6 +820,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     addElement,
     updateElement,
     removeElement,
+    discardElement,
 
     // Connection operations
     addConnection,
@@ -807,7 +859,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     saveStatus, loading, error,
     deleteSelected, duplicateSelected, selectAll, clearSelection,
     setDiagram, setElements, setConnections,
-    addElement, updateElement, removeElement,
+    addElement, updateElement, removeElement, discardElement,
     addConnection, updateConnection, removeConnection,
     addLayer, updateLayer, removeLayer, reorderLayers,
     groupElements, ungroupElements,
