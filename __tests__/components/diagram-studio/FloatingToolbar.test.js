@@ -22,27 +22,17 @@ describe('FloatingToolbar', () => {
     jest.clearAllMocks();
   });
 
-  it('renders zoom controls', () => {
+  // Zoom controls moved out of FloatingToolbar into TitleBar; the toolbar is export-only.
+  it('does not render zoom controls (export-only toolbar)', () => {
     render(
       <Wrapper>
         <FloatingToolbar {...defaultProps} />
       </Wrapper>
     );
 
-    expect(screen.getByTitle('Zoom Out')).toBeInTheDocument();
-    expect(screen.getByTitle('Zoom In')).toBeInTheDocument();
-    expect(screen.getByTitle('Fit to Screen')).toBeInTheDocument();
-  });
-
-  it('displays current zoom level', () => {
-    render(
-      <Wrapper>
-        <FloatingToolbar {...defaultProps} />
-      </Wrapper>
-    );
-
-    // Default zoom is 100%
-    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(screen.queryByTitle('Zoom Out')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Zoom In')).not.toBeInTheDocument();
+    expect(screen.queryByText('100%')).not.toBeInTheDocument();
   });
 
   it('renders export button', () => {

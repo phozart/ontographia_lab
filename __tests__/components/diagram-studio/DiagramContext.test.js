@@ -18,7 +18,7 @@ describe('DiagramContext', () => {
       expect(result.current.connections).toEqual([]);
       expect(result.current.activeTool).toBe('select');
       expect(result.current.showGrid).toBe(true);
-      expect(result.current.gridStyle).toBe('dots');
+      expect(result.current.gridStyle).toBe('lines');
     });
 
     it('should add element', () => {
@@ -104,13 +104,13 @@ describe('DiagramContext', () => {
     it('should change grid style', () => {
       const { result } = renderHook(() => useDiagram(), { wrapper });
 
-      expect(result.current.gridStyle).toBe('dots');
+      expect(result.current.gridStyle).toBe('lines');
 
       act(() => {
-        result.current.setGridStyle('lines');
+        result.current.setGridStyle('dots');
       });
 
-      expect(result.current.gridStyle).toBe('lines');
+      expect(result.current.gridStyle).toBe('dots');
     });
 
     it('should add connection', () => {
@@ -135,9 +135,11 @@ describe('DiagramContext', () => {
     it('should provide initial viewport', () => {
       const { result } = renderHook(() => useDiagramViewport(), { wrapper });
 
+      // Infinite canvas: 100000x100000 with origin at center, so the initial
+      // viewport is offset to (-50000, -50000)
       expect(result.current.viewport).toEqual({
-        x: 0,
-        y: 0,
+        x: -50000,
+        y: -50000,
         scale: 1,
       });
     });
@@ -169,8 +171,8 @@ describe('DiagramContext', () => {
         result.current.pan(100, 50);
       });
 
-      expect(result.current.viewport.x).toBe(100);
-      expect(result.current.viewport.y).toBe(50);
+      expect(result.current.viewport.x).toBe(-50000 + 100);
+      expect(result.current.viewport.y).toBe(-50000 + 50);
     });
   });
 
