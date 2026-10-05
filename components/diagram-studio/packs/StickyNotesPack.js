@@ -1,6 +1,8 @@
 // components/diagram-studio/packs/StickyNotesPack.js
 // Sticky notes pack for freeform canvas
 
+import { cssUrl } from '../export/safeUrl';
+
 // ============ STENCILS ============
 
 const stencils = [
@@ -588,12 +590,13 @@ function ImagePlaceholderNode({ element, stencil }) {
   const { width, height } = element.size || stencil?.defaultSize || { width: 200, height: 150 };
   const imageUrl = element.data?.imageUrl;
 
-  if (imageUrl) {
+  const safeImage = cssUrl(imageUrl);
+  if (safeImage) {
     return (
       <div style={{
         width: '100%',
         height: '100%',
-        backgroundImage: `url(${imageUrl})`,
+        backgroundImage: safeImage,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         borderRadius: 4,
