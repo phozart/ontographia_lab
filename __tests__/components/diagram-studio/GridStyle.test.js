@@ -32,9 +32,9 @@ describe('Grid Style Feature', () => {
   });
 
   describe('Grid style options', () => {
-    it('should default to dots style', () => {
+    it('should default to lines style', () => {
       const { result } = renderHook(() => useDiagram(), { wrapper });
-      expect(result.current.gridStyle).toBe('dots');
+      expect(result.current.gridStyle).toBe('lines');
     });
 
     it('should change to lines style', () => {
@@ -58,14 +58,14 @@ describe('Grid Style Feature', () => {
     it('should cycle through styles', () => {
       const { result } = renderHook(() => useDiagram(), { wrapper });
 
-      // Start with dots
-      expect(result.current.gridStyle).toBe('dots');
-
-      // Change to lines
-      act(() => {
-        result.current.setGridStyle('lines');
-      });
+      // Default is lines (DiagramContext + TitleBar both default to 'lines')
       expect(result.current.gridStyle).toBe('lines');
+
+      // Change to dots
+      act(() => {
+        result.current.setGridStyle('dots');
+      });
+      expect(result.current.gridStyle).toBe('dots');
 
       // Change to none
       act(() => {
@@ -73,11 +73,11 @@ describe('Grid Style Feature', () => {
       });
       expect(result.current.gridStyle).toBe('none');
 
-      // Back to dots
+      // Back to lines
       act(() => {
-        result.current.setGridStyle('dots');
+        result.current.setGridStyle('lines');
       });
-      expect(result.current.gridStyle).toBe('dots');
+      expect(result.current.gridStyle).toBe('lines');
     });
   });
 

@@ -135,7 +135,7 @@ export default function Testimonials() {
               mx: 'auto',
             }}
           >
-            "{activeTestimonial.quote}"
+            &quot;{activeTestimonial.quote}&quot;
           </Typography>
 
           {/* Author */}
