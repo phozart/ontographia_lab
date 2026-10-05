@@ -18,11 +18,15 @@ import {
   InputAdornment,
   Menu,
   MenuItem,
+  Drawer,
+  useMediaQuery,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ViewListIcon from '@mui/icons-material/ViewList';
+import MenuIcon from '@mui/icons-material/Menu';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -180,6 +184,9 @@ export default function DashboardPage() {
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedDiagram, setSelectedDiagram] = useState(null);
   const [creating, setCreating] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [navOpen, setNavOpen] = useState(false);
 
   // Auth check
   useEffect(() => {
@@ -300,10 +307,46 @@ export default function DashboardPage() {
 
       <div className="dashboard-layout">
         {/* Left Sidebar */}
-        <AppSidebar onCreateWorkspace={createWorkspace} />
+        {isMobile ? (
+          <Drawer
+            anchor="left"
+            open={navOpen}
+            onClose={() => setNavOpen(false)}
+            PaperProps={{ sx: { width: 240 } }}
+          >
+            <AppSidebar
+              forceExpanded
+              onCreateWorkspace={() => {
+                setNavOpen(false);
+                createWorkspace();
+              }}
+            />
+          </Drawer>
+        ) : (
+          <AppSidebar onCreateWorkspace={createWorkspace} />
+        )}
 
         {/* Main Content */}
         <div className="dashboard-main">
+          {isMobile && (
+            <Box
+              component="header"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                px: 1,
+                py: 0.5,
+                borderBottom: '1px solid var(--border, #e2e8f0)',
+                bgcolor: 'var(--panel, #ffffff)',
+              }}
+            >
+              <IconButton aria-label="Open navigation menu" onClick={() => setNavOpen(true)}>
+                <MenuIcon />
+              </IconButton>
+              <LogoIcon size={24} />
+            </Box>
+          )}
           {/* Content Area */}
           <div className="dashboard-content">
             {/* Header with greeting */}
@@ -329,7 +372,7 @@ export default function DashboardPage() {
             <Box sx={{ mb: 5 }}>
               <SectionHeader icon={RocketLaunchIcon} title="Quick Actions" />
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <QuickAction
                     icon={AddIcon}
                     label="New Workspace"
@@ -339,7 +382,7 @@ export default function DashboardPage() {
                     primary
                   />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <QuickAction
                     icon={MenuBookIcon}
                     label="Getting Started"
@@ -348,7 +391,7 @@ export default function DashboardPage() {
                     color={SKY.deepLavender}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <QuickAction
                     icon={KeyboardIcon}
                     label="Shortcuts"
@@ -357,7 +400,7 @@ export default function DashboardPage() {
                     color={SKY.mauveRose}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <QuickAction
                     icon={ExtensionIcon}
                     label="Stencil Packs"
@@ -372,7 +415,7 @@ export default function DashboardPage() {
             {/* Main content area - two columns on larger screens */}
             <Grid container spacing={4}>
               {/* Workspaces Column */}
-              <Grid item xs={12} lg={8}>
+              <Grid size={{ xs: 12, lg: 8 }}>
                 {/* Recent Workspaces or Empty State */}
                 {loading ? (
                   <DiagramGridSkeleton count={6} />
@@ -506,7 +549,7 @@ export default function DashboardPage() {
                           };
 
                           return (
-                            <Grid item xs={12} sm={6} md={4} key={diagram.id} sx={{ display: 'flex' }}>
+                            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={diagram.id} sx={{ display: 'flex' }}>
                               <Paper
                                 elevation={0}
                                 sx={{
@@ -567,6 +610,7 @@ export default function DashboardPage() {
                                     </Box>
                                     <IconButton
                                       size="small"
+                                      aria-label="Workspace actions"
                                       onClick={(e) => {
                                         setMenuAnchor(e.currentTarget);
                                         setSelectedDiagram(diagram);
@@ -588,7 +632,7 @@ export default function DashboardPage() {
               </Grid>
 
               {/* Resources Sidebar */}
-              <Grid item xs={12} lg={4}>
+              <Grid size={{ xs: 12, lg: 4 }}>
                 <Paper
                   elevation={0}
                   sx={{

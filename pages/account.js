@@ -54,6 +54,17 @@ export default function AccountPage() {
   const [resettingSettings, setResettingSettings] = useState(false);
   const [settingsMessage, setSettingsMessage] = useState({ type: '', text: '' });
 
+  // Calculate password strength
+  const passwordStrength = useMemo(() => {
+    const passed = PASSWORD_REQUIREMENTS.filter(req => req.test(newPassword)).length;
+    return {
+      score: passed,
+      total: PASSWORD_REQUIREMENTS.length,
+      percentage: (passed / PASSWORD_REQUIREMENTS.length) * 100,
+      isValid: passed === PASSWORD_REQUIREMENTS.length,
+    };
+  }, [newPassword]);
+
   // Redirect if not logged in
   if (status === 'loading') {
     return (
@@ -70,17 +81,6 @@ export default function AccountPage() {
 
   const user = session.user;
   const isOAuthUser = user.image && !user.email?.includes('@example.com'); // OAuth users have profile images
-
-  // Calculate password strength
-  const passwordStrength = useMemo(() => {
-    const passed = PASSWORD_REQUIREMENTS.filter(req => req.test(newPassword)).length;
-    return {
-      score: passed,
-      total: PASSWORD_REQUIREMENTS.length,
-      percentage: (passed / PASSWORD_REQUIREMENTS.length) * 100,
-      isValid: passed === PASSWORD_REQUIREMENTS.length,
-    };
-  }, [newPassword]);
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
