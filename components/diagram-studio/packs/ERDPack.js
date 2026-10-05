@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { DiamondNode } from './CorePack';
+import { normalizeFields } from './erdFields';
 
 // ============ STENCILS ============
 
@@ -271,7 +272,7 @@ const validators = [
     validate: (elements) => {
       const withoutPk = elements.filter(el => {
         if (el.type !== 'entity') return false;
-        const fields = el.data?.fields || [];
+        const fields = normalizeFields(el.data?.fields);
         return !fields.some(f => f.isPrimaryKey);
       });
       if (withoutPk.length > 0) {
@@ -296,7 +297,7 @@ const validators = [
       const errors = [];
       elements.forEach(el => {
         if (el.type !== 'entity') return;
-        const fields = el.data?.fields || [];
+        const fields = normalizeFields(el.data?.fields);
         fields.forEach(field => {
           if (field.isForeignKey && field.references?.table) {
             if (!entityNames.includes(field.references.table.toLowerCase())) {
@@ -550,11 +551,22 @@ const nodeProperties = [
 
 // ============ CUSTOM RENDERERS ============
 
+const KEY_BADGE = {
+  fontSize: 9,
+  fontWeight: 700,
+  padding: '0 4px',
+  borderRadius: 3,
+  background: 'rgba(79, 179, 206, 0.18)',
+  color: 'var(--text, #1f2937)',
+  lineHeight: '14px',
+};
+
 // ERD Entity Renderer with fields
 function ERDEntityRenderer({ element, stencil, isSelected }) {
   const { label, data } = element;
   // Ensure fields and indexes are always arrays
-  const fields = Array.isArray(data?.fields) ? data.fields : [];
+  // data.fields may be structured rows, legacy strings, or a free-text block
+  const fields = normalizeFields(data?.fields);
   const indexes = Array.isArray(data?.indexes) ? data.indexes : [];
   const isWeakEntity = element.type === 'weak-entity';
   const isJunction = element.type === 'junction';
@@ -583,6 +595,12 @@ function ERDEntityRenderer({ element, stencil, isSelected }) {
                 {!field.isPrimaryKey && !field.isForeignKey && <span className="erd-field-spacer">•</span>}
               </span>
               <span className="erd-field-name">{field.name}</span>
+              {(field.isPrimaryKey || field.isForeignKey) && (
+                <span className="erd-field-keys" style={{ display: 'inline-flex', gap: 2 }}>
+                  {field.isPrimaryKey && <span className="erd-key-badge" style={KEY_BADGE}>PK</span>}
+                  {field.isForeignKey && <span className="erd-key-badge" style={KEY_BADGE}>FK</span>}
+                </span>
+              )}
               <span className="erd-field-type">{field.dataType}</span>
               {field.isNullable === false && <span className="erd-field-notnull" title="NOT NULL">*</span>}
             </div>

@@ -9,6 +9,14 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import CloseIcon from '@mui/icons-material/Close';
 
+import FieldListEditor from './properties/FieldListEditor';
+import StyleSection from './properties/StyleSection';
+import { toDisplayCoord, fromDisplayCoord } from './properties/coordinates';
+import { cacheStencilStyle } from './styling/StencilStyleManager';
+
+// Element fields shared with the contextual style toolbar (cached per stencil like the toolbar does)
+const STYLE_FIELDS = new Set(['color', 'borderColor', 'borderWidth', 'fontSize', 'fontWeight', 'textColor']);
+
 // ============ ACCORDION SECTION ============
 
 function AccordionSection({ title, defaultOpen = true, children }) {
@@ -67,11 +75,17 @@ export default function PropertiesPanel({
   }, [selectedItem, pack]);
 
   // Handle property change
-  const handleChange = useCallback((field, value) => {
+  const handleChange = useCallback((field, value, opts) => {
     if (!selectedItem) return;
 
     if (selectedItem.type === 'element') {
-      updateElement(selectedItem.item.id, { [field]: value });
+      const el = selectedItem.item;
+      // Continuous inputs (color pickers) coalesce into a single undo step
+      const options = opts?.coalesce ? { coalesceKey: `props:${el.id}:${field}` } : undefined;
+      updateElement(el.id, { [field]: value }, options);
+      if (STYLE_FIELDS.has(field) && el.packId && el.type) {
+        cacheStencilStyle(el.packId, el.type, { [field]: value });
+      }
     } else {
       updateConnection(selectedItem.item.id, { [field]: value });
     }
@@ -209,6 +223,18 @@ export default function PropertiesPanel({
           </AccordionSection>
         )}
 
+        {/* Style (elements only): fill, stroke, font */}
+        {isElement && (
+          <AccordionSection title="Style" defaultOpen={true}>
+            <StyleSection
+              item={item}
+              stencil={stencil}
+              onChange={handleChange}
+              readOnly={readOnly || !canEditProperties}
+            />
+          </AccordionSection>
+        )}
+
         {/* Line Styling (connections only) */}
         {!isElement && (
           <>
@@ -290,27 +316,30 @@ function GeneralSection({ item, isElement, onChange, readOnly }) {
 
 // ============ POSITION SECTION ============
 
+// X/Y are canvas coordinates relative to the canvas origin (same as the status bar).
 function PositionSection({ item, onChange, readOnly }) {
   return (
     <>
       <div style={{ display: 'flex', gap: 8 }}>
         <div className="ds-property-row" style={{ flex: 1 }}>
-          <label className="ds-property-label">X</label>
+          <label className="ds-property-label" htmlFor="ds-pos-x">X</label>
           <input
+            id="ds-pos-x"
             type="number"
             className="ds-property-input"
-            value={item.x || 0}
-            onChange={(e) => onChange('x', parseInt(e.target.value) || 0)}
+            value={toDisplayCoord(item.x)}
+            onChange={(e) => onChange('x', fromDisplayCoord(parseInt(e.target.value, 10) || 0))}
             disabled={readOnly}
           />
         </div>
         <div className="ds-property-row" style={{ flex: 1 }}>
-          <label className="ds-property-label">Y</label>
+          <label className="ds-property-label" htmlFor="ds-pos-y">Y</label>
           <input
+            id="ds-pos-y"
             type="number"
             className="ds-property-input"
-            value={item.y || 0}
-            onChange={(e) => onChange('y', parseInt(e.target.value) || 0)}
+            value={toDisplayCoord(item.y)}
+            onChange={(e) => onChange('y', fromDisplayCoord(parseInt(e.target.value, 10) || 0))}
             disabled={readOnly}
           />
         </div>
@@ -336,218 +365,6 @@ function PositionSection({ item, onChange, readOnly }) {
             onChange={(e) => onChange('size', { ...item.size, height: parseInt(e.target.value) || 60 })}
             disabled={readOnly}
           />
-        </div>
-      </div>
-    </>
-  );
-}
-
-// ============ APPEARANCE SECTION ============
-
-function AppearanceSection({ item, isElement, onChange, readOnly }) {
-  const colors = [
-    '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6',
-    '#06b6d4', '#ec4899', '#64748b', '#f97316', '#14b8a6',
-  ];
-
-  return (
-    <>
-      {/* Color */}
-      <div className="ds-property-row">
-        <label className="ds-property-label">Color</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {colors.map(color => (
-            <button
-              key={color}
-              onClick={() => !readOnly && onChange('color', color)}
-              style={{
-                width: 24,
-                height: 24,
-                borderRadius: 4,
-                background: color,
-                border: item.color === color ? '2px solid var(--text)' : '2px solid transparent',
-                cursor: readOnly ? 'not-allowed' : 'pointer',
-              }}
-              title={color}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Background Color (element only) */}
-      {isElement && (
-        <div className="ds-property-row">
-          <label className="ds-property-label">Background</label>
-          <input
-            type="color"
-            value={item.backgroundColor || '#ffffff'}
-            onChange={(e) => onChange('backgroundColor', e.target.value)}
-            disabled={readOnly}
-            style={{
-              width: '100%',
-              height: 32,
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              cursor: readOnly ? 'not-allowed' : 'pointer',
-            }}
-          />
-        </div>
-      )}
-
-      {/* Opacity */}
-      <div className="ds-property-row">
-        <label className="ds-property-label">Opacity ({Math.round((item.opacity || 1) * 100)}%)</label>
-        <input
-          type="range"
-          min="0.1"
-          max="1"
-          step="0.1"
-          value={item.opacity || 1}
-          onChange={(e) => onChange('opacity', parseFloat(e.target.value))}
-          disabled={readOnly}
-          style={{ width: '100%' }}
-        />
-      </div>
-
-      {/* Border Section - only for elements */}
-      {isElement && (
-        <>
-          {/* Border Width */}
-          <div className="ds-property-row">
-            <label className="ds-property-label">Border Width</label>
-            <select
-              className="ds-property-input"
-              value={item.borderWidth ?? 1}
-              onChange={(e) => onChange('borderWidth', parseInt(e.target.value))}
-              disabled={readOnly}
-            >
-              <option value={0}>None</option>
-              <option value={1}>1px</option>
-              <option value={2}>2px</option>
-              <option value={3}>3px</option>
-              <option value={4}>4px</option>
-            </select>
-          </div>
-
-          {/* Border Color */}
-          <div className="ds-property-row">
-            <label className="ds-property-label">Border Color</label>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input
-                type="color"
-                value={item.borderColor || '#d1d5db'}
-                onChange={(e) => onChange('borderColor', e.target.value)}
-                disabled={readOnly}
-                style={{
-                  width: 40,
-                  height: 28,
-                  border: '1px solid var(--border)',
-                  borderRadius: 4,
-                  cursor: readOnly ? 'not-allowed' : 'pointer',
-                  padding: 0,
-                }}
-              />
-              <button
-                onClick={() => onChange('borderColor', null)}
-                disabled={readOnly}
-                style={{
-                  fontSize: 10,
-                  padding: '4px 8px',
-                  border: '1px solid var(--border)',
-                  borderRadius: 4,
-                  background: 'var(--bg)',
-                  cursor: readOnly ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Auto
-              </button>
-            </div>
-          </div>
-
-          {/* Border Radius */}
-          <div className="ds-property-row">
-            <label className="ds-property-label">Corner Radius</label>
-            <select
-              className="ds-property-input"
-              value={item.borderRadius ?? 8}
-              onChange={(e) => onChange('borderRadius', parseInt(e.target.value))}
-              disabled={readOnly}
-            >
-              <option value={0}>Square (0)</option>
-              <option value={4}>Slight (4px)</option>
-              <option value={8}>Rounded (8px)</option>
-              <option value={12}>More (12px)</option>
-              <option value={16}>Very (16px)</option>
-              <option value={9999}>Pill</option>
-            </select>
-          </div>
-        </>
-      )}
-    </>
-  );
-}
-
-// ============ TEXT STYLE SECTION ============
-
-function TextStyleSection({ item, onChange, readOnly }) {
-  const fontSizes = [10, 11, 12, 13, 14, 16, 18, 20, 24];
-
-  return (
-    <>
-      {/* Font Size */}
-      <div className="ds-property-row">
-        <label className="ds-property-label">Font Size</label>
-        <select
-          className="ds-property-input"
-          value={item.fontSize || 13}
-          onChange={(e) => onChange('fontSize', parseInt(e.target.value))}
-          disabled={readOnly}
-        >
-          {fontSizes.map(size => (
-            <option key={size} value={size}>{size}px</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Font Weight */}
-      <div className="ds-property-row">
-        <label className="ds-property-label">Font Weight</label>
-        <select
-          className="ds-property-input"
-          value={item.fontWeight || 'normal'}
-          onChange={(e) => onChange('fontWeight', e.target.value)}
-          disabled={readOnly}
-        >
-          <option value="normal">Normal</option>
-          <option value="500">Medium</option>
-          <option value="600">Semi Bold</option>
-          <option value="bold">Bold</option>
-        </select>
-      </div>
-
-      {/* Text Align */}
-      <div className="ds-property-row">
-        <label className="ds-property-label">Text Align</label>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {['left', 'center', 'right'].map(align => (
-            <button
-              key={align}
-              onClick={() => !readOnly && onChange('textAlign', align)}
-              style={{
-                flex: 1,
-                padding: '6px',
-                background: (item.textAlign || 'center') === align ? 'var(--accent)' : 'var(--bg)',
-                color: (item.textAlign || 'center') === align ? 'white' : 'var(--text)',
-                border: '1px solid var(--border)',
-                borderRadius: 4,
-                cursor: readOnly ? 'not-allowed' : 'pointer',
-                fontSize: 11,
-                textTransform: 'capitalize',
-              }}
-            >
-              {align}
-            </button>
-          ))}
         </div>
       </div>
     </>
@@ -966,6 +783,9 @@ function PropertyField({ property, value, onChange, readOnly }) {
           readOnly={readOnly}
         />
       );
+
+    case 'fieldList':
+      return <FieldListEditor value={value} onChange={onChange} readOnly={readOnly} />;
 
     case 'select':
       return (
