@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import { verifyCaptcha, isProvided } from '../../../lib/captcha';
 import { query } from '../../../lib/db';
 import { strictLimiter } from '../../../lib/rateLimit';
+import { isEmailConfigured, sendMail } from '../../../lib/email';
+import { passwordResetEmail } from '../../../lib/emailTemplates';
 
 // Token expires in 1 hour
 const TOKEN_EXPIRY_HOURS = 1;
@@ -72,19 +74,34 @@ export default async function handler(req, res) {
       [resetTokenHash, expiresAt, user.id]
     );
 
-    // No email transport is configured yet. Reset links are only surfaced
-    // in local development; in every other environment they are never logged.
     const isDev = process.env.NODE_ENV === 'development';
     const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${resetToken}`;
+    const emailConfigured = isEmailConfigured();
 
-    if (isDev) {
+    if (emailConfigured) {
+      // Fire-and-forget: awaiting delivery would make response time reveal
+      // whether the account exists. A failure is only logged (no token) and
+      // the stored token stays valid so a retry works.
+      const logFailure = (sendError) =>
+        console.error('Password reset email delivery failed:', sendError && sendError.message);
+      try {
+        const message = passwordResetEmail({ resetUrl, expiresInHours: TOKEN_EXPIRY_HOURS });
+        Promise.resolve(sendMail({ to: user.email, ...message })).catch(logFailure);
+      } catch (sendError) {
+        logFailure(sendError);
+      }
+    } else if (isDev) {
+      // Local development without SMTP: surface the link directly.
       console.log(`[dev] Password reset link for ${email}: ${resetUrl}`);
+    } else {
+      // Never log the token or URL outside development.
+      console.warn('Password reset requested but email transport not configured (set SMTP_HOST and EMAIL_FROM); no email sent.');
     }
 
     return res.status(200).json({
       success: true,
       message: successMessage,
-      ...(isDev && { resetUrl }),
+      ...(isDev && !emailConfigured && { resetUrl }),
     });
 
   } catch (error) {
