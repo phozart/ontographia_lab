@@ -4,6 +4,7 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { migrateDiagram } from './migrations/migrateDiagram';
+import { assignFrameOnCreate } from './utils/frameMembership';
 
 // ============ CONTEXT ============
 
@@ -276,7 +277,9 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       createdAt: new Date().toISOString(),
       ...element,
     };
-    setElementsState(prev => [...prev, newElement]);
+    // Explicit frame membership: frames are flagged, shapes created inside a
+    // frame join it (a `parentFrameId` key, even null, opts out)
+    setElementsState(prev => [...prev, assignFrameOnCreate(newElement, prev)]);
     return newElement;
   }, [recordHistory]);
 
@@ -291,7 +294,10 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   const removeElement = useCallback((elementId) => {
     recordHistory();
-    setElementsState(prev => prev.filter(el => el.id !== elementId));
+    // Deleting a frame releases its members (no dangling parentFrameId)
+    setElementsState(prev => prev
+      .filter(el => el.id !== elementId)
+      .map(el => (el.parentFrameId === elementId ? { ...el, parentFrameId: null } : el)));
     // Also remove connections to/from this element
     setConnectionsState(prev => prev.filter(
       conn => conn.sourceId !== elementId && conn.targetId !== elementId
@@ -446,7 +452,9 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
     // Remove selected elements
     if (selectedNodeIds.length > 0) {
-      setElementsState(prev => prev.filter(el => !selectedNodeIds.includes(el.id)));
+      setElementsState(prev => prev
+        .filter(el => !selectedNodeIds.includes(el.id))
+        .map(el => (el.parentFrameId && selectedNodeIds.includes(el.parentFrameId) ? { ...el, parentFrameId: null } : el)));
       // Also remove connections that reference deleted elements
       setConnectionsState(prev => prev.filter(conn =>
         !selectedNodeIds.includes(conn.sourceId) && !selectedNodeIds.includes(conn.targetId)

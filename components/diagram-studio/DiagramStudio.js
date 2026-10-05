@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { resolveEditorShortcut, isTypingTarget } from './hooks/interaction/editorShortcuts';
+import { getTemplateBounds, getContentBounds, computeTemplatePlacement, computeFitViewport } from './utils/templatePlacement';
 import { DiagramProvider, useDiagram, useDiagramViewport, useDiagramSelection } from './DiagramContext';
 import { getProfile, isActionAllowed, isModeAllowed } from './DiagramProfile';
 import { ResizablePanel, PanelGroup } from './ResizablePanel';
@@ -95,8 +96,8 @@ function DiagramStudioInner({
 }) {
   const { data: session } = useSession();
   const { diagram, setDiagram, activePack, saveStatus, saveDiagram, elements, connections, addElement, addConnection, undo, redo, selectAll, clearSelection, deleteSelected, activeTool, setActiveTool, selectedStencil, setSelectedStencil, drawingTool, drawingColor, drawingStrokeWidth, isDragging, isRotating, stickyNoteColor } = useDiagram();
-  const { viewport, zoomIn, zoomOut } = useDiagramViewport();
-  const { selection, selectedElements } = useDiagramSelection();
+  const { viewport, setViewport, zoomIn, zoomOut } = useDiagramViewport();
+  const { selection, selectedElements, selectElements } = useDiagramSelection();
   const [draggingStencil, setDraggingStencil] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
@@ -332,25 +333,36 @@ function DiagramStudioInner({
     addReply(commentId, text, currentUser);
   }, [addReply, currentUser]);
 
-  // Handle applying a starter pack
+  // Handle applying a template: place it in the first empty region right of the
+  // existing content (or centered in the viewport on an empty canvas), fit the
+  // viewport to it and select everything that was inserted.
   const handleApplyStarterPack = useCallback((starterPack) => {
     if (!starterPack) return;
 
-    // Offset to place starter pack elements near the center of the infinite canvas
-    // The infinite canvas is 100000x100000, with center at 50000,50000
-    const CANVAS_OFFSET = 50000;
+    const rect = canvasContainerRef.current?.getBoundingClientRect();
+    const container = { width: rect?.width || 1200, height: rect?.height || 800 };
+    const bounds = getTemplateBounds(starterPack);
+    const { dx, dy } = computeTemplatePlacement({
+      bounds,
+      contentBounds: getContentBounds(elements),
+      viewport,
+      container,
+    });
+    const stamp = Date.now();
+    const insertedIds = [];
 
     // Create frame first (so it renders behind elements in z-order)
     let frameId = null;
     if (starterPack.frame) {
-      frameId = `frame_${Date.now()}`;
+      frameId = `frame_${stamp}`;
+      insertedIds.push(frameId);
       addElement({
         type: 'frame',
         packId: 'core',
         id: frameId,
         label: starterPack.frame.label || 'Untitled Frame',
-        x: CANVAS_OFFSET + starterPack.frame.x,
-        y: CANVAS_OFFSET + starterPack.frame.y,
+        x: starterPack.frame.x + dx,
+        y: starterPack.frame.y + dy,
         size: {
           width: starterPack.frame.width,
           height: starterPack.frame.height,
@@ -359,23 +371,25 @@ function DiagramStudioInner({
       });
     }
 
-    // Generate unique IDs and add elements (with frame reference)
+    // Template shapes are explicit members of the template's frame (null when
+    // there is none, so nothing underneath is ever adopted)
     const idMap = {};
     starterPack.elements.forEach((el, idx) => {
-      const newId = `el_${Date.now()}_${idx}`;
+      const newId = `el_${stamp}_${idx}`;
       idMap[idx] = newId;
+      insertedIds.push(newId);
       addElement({
         ...el,
         id: newId,
-        x: CANVAS_OFFSET + (el.x || 0),
-        y: CANVAS_OFFSET + (el.y || 0),
+        x: (el.x || 0) + dx,
+        y: (el.y || 0) + dy,
         packId: starterPack.packId,
-        parentFrameId: frameId, // Reference to containing frame
+        parentFrameId: frameId,
       });
     });
 
     // Add connections with mapped IDs (with frame reference for clipping)
-    starterPack.connections?.forEach((conn, idx) => {
+    starterPack.connections?.forEach((conn) => {
       const sourceId = idMap[conn.sourceIdx];
       const targetId = idMap[conn.targetIdx];
       if (sourceId && targetId) {
@@ -390,7 +404,13 @@ function DiagramStudioInner({
         });
       }
     });
-  }, [addElement, addConnection]);
+
+    setViewport?.(computeFitViewport(
+      { x: bounds.x + dx, y: bounds.y + dy, width: bounds.width, height: bounds.height },
+      container,
+    ));
+    selectElements?.(insertedIds);
+  }, [addElement, addConnection, elements, viewport, setViewport, selectElements]);
 
   // Toggle comment tool
   const toggleCommentTool = useCallback(() => {
