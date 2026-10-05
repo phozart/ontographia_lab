@@ -404,4 +404,4 @@ const CorePack = {
 };
 
 export default CorePack;
-export { stencils, connectionTypes, renderNode };
+export { stencils, connectionTypes, renderNode, DiamondNode };

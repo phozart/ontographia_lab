@@ -4,6 +4,26 @@
 import React from 'react';
 import SvgNodeFrame from './SvgNodeFrame';
 
+// ============ LOOP LABEL FIT ============
+
+const LOOP_FONT_MAX = 14;
+const LOOP_FONT_MIN = 9;
+const LOOP_CHAR_WIDTH = 0.62; // approx. em width of bold sans-serif glyphs
+
+// Fit a label inside a loop-marker circle: shrink the font down to a minimum,
+// then truncate with an ellipsis. Returns { text, fontSize, truncated }.
+export function fitLoopLabel(label, diameter) {
+  const text = String(label ?? '');
+  const available = Math.max(0, diameter * 0.7);
+  const widthAt = (str, size) => str.length * size * LOOP_CHAR_WIDTH;
+
+  for (let size = LOOP_FONT_MAX; size >= LOOP_FONT_MIN; size--) {
+    if (widthAt(text, size) <= available) return { text, fontSize: size, truncated: false };
+  }
+  const maxChars = Math.max(1, Math.floor(available / (LOOP_FONT_MIN * LOOP_CHAR_WIDTH)) - 1);
+  return { text: text.slice(0, maxChars).trimEnd() + '…', fontSize: LOOP_FONT_MIN, truncated: true };
+}
+
 // ============ STENCILS ============
 
 const stencils = [
@@ -627,6 +647,7 @@ function ReinforcingLoopNode({ element, stencil, isSelected }) {
   const color = element.color || stencil.color;
   const label = element.label || 'R';
   const r = Math.min(width, height) / 2 - 2;
+  const fit = fitLoopLabel(label, r * 2);
   const cx = width / 2;
   const cy = height / 2;
 
@@ -669,11 +690,12 @@ function ReinforcingLoopNode({ element, stencil, isSelected }) {
         textAnchor="middle"
         dominantBaseline="central"
         fill={color}
-        fontSize="14"
+        fontSize={fit.fontSize}
         fontWeight="700"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
-        {label}
+        {fit.truncated && <title>{label}</title>}
+        {fit.text}
       </text>
       {/* Define arrow marker */}
       <defs>
@@ -701,6 +723,7 @@ function BalancingLoopNode({ element, stencil, isSelected }) {
   const color = element.color || stencil.color;
   const label = element.label || 'B';
   const r = Math.min(width, height) / 2 - 2;
+  const fit = fitLoopLabel(label, r * 2);
   const cx = width / 2;
   const cy = height / 2;
 
@@ -743,11 +766,12 @@ function BalancingLoopNode({ element, stencil, isSelected }) {
         textAnchor="middle"
         dominantBaseline="central"
         fill={color}
-        fontSize="14"
+        fontSize={fit.fontSize}
         fontWeight="700"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
-        {label}
+        {fit.truncated && <title>{label}</title>}
+        {fit.text}
       </text>
       {/* Define arrow marker */}
       <defs>

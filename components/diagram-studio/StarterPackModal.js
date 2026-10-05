@@ -87,11 +87,11 @@ const STARTER_PACKS = [
     packId: 'mind-map',
     thumbnail: '🧠',
     elements: [
-      { type: 'central-idea', label: 'Main Topic', x: 300, y: 200, size: { width: 150, height: 80 } },
-      { type: 'branch', label: 'Branch 1', x: 100, y: 80, size: { width: 120, height: 50 } },
-      { type: 'branch', label: 'Branch 2', x: 520, y: 80, size: { width: 120, height: 50 } },
-      { type: 'branch', label: 'Branch 3', x: 100, y: 320, size: { width: 120, height: 50 } },
-      { type: 'branch', label: 'Branch 4', x: 520, y: 320, size: { width: 120, height: 50 } },
+      { type: 'central-topic', label: 'Main Topic', x: 300, y: 200, size: { width: 150, height: 80 } },
+      { type: 'main-topic', label: 'Branch 1', x: 100, y: 80, size: { width: 120, height: 50 } },
+      { type: 'main-topic', label: 'Branch 2', x: 520, y: 80, size: { width: 120, height: 50 } },
+      { type: 'main-topic', label: 'Branch 3', x: 100, y: 320, size: { width: 120, height: 50 } },
+      { type: 'main-topic', label: 'Branch 4', x: 520, y: 320, size: { width: 120, height: 50 } },
     ],
     connections: [
       { sourceIdx: 0, targetIdx: 1 },
@@ -110,9 +110,9 @@ const STARTER_PACKS = [
     thumbnail: '📝',
     elements: [
       // Column headers (using annotations or stickies)
-      { type: 'sticky-yellow', label: 'To Do', x: 100, y: 80, size: { width: 150, height: 40 } },
-      { type: 'sticky-yellow', label: 'In Progress', x: 300, y: 80, size: { width: 150, height: 40 } },
-      { type: 'sticky-yellow', label: 'Done', x: 500, y: 80, size: { width: 150, height: 40 } },
+      { type: 'sticky-medium', label: 'To Do', x: 100, y: 80, size: { width: 150, height: 40 } },
+      { type: 'sticky-medium', label: 'In Progress', x: 300, y: 80, size: { width: 150, height: 40 } },
+      { type: 'sticky-medium', label: 'Done', x: 500, y: 80, size: { width: 150, height: 40 } },
       // Sample tasks
       { type: 'sticky-blue', label: 'Task 1', x: 100, y: 150, size: { width: 150, height: 100 } },
       { type: 'sticky-blue', label: 'Task 2', x: 100, y: 270, size: { width: 150, height: 100 } },

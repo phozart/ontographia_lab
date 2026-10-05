@@ -651,6 +651,15 @@ function MainTopicNode({ element, stencil, isSelected }) {
   );
 }
 
+// Dark label on light fills (image/link topics), white on saturated fills
+function labelColorFor(hex) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return '#fff';
+  const n = parseInt(m[1], 16);
+  const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  return lum > 0.75 ? '#374151' : '#fff';
+}
+
 /**
  * Sub-topic Renderer - Smaller pill, lighter styling
  */
@@ -682,7 +691,7 @@ function SubTopicNode({ element, stencil, isSelected }) {
         y={height / 2}
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#fff"
+        fill={labelColorFor(color)}
         fontSize="12"
         fontWeight="500"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
