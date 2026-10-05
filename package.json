@@ -8,7 +8,7 @@
     "dev:test": "next dev -p 3002",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "jest --selectProjects unit",
     "test:watch": "jest --selectProjects unit --watch",
     "test:coverage": "jest --selectProjects unit --coverage",
@@ -38,6 +38,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
+    "@eslint/eslintrc": "^3.3.3",
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.0.0",
     "jest": "^30.2.0",

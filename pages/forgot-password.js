@@ -30,31 +30,16 @@ const SKY = {
   skyReturn: '#6EC5D8',
 };
 
-// Generate a simple math CAPTCHA
-function generateCaptcha() {
-  const operations = ['+', '-', '×'];
-  const op = operations[Math.floor(Math.random() * operations.length)];
-  let a, b, answer;
-
-  switch (op) {
-    case '+':
-      a = Math.floor(Math.random() * 20) + 1;
-      b = Math.floor(Math.random() * 20) + 1;
-      answer = a + b;
-      break;
-    case '-':
-      a = Math.floor(Math.random() * 20) + 10;
-      b = Math.floor(Math.random() * a);
-      answer = a - b;
-      break;
-    case '×':
-      a = Math.floor(Math.random() * 10) + 1;
-      b = Math.floor(Math.random() * 10) + 1;
-      answer = a * b;
-      break;
+// Fetch a server-issued CAPTCHA challenge ({ question, token })
+async function fetchCaptcha() {
+  try {
+    const res = await fetch('/api/auth/captcha', { cache: 'no-store' });
+    if (!res.ok) throw new Error('captcha unavailable');
+    const data = await res.json();
+    return { question: data.question, token: data.token };
+  } catch (e) {
+    return { question: 'Verification unavailable - refresh to retry', token: '' };
   }
-
-  return { question: `${a} ${op} ${b} = ?`, answer: answer.toString() };
 }
 
 export default function ForgotPasswordPage() {
@@ -63,14 +48,14 @@ export default function ForgotPasswordPage() {
 
   const [email, setEmail] = useState('');
   const [captchaAnswer, setCaptchaAnswer] = useState('');
-  const [captcha, setCaptcha] = useState({ question: '', answer: '' });
+  const [captcha, setCaptcha] = useState({ question: '', token: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resetUrl, setResetUrl] = useState(''); // For dev mode
 
   useEffect(() => {
-    setCaptcha(generateCaptcha());
+    fetchCaptcha().then(setCaptcha);
   }, []);
 
   // Redirect if logged in
@@ -81,7 +66,7 @@ export default function ForgotPasswordPage() {
   }, [session, router]);
 
   const refreshCaptcha = () => {
-    setCaptcha(generateCaptcha());
+    fetchCaptcha().then(setCaptcha);
     setCaptchaAnswer('');
   };
 
@@ -103,7 +88,7 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({
           email,
           captchaAnswer,
-          captchaExpected: captcha.answer,
+          captchaToken: captcha.token,
         }),
       });
 

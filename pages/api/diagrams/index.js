@@ -29,6 +29,10 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'type and name are required' });
       }
 
+      if (typeof name !== 'string' || name.length > 255) {
+        return res.status(400).json({ error: 'name must be a string of at most 255 characters' });
+      }
+
       try {
         const diagram = await diagramRepository.createDiagram(req.body, user.email);
         return res.status(201).json(diagram);
@@ -43,6 +47,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error('Diagrams API error', err);
-    return res.status(500).json({ error: 'Internal server error', details: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
