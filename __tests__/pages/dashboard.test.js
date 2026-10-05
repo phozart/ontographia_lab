@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import DashboardPage from '../../pages/dashboard';
 
 const push = jest.fn();
@@ -17,7 +17,11 @@ jest.mock('@mui/material/useMediaQuery', () => ({
   __esModule: true,
   default: () => mockMatches,
 }));
-jest.mock('../../components/ui/AppSidebar', () => () => <aside data-testid="sidebar" />);
+jest.mock('../../components/ui/AppSidebar', () => () => (
+  <aside data-testid="sidebar">
+    <a href="#home" onClick={(e) => e.preventDefault()}>Home</a>
+  </aside>
+));
 
 const diagram = { id: '1', name: 'WS One', type: 'mindmap', updated_at: new Date().toISOString() };
 
@@ -46,5 +50,13 @@ describe('Dashboard responsive sidebar', () => {
     mockMatches = false;
     render(<DashboardPage />);
     expect(await screen.findByLabelText('Workspace actions')).toBeInTheDocument();
+  });
+
+  it('closes the mobile drawer when any nav item is clicked', async () => {
+    mockMatches = true;
+    render(<DashboardPage />);
+    fireEvent.click(await screen.findByLabelText('Open navigation menu'));
+    fireEvent.click(await screen.findByText('Home'));
+    await waitFor(() => expect(screen.queryByTestId('sidebar')).not.toBeInTheDocument());
   });
 });

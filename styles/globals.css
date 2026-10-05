@@ -204,6 +204,11 @@ button {
   outline-offset: 2px;
 }
 
+/* MUI inputs draw their own focus ring */
+.MuiInputBase-input:focus-visible {
+  outline: none;
+}
+
 /* Button base styles */
 .btn {
   display: inline-flex;

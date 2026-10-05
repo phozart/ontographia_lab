@@ -18,15 +18,11 @@ import {
   InputAdornment,
   Menu,
   MenuItem,
-  Drawer,
-  useMediaQuery,
 } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ViewListIcon from '@mui/icons-material/ViewList';
-import MenuIcon from '@mui/icons-material/Menu';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -40,7 +36,7 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { formatDistanceToNow } from 'date-fns';
 
-import AppSidebar from '../components/ui/AppSidebar';
+import { ResponsiveSidebar, MobileNavBar, useResponsiveNav } from '../components/ui/ResponsiveNav';
 import { LogoIcon } from '../components/ui/Logo';
 import { DiagramGridSkeleton } from '../components/ui/LoadingSkeleton';
 import { ConfirmDialog, useConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -184,9 +180,7 @@ export default function DashboardPage() {
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedDiagram, setSelectedDiagram] = useState(null);
   const [creating, setCreating] = useState(false);
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [navOpen, setNavOpen] = useState(false);
+  const nav = useResponsiveNav();
 
   // Auth check
   useEffect(() => {
@@ -307,46 +301,11 @@ export default function DashboardPage() {
 
       <div className="dashboard-layout">
         {/* Left Sidebar */}
-        {isMobile ? (
-          <Drawer
-            anchor="left"
-            open={navOpen}
-            onClose={() => setNavOpen(false)}
-            PaperProps={{ sx: { width: 240 } }}
-          >
-            <AppSidebar
-              forceExpanded
-              onCreateWorkspace={() => {
-                setNavOpen(false);
-                createWorkspace();
-              }}
-            />
-          </Drawer>
-        ) : (
-          <AppSidebar onCreateWorkspace={createWorkspace} />
-        )}
+        <ResponsiveSidebar nav={nav} onCreateWorkspace={createWorkspace} />
 
         {/* Main Content */}
         <div className="dashboard-main">
-          {isMobile && (
-            <Box
-              component="header"
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                px: 1,
-                py: 0.5,
-                borderBottom: '1px solid var(--border, #e2e8f0)',
-                bgcolor: 'var(--panel, #ffffff)',
-              }}
-            >
-              <IconButton aria-label="Open navigation menu" onClick={() => setNavOpen(true)}>
-                <MenuIcon />
-              </IconButton>
-              <LogoIcon size={24} />
-            </Box>
-          )}
+          <MobileNavBar nav={nav} />
           {/* Content Area */}
           <div className="dashboard-content">
             {/* Header with greeting */}

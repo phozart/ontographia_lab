@@ -28,7 +28,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import SettingsBackupRestoreIcon from '@mui/icons-material/SettingsBackupRestore';
 import TuneIcon from '@mui/icons-material/Tune';
 
-import AppSidebar from '../components/ui/AppSidebar';
+import { ResponsiveSidebar, MobileNavBar, useResponsiveNav } from '../components/ui/ResponsiveNav';
 import { RoleBadge, StatusBadge } from '../components/ui/StatusBadge';
 
 // Password requirements
@@ -43,6 +43,7 @@ const PASSWORD_REQUIREMENTS = [
 export default function AccountPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const nav = useResponsiveNav();
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -167,10 +168,12 @@ export default function AccountPage() {
         <title>Account - Ontographia Lab</title>
       </Head>
 
-      <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'var(--bg)' }}>
-        <AppSidebar />
+      <Box className="dashboard-layout">
+        <ResponsiveSidebar nav={nav} />
 
-        <Box sx={{ flex: 1, p: 4, maxWidth: 800, mx: 'auto' }}>
+        <Box className="dashboard-main">
+        <MobileNavBar nav={nav} />
+        <Box sx={{ flex: 1, p: { xs: 2, md: 4 }, width: '100%', maxWidth: 800, mx: 'auto', boxSizing: 'border-box' }}>
           <Typography variant="h4" sx={{ fontWeight: 700, color: 'var(--text)', mb: 4 }}>
             Account Settings
           </Typography>
@@ -475,6 +478,7 @@ export default function AccountPage() {
               Sign Out
             </Button>
           </Paper>
+        </Box>
         </Box>
       </Box>
     </>
