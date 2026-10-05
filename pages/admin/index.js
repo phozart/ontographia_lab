@@ -29,7 +29,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
-    } else if (session?.user?.role !== 'admin') {
+    } else if (status === 'authenticated' && session?.user?.role !== 'admin') {
       router.push('/dashboard');
     }
   }, [status, session, router]);
