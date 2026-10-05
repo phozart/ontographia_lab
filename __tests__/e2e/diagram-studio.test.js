@@ -4,25 +4,26 @@
  * Tests the core functionality of the Ontographia Lab Diagram Studio using Puppeteer.
  *
  * Prerequisites:
- * - The app must be running at http://localhost:3002
- * - User must be logged in (auth required)
- * - npm install puppeteer (if not already installed)
+ * - The app must be running at TEST_BASE_URL (default http://localhost:3002)
+ * - .env.qa.local (gitignored) must define QA_ADMIN_EMAIL and QA_ADMIN_PASSWORD
+ *   for a local QA user. The suite logs in via /login and creates/deletes its
+ *   own fixture diagram through POST/DELETE /api/diagrams.
  *
  * Run with: npm run test:e2e
  * Debug mode: HEADLESS=false npm run test:e2e
  *
- * IMPORTANT: These tests require authentication. Run the app and log in manually first,
- * or set up test credentials in the environment.
  */
 
+const path = require('path');
 const puppeteer = require('puppeteer');
+require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
 // Set Jest timeout for all tests (E2E tests need more time)
 jest.setTimeout(60000);
 
-const BASE_URL = 'http://localhost:3002';
-// Use an existing diagram ID from the database
-const DIAGRAM_URL = `${BASE_URL}/diagram/LAB-5`;
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3002';
+// Set in beforeAll once the fixture diagram has been created
+let DIAGRAM_URL = null;
 
 // Test configuration
 const CONFIG = {
@@ -106,9 +107,19 @@ async function ensureAuthenticated(page) {
 describe('Diagram Studio E2E Tests', () => {
   let browser;
   let page;
+  let sessionCookies = [];
+  let fixtureDiagramId = null;
 
   // Setup before all tests
   beforeAll(async () => {
+    const email = process.env.QA_ADMIN_EMAIL;
+    const password = process.env.QA_ADMIN_PASSWORD;
+    if (!email || !password) {
+      throw new Error(
+        'QA_ADMIN_EMAIL and QA_ADMIN_PASSWORD must be set (define them in .env.qa.local) to run e2e tests.'
+      );
+    }
+
     browser = await puppeteer.launch({
       headless: CONFIG.headless,
       slowMo: CONFIG.slowMo,
@@ -120,12 +131,64 @@ describe('Diagram Studio E2E Tests', () => {
         '--disable-gpu',
       ],
     });
+
+    // Log in once through the /login form and keep the session cookies
+    const loginPage = await browser.newPage();
+    try {
+      loginPage.setDefaultTimeout(CONFIG.defaultTimeout);
+      await loginPage.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle0' });
+      await loginPage.type('#email', email);
+      await loginPage.type('#password', password);
+      await Promise.all([
+        loginPage.waitForFunction(() => !window.location.pathname.startsWith('/login'), {
+          timeout: CONFIG.defaultTimeout,
+        }),
+        loginPage.click('button[type="submit"]'),
+      ]);
+      sessionCookies = await loginPage.cookies();
+      if (sessionCookies.length === 0) {
+        throw new Error('Login produced no session cookies');
+      }
+
+      // Create a fresh fixture diagram (same-origin fetch carries the session)
+      const created = await loginPage.evaluate(async () => {
+        const res = await fetch('/api/diagrams', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'infinite-canvas', name: 'E2E Fixture' }),
+        });
+        return { status: res.status, body: await res.json().catch(() => null) };
+      });
+      if (created.status !== 201 || !created.body) {
+        throw new Error(`Fixture diagram creation failed (HTTP ${created.status})`);
+      }
+      fixtureDiagramId = created.body.id;
+      const shortId = created.body.short_id || created.body.shortId || created.body.id;
+      DIAGRAM_URL = `${BASE_URL}/diagram/${shortId}`;
+    } finally {
+      await loginPage.close().catch(() => {});
+    }
   });
 
   // Cleanup after all tests
   afterAll(async () => {
-    if (browser) {
-      await browser.close();
+    try {
+      if (browser && fixtureDiagramId && sessionCookies.length) {
+        const p = await browser.newPage();
+        await p.setCookie(...sessionCookies);
+        await p.goto(`${BASE_URL}/login`, { waitUntil: 'domcontentloaded' });
+        await p.evaluate(
+          (id) => fetch(`/api/diagrams/${id}`, { method: 'DELETE' }),
+          fixtureDiagramId
+        );
+        await p.close();
+      }
+    } catch (err) {
+      console.warn('E2E cleanup of fixture diagram failed:', err.message);
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
     }
   });
 
@@ -134,16 +197,23 @@ describe('Diagram Studio E2E Tests', () => {
     page = await browser.newPage();
     await page.setViewport(CONFIG.viewport);
     page.setDefaultTimeout(CONFIG.defaultTimeout);
-
-    // Note: Auth is handled by the browser session.
-    // For CI, you would load stored cookies here.
-    // Example: await page.setCookie(...storedCookies);
+    // page.waitForTimeout was removed in Puppeteer 22+; keep tests working
+    if (typeof page.waitForTimeout !== 'function') {
+      page.waitForTimeout = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    }
+    await page.setCookie(...sessionCookies);
   });
 
   // Close page after each test
   afterEach(async () => {
-    if (page) {
-      await page.close();
+    try {
+      if (page && !page.isClosed()) {
+        await page.close();
+      }
+    } catch (err) {
+      // A crashed/closed page must not fail subsequent tests
+    } finally {
+      page = null;
     }
   });
 
@@ -604,10 +674,10 @@ describe('Diagram Studio E2E Tests', () => {
       await waitForDiagramStudio(page);
 
       // Look for "Add shapes" button
-      const addShapesBtn = await page.$('button:has-text("Add shapes"), .ds-welcome-action-btn');
+      const addShapesBtn = await page.$('.ds-welcome-action-btn');
 
       // Look for "Use template" button
-      const templateBtn = await page.$('button:has-text("Use template"), .ds-welcome-action-btn:nth-child(2)');
+      const templateBtn = await page.$('.ds-welcome-action-btn:nth-child(2)');
 
       // At least one action button should exist
       expect(addShapesBtn !== null || templateBtn !== null).toBe(true);
@@ -783,7 +853,7 @@ describe('Diagram Studio E2E Tests', () => {
 
       // Look for collaboration bar (top right area)
       const collabBar = await page.$('.ds-collaboration-bar, [class*="collaboration"]');
-      const shareBtn = await page.$('[title*="Share"], button:has-text("Share")');
+      const shareBtn = await page.$('[title*="Share"]');
 
       // Either the bar or share button should exist
       expect(collabBar !== null || shareBtn !== null).toBe(true);

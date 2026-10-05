@@ -10,7 +10,7 @@ module.exports = async () => {
 
   // Set environment variables for E2E tests
   process.env.E2E_TEST = 'true';
-  process.env.TEST_BASE_URL = 'http://localhost:3002';
+  process.env.TEST_BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3002';
 
   // Note: The Next.js dev server should be running before tests
   // You can either:
