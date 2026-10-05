@@ -3,6 +3,7 @@
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { migrateDiagram } from './migrations/migrateDiagram';
 
 // ============ CONTEXT ============
 
@@ -591,8 +592,9 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     if (newDiagram) {
       // Extract elements and connections from content field (database format)
       // or from top-level fields (legacy/direct format)
-      const content = newDiagram.content || {};
-      const elements = newDiagram.elements || content.elements || content.nodes || [];
+      // migrateDiagram upgrades legacy element types (pure, idempotent)
+      const content = migrateDiagram(newDiagram.content) || {};
+      const elements = migrateDiagram({ elements: newDiagram.elements }).elements || content.elements || content.nodes || [];
       const connections = newDiagram.connections || content.connections || content.edges || [];
       const layers = newDiagram.layers || content.layers || [DEFAULT_LAYER];
       const groups = newDiagram.groups || content.groups || [];
