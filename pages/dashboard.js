@@ -36,7 +36,7 @@ import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { formatDistanceToNow } from 'date-fns';
 
-import AppSidebar from '../components/ui/AppSidebar';
+import { ResponsiveSidebar, MobileNavBar, useResponsiveNav } from '../components/ui/ResponsiveNav';
 import { LogoIcon } from '../components/ui/Logo';
 import { DiagramGridSkeleton } from '../components/ui/LoadingSkeleton';
 import { ConfirmDialog, useConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -180,6 +180,7 @@ export default function DashboardPage() {
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedDiagram, setSelectedDiagram] = useState(null);
   const [creating, setCreating] = useState(false);
+  const nav = useResponsiveNav();
 
   // Auth check
   useEffect(() => {
@@ -300,10 +301,11 @@ export default function DashboardPage() {
 
       <div className="dashboard-layout">
         {/* Left Sidebar */}
-        <AppSidebar onCreateWorkspace={createWorkspace} />
+        <ResponsiveSidebar nav={nav} onCreateWorkspace={createWorkspace} />
 
         {/* Main Content */}
         <div className="dashboard-main">
+          <MobileNavBar nav={nav} />
           {/* Content Area */}
           <div className="dashboard-content">
             {/* Header with greeting */}
@@ -329,7 +331,7 @@ export default function DashboardPage() {
             <Box sx={{ mb: 5 }}>
               <SectionHeader icon={RocketLaunchIcon} title="Quick Actions" />
               <Grid container spacing={2}>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <QuickAction
                     icon={AddIcon}
                     label="New Workspace"
@@ -339,7 +341,7 @@ export default function DashboardPage() {
                     primary
                   />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <QuickAction
                     icon={MenuBookIcon}
                     label="Getting Started"
@@ -348,7 +350,7 @@ export default function DashboardPage() {
                     color={SKY.deepLavender}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <QuickAction
                     icon={KeyboardIcon}
                     label="Shortcuts"
@@ -357,7 +359,7 @@ export default function DashboardPage() {
                     color={SKY.mauveRose}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6} md={3}>
+                <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <QuickAction
                     icon={ExtensionIcon}
                     label="Stencil Packs"
@@ -372,7 +374,7 @@ export default function DashboardPage() {
             {/* Main content area - two columns on larger screens */}
             <Grid container spacing={4}>
               {/* Workspaces Column */}
-              <Grid item xs={12} lg={8}>
+              <Grid size={{ xs: 12, lg: 8 }}>
                 {/* Recent Workspaces or Empty State */}
                 {loading ? (
                   <DiagramGridSkeleton count={6} />
@@ -506,7 +508,7 @@ export default function DashboardPage() {
                           };
 
                           return (
-                            <Grid item xs={12} sm={6} md={4} key={diagram.id} sx={{ display: 'flex' }}>
+                            <Grid size={{ xs: 12, sm: 6, md: 4 }} key={diagram.id} sx={{ display: 'flex' }}>
                               <Paper
                                 elevation={0}
                                 sx={{
@@ -567,6 +569,7 @@ export default function DashboardPage() {
                                     </Box>
                                     <IconButton
                                       size="small"
+                                      aria-label="Workspace actions"
                                       onClick={(e) => {
                                         setMenuAnchor(e.currentTarget);
                                         setSelectedDiagram(diagram);
@@ -588,7 +591,7 @@ export default function DashboardPage() {
               </Grid>
 
               {/* Resources Sidebar */}
-              <Grid item xs={12} lg={4}>
+              <Grid size={{ xs: 12, lg: 4 }}>
                 <Paper
                   elevation={0}
                   sx={{

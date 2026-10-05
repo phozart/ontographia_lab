@@ -18,10 +18,12 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
 
-export default function AppSidebar({ onCreateWorkspace }) {
+export default function AppSidebar({ onCreateWorkspace, forceExpanded = false }) {
   const { data: session } = useSession();
   const router = useRouter();
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [expandedState, setIsExpanded] = useState(true);
+  // forceExpanded is used when rendered inside a mobile drawer
+  const isExpanded = forceExpanded || expandedState;
   const [recentSpaces, setRecentSpaces] = useState([]);
 
   const isAdmin = session?.user?.role === 'admin';
@@ -76,16 +78,18 @@ export default function AppSidebar({ onCreateWorkspace }) {
             <Link href="/dashboard" className="sidebar-logo">
               <Logo size={32} showText={true} textColor="var(--text)" />
             </Link>
-            <button className="sidebar-toggle" onClick={toggleSidebar} title="Collapse sidebar">
-              <ChevronLeftIcon fontSize="small" />
-            </button>
+            {!forceExpanded && (
+              <button className="sidebar-toggle" onClick={toggleSidebar} title="Collapse sidebar" aria-label="Collapse sidebar">
+                <ChevronLeftIcon fontSize="small" />
+              </button>
+            )}
           </>
         ) : (
           <>
             <Link href="/dashboard" className="sidebar-logo-collapsed" title="Ontographia Lab">
               <LogoIcon size={28} />
             </Link>
-            <button className="sidebar-toggle" onClick={toggleSidebar} title="Expand sidebar">
+            <button className="sidebar-toggle" onClick={toggleSidebar} title="Expand sidebar" aria-label="Expand sidebar">
               <ChevronRightIcon fontSize="small" />
             </button>
           </>

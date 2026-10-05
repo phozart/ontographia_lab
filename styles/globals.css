@@ -204,6 +204,11 @@ button {
   outline-offset: 2px;
 }
 
+/* MUI inputs draw their own focus ring */
+.MuiInputBase-input:focus-visible {
+  outline: none;
+}
+
 /* Button base styles */
 .btn {
   display: inline-flex;
@@ -253,13 +258,17 @@ button {
   transform: translateY(-2px);
 }
 
-/* Input styles */
-input[type="text"],
-input[type="email"],
-input[type="password"],
-input[type="search"],
-textarea,
-select {
+/* Input styles
+   Wrapped in :where() (zero specificity) and excluding MUI inputs so these
+   defaults never override MUI's own input styling (fixes invisible text). */
+:where(
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  textarea,
+  select
+):not(.MuiInputBase-input) {
   font-family: inherit;
   font-size: 14px;
   padding: 10px 14px;
@@ -270,16 +279,13 @@ select {
   transition: all 0.2s ease;
 }
 
-input:focus,
-textarea:focus,
-select:focus {
+:where(input, textarea, select):not(.MuiInputBase-input):focus {
   outline: none;
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
-input::placeholder,
-textarea::placeholder {
+:where(input, textarea):not(.MuiInputBase-input)::placeholder {
   color: var(--text-light);
 }
 
@@ -538,6 +544,13 @@ textarea::placeholder {
   background: var(--bg);
 }
 
+/* Sidebar fills the viewport height and stays put while content scrolls */
+.dashboard-layout > .app-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
 .dashboard-main {
   flex: 1;
   display: flex;
@@ -550,4 +563,10 @@ textarea::placeholder {
   flex: 1;
   overflow: auto;
   padding: 32px;
+}
+
+@media (max-width: 899.95px) {
+  .dashboard-content {
+    padding: 16px;
+  }
 }

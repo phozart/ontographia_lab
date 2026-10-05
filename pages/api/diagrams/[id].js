@@ -4,6 +4,10 @@
 import { diagramRepository } from '../../../lib/diagramRepository';
 import { requireActiveUser } from '../../../lib/useAuth';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SHORT_ID_RE = /^LAB-\d{1,9}$/;
+const MAX_NAME_LENGTH = 255;
+
 export default async function handler(req, res) {
   // Require authenticated and active user
   const user = await requireActiveUser(req, res);
@@ -11,6 +15,9 @@ export default async function handler(req, res) {
 
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'Diagram ID required' });
+  if (typeof id !== 'string' || !(UUID_RE.test(id) || SHORT_ID_RE.test(id))) {
+    return res.status(404).json({ error: 'Diagram not found' });
+  }
 
   try {
     // GET - fetch single diagram
@@ -48,6 +55,13 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
+      const name = req.body?.name;
+      if (name !== undefined && name !== null) {
+        if (typeof name !== 'string' || name.length > MAX_NAME_LENGTH) {
+          return res.status(400).json({ error: `name must be a string of at most ${MAX_NAME_LENGTH} characters` });
+        }
+      }
+
       const updated = await diagramRepository.updateDiagram(diagram.id, req.body);
       return res.status(200).json(updated);
     }
@@ -75,6 +89,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error('Diagram API error', err);
-    return res.status(500).json({ error: 'Internal server error', details: err.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }
