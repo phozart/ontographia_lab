@@ -3,6 +3,7 @@
 
 import { diagramRepository } from '../../../lib/diagramRepository';
 import { requireActiveUser } from '../../../lib/useAuth';
+import { migrateDiagram } from '../../../components/diagram-studio/migrations/migrateDiagram';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SHORT_ID_RE = /^LAB-\d{1,9}$/;
@@ -36,7 +37,8 @@ export default async function handler(req, res) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      return res.status(200).json(diagram);
+      // Upgrade legacy element types on read; persisted on the next save
+      return res.status(200).json({ ...diagram, content: migrateDiagram(diagram.content) });
     }
 
     // PUT - update diagram

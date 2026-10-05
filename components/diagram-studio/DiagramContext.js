@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useCallback, useMemo, useEffect, u
 import { useSession } from 'next-auth/react';
 import { generateId } from './utils/ids';
 import { normalizeDiagramContent } from './migrations/normalizeContent';
+import { migrateDiagram } from './migrations/migrateDiagram';
 
 // ============ CONTEXT ============
 
@@ -593,9 +594,10 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     if (newDiagram) {
       // Extract elements and connections from content field (database format)
       // or from top-level fields (legacy/direct format)
-      // normalizeDiagramContent handles legacy nodes/edges and the nested double-write shape
-      const content = normalizeDiagramContent(newDiagram.content);
-      const elements = newDiagram.elements || content.elements;
+      // normalize first (legacy nodes/edges, nested double-write shape), then upgrade legacy
+      // element types; migrateDiagram only looks at top-level elements, so order matters
+      const content = migrateDiagram(normalizeDiagramContent(newDiagram.content));
+      const elements = migrateDiagram({ elements: newDiagram.elements }).elements || content.elements;
       const connections = newDiagram.connections || content.connections;
       const layers = newDiagram.layers || content.layers;
       const groups = newDiagram.groups || content.groups;

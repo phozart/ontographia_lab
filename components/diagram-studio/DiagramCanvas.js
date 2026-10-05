@@ -41,6 +41,7 @@ import { useClipboard, useQuickCreate, useAlignmentGuides } from './hooks';
 import { useCanvasInteractions } from './hooks/composite/useCanvasInteractions';
 import { getZIndexForOrder, compareByZOrder } from './hooks/interaction/zOrder';
 import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOptions';
+import { requestJsonImportFromDrop } from './export/useJsonImport';
 
 // Extracted utilities (refactored 2025-12-29)
 import {
@@ -3699,6 +3700,9 @@ export default function DiagramCanvas({
     e.stopPropagation();
     dragCounterRef.current = 0;
     setIsDragOver(false);
+
+    // A dropped .json file opens the import dialog (handled by the title bar)
+    if (requestJsonImportFromDrop(e.dataTransfer)) return;
 
     // Use containerRef for consistent bounding rect with drag handling
     const rect = containerRef.current?.getBoundingClientRect();

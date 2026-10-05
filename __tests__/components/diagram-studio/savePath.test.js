@@ -67,4 +67,16 @@ describe('save path', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(global.fetch.mock.calls.filter(([, i]) => i?.method === 'PUT')).toHaveLength(1);
   });
+
+  test('nested legacy content gets legacy element types upgraded (normalize, then migrate)', () => {
+    const { result } = setup();
+    act(() => {
+      result.current.setDiagram({
+        id: 'd1', name: 'L', type: 'mindmap',
+        content: { diagram: { content: { elements: [{ id: 'n1', type: 'central-idea', x: 0, y: 0 }] } } },
+      });
+    });
+    expect(result.current.elements).toHaveLength(1);
+    expect(result.current.elements[0]).toMatchObject({ id: 'n1', type: 'central-topic', packId: 'mind-map' });
+  });
 });

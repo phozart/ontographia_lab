@@ -215,7 +215,7 @@ export default function ExportImportPage() {
           <FeatureCard
             icon={CodeIcon}
             title="SVG Export"
-            description="Scalable vector graphics that stay crisp at any size. Ideal for web embedding and print materials."
+            description="Scalable image that stays crisp at any size and matches the canvas exactly, including custom stencils and connection styles. Ideal for web embedding and documents."
             color={SKY.steelBlue}
           />
         </Grid>
@@ -223,16 +223,15 @@ export default function ExportImportPage() {
           <FeatureCard
             icon={PictureAsPdfIcon}
             title="PDF Export"
-            description="Print-ready documents with vector graphics. Supports multiple pages for large diagrams."
+            description="Print-ready single page: fit the page to your diagram, or choose A4 or US Letter in landscape or portrait. The diagram is embedded as a high-resolution image."
             color={SKY.deepLavender}
-            badge="Coming Soon"
           />
         </Grid>
         <Grid item xs={12} md={6}>
           <FeatureCard
             icon={DataObjectIcon}
             title="JSON Export"
-            description="Full diagram data in structured JSON format. Use for backups, version control, or programmatic access."
+            description="Full diagram data in a versioned JSON file. Use for backups, version control, or programmatic access, and import it back into any diagram."
             color={SKY.mauveRose}
           />
         </Grid>
@@ -262,8 +261,8 @@ export default function ExportImportPage() {
         <FormatCard
           format="SVG"
           extension=".svg"
-          description="Vector format that scales infinitely. Editable in design tools like Figma, Illustrator, or Inkscape."
-          use="Web embedding, design handoff, print materials"
+          description="Scalable format that matches what you see on the canvas. Opens in browsers and most viewers; text and shapes are not converted to editable vector paths."
+          use="Web embedding, documentation, print materials"
         />
         <FormatCard
           format="JSON"
@@ -298,10 +297,10 @@ export default function ExportImportPage() {
         <Box component="ol" sx={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 14, lineHeight: 2.2, pl: 3 }}>
           <li>Open the diagram you want to export</li>
           <li>Click the menu icon (☰) in the top-left corner</li>
-          <li>Select <strong style={{ color: 'white' }}>Export</strong> from the menu</li>
-          <li>Choose your desired format (PNG, SVG, or JSON)</li>
+          <li>Select <strong style={{ color: 'white' }}>Export...</strong> from the menu</li>
+          <li>Choose your desired format (PNG, SVG, JPEG, PDF, or JSON)</li>
           <li>Configure export options (background, scale, selection)</li>
-          <li>Click <strong style={{ color: 'white' }}>Download</strong></li>
+          <li>Click <strong style={{ color: 'white' }}>Export</strong></li>
         </Box>
       </Box>
 
@@ -320,7 +319,7 @@ export default function ExportImportPage() {
 
       <Grid container spacing={2} sx={{ mb: 6 }}>
         {[
-          { title: 'Background', desc: 'Transparent, white, or custom color' },
+          { title: 'Background', desc: 'Transparent, white, grid, or custom color' },
           { title: 'Scale', desc: '1x, 2x, or 3x resolution for images' },
           { title: 'Selection Only', desc: 'Export just the selected elements' },
           { title: 'Include Padding', desc: 'Add margin around the diagram' },
@@ -364,7 +363,7 @@ export default function ExportImportPage() {
           <FeatureCard
             icon={FileUploadIcon}
             title="JSON Import"
-            description="Import diagrams previously exported from Ontographia Lab. Preserves all elements, connections, and styling."
+            description="Use Menu, then Import JSON to bring in a file exported from Ontographia Lab. Add it to the open diagram (placed at the center of your view) or create a new diagram. Files up to 5 MB."
             color={SKY.warmPeach}
           />
         </Grid>
@@ -372,7 +371,7 @@ export default function ExportImportPage() {
           <FeatureCard
             icon={FileDownloadIcon}
             title="Drag & Drop"
-            description="Simply drag a JSON file onto the canvas to import. Works in any open diagram."
+            description="Drag a JSON file onto the canvas to start the same import. Works in any open diagram you can edit."
             color={SKY.goldenHour}
           />
         </Grid>

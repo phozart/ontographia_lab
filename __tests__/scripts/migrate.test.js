@@ -18,6 +18,7 @@ const {
   listMigrationFiles,
   checksumOf,
   getConnectionString,
+  isFatalConnectError,
 } = require('../../scripts/migrate');
 
 const REAL_DIR = path.join(__dirname, '..', '..', 'db', 'migrations');
@@ -62,6 +63,15 @@ describe('migration files (pure)', () => {
     process.env.DATABASE_URL = 'postgresql://u:p@h:1/d';
     expect(getConnectionString()).toBe('postgresql://u:p@h:1/d');
     if (prev === undefined) delete process.env.DATABASE_URL; else process.env.DATABASE_URL = prev;
+  });
+});
+
+describe('connect error classification (pure)', () => {
+  test('bad password / missing database are fatal; network errors are transient', () => {
+    expect(isFatalConnectError({ code: '28P01' })).toBe(true);
+    expect(isFatalConnectError({ code: '3D000' })).toBe(true);
+    expect(isFatalConnectError({ code: 'ECONNREFUSED' })).toBe(false);
+    expect(isFatalConnectError({ code: '57P03' })).toBe(false);
   });
 });
 
@@ -249,5 +259,39 @@ dbDescribe('migration runner against a throwaway database', () => {
     const res = await migrate({ connectionString: url, dir, logger: { log: () => {}, warn } });
     expect(res.applied).toEqual([]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('0002_b'));
+  });
+  test('missing database fails fast without retrying', async () => {
+    const warn = jest.fn();
+    const start = Date.now();
+    await expect(migrate({
+      connectionString: urlFor(`${dbName}_does_not_exist`), dir: REAL_DIR,
+      logger: { log: () => {}, warn }, retries: 5, retryDelayMs: 1000,
+    })).rejects.toMatchObject({ code: '3D000' });
+    expect(warn).not.toHaveBeenCalled();
+    expect(Date.now() - start).toBeLessThan(3000);
+  });
+
+  test('a migration blocked by another transaction fails on lock_timeout and is not recorded', async () => {
+    const url = await freshDb();
+    const dir = tmpMigrationsDir({ '0001_a.sql': 'create table locked1(id int);', '0002_b.sql': 'alter table locked1 add column x int;' });
+    await migrate({ connectionString: url, dir: tmpMigrationsDir({ '0001_a.sql': 'create table locked1(id int);' }), logger: quiet });
+    const blocker = new Client({ connectionString: url });
+    await blocker.connect();
+    try {
+      await blocker.query('BEGIN');
+      await blocker.query('LOCK TABLE locked1 IN ACCESS SHARE MODE');
+      const start = Date.now();
+      await expect(migrate({ connectionString: url, dir, logger: quiet, lockTimeout: '300ms' })).rejects.toThrow(/0002_b.*lock timeout/i);
+      expect(Date.now() - start).toBeLessThan(5000);
+    } finally {
+      await blocker.query('ROLLBACK');
+      await blocker.end();
+    }
+    await withClient(url, async (c) => {
+      const v = await c.query('select version from schema_migrations order by 1');
+      expect(v.rows.map((r) => r.version)).toEqual(['0001_a']);
+    });
+    const res = await migrate({ connectionString: url, dir, logger: quiet });
+    expect(res.applied).toEqual(['0002_b']);
   });
 });

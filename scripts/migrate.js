@@ -71,6 +71,12 @@ function listMigrationFiles(dir = DEFAULT_DIR) {
   return files;
 }
 
+// Errors that retrying cannot fix: 28P01 bad password, 28000 invalid authorization, 3D000 database missing
+const FATAL_CONNECT_CODES = new Set(['28P01', '28000', '3D000']);
+function isFatalConnectError(err) {
+  return !!err && FATAL_CONNECT_CODES.has(err.code);
+}
+
 async function connectWithRetry(connectionString, { attempts = 10, delayMs = 2000, logger }) {
   let lastErr;
   for (let i = 1; i <= attempts; i += 1) {
@@ -81,6 +87,7 @@ async function connectWithRetry(connectionString, { attempts = 10, delayMs = 200
     } catch (err) {
       lastErr = err;
       try { await client.end(); } catch (_) { /* ignore */ }
+      if (isFatalConnectError(err)) throw err;
       if (i < attempts) {
         logger.warn(`[migrate] database not reachable (${err.code || err.message}); retry ${i}/${attempts - 1}`);
         await new Promise((r) => setTimeout(r, delayMs));
@@ -99,12 +106,12 @@ const LEDGER_DDL = `
 
 /**
  * Apply pending migrations.
- * @param {{connectionString?:string, dir?:string, logger?:{log:Function,warn:Function}, dryRun?:boolean, retries?:number}} opts
+ * @param {{connectionString?:string, dir?:string, logger?:{log:Function,warn:Function}, dryRun?:boolean, retries?:number, retryDelayMs?:number, lockTimeout?:string, statementTimeout?:string}} opts
  * @returns {Promise<{applied:string[], skipped:string[], pending:string[]}>}
  */
-async function migrate({ connectionString = getConnectionString(), dir = DEFAULT_DIR, logger = console, dryRun = false, retries } = {}) {
+async function migrate({ connectionString = getConnectionString(), dir = DEFAULT_DIR, logger = console, dryRun = false, retries, retryDelayMs, lockTimeout = '15s', statementTimeout = '5min' } = {}) {
   const files = listMigrationFiles(dir);
-  const client = await connectWithRetry(connectionString, { logger, attempts: retries || 10 });
+  const client = await connectWithRetry(connectionString, { logger, attempts: retries || 10, delayMs: retryDelayMs === undefined ? 2000 : retryDelayMs });
   const applied = [];
   const skipped = [];
   const pending = [];
@@ -141,6 +148,10 @@ async function migrate({ connectionString = getConnectionString(), dir = DEFAULT
         logger.log(`[migrate] applying ${f.version}`);
         try {
           await client.query('BEGIN');
+          // Fail (and let the container retry) instead of queueing behind a long-running transaction
+          // and, in turn, blocking application traffic behind our DDL lock request.
+          await client.query(`SET LOCAL lock_timeout = '${lockTimeout}'`);
+          await client.query(`SET LOCAL statement_timeout = '${statementTimeout}'`);
           await client.query(f.sql);
           await client.query('INSERT INTO schema_migrations (version, checksum) VALUES ($1, $2)', [f.version, f.checksum]);
           await client.query('COMMIT');
@@ -184,4 +195,4 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { migrate, listMigrationFiles, checksumOf, getConnectionString, ADVISORY_LOCK_KEY };
+module.exports = { migrate, isFatalConnectError, listMigrationFiles, checksumOf, getConnectionString, ADVISORY_LOCK_KEY };
