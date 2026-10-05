@@ -1,4 +1,5 @@
 import { renderHook, act } from '@testing-library/react';
+import { fireEvent } from '@testing-library/react';
 import { DiagramProvider, useDiagram } from '../../../components/diagram-studio/DiagramContext';
 
 const wrapper = ({ children }) => (
@@ -97,6 +98,53 @@ describe('undo history', () => {
       });
     }
     expect(countUndosFrom(result) - base).toBe(1);
+  });
+
+  const resize = (result, w) => act(() => {
+    result.current.updateElement('a', { size: { width: w, height: 50 } }, { coalesceKey: 'resize:a' });
+  });
+
+  test('two quick gestures (mouseup between) are two entries', () => {
+    const { result } = renderHook(() => useDiagram(), { wrapper });
+    act(() => { result.current.addElement(node('a', { size: { width: 100, height: 50 } })); });
+    const base = countUndosFrom(result);
+    resize(result, 110); resize(result, 120);
+    act(() => { fireEvent.mouseUp(document); });
+    resize(result, 130); resize(result, 140);
+    act(() => { fireEvent.mouseUp(document); });
+    expect(countUndosFrom(result) - base).toBe(2);
+  });
+
+  test('one gesture with a long pause is still one entry', () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    const { result } = renderHook(() => useDiagram(), { wrapper });
+    act(() => { result.current.addElement(node('a', { size: { width: 100, height: 50 } })); });
+    const base = countUndosFrom(result);
+    resize(result, 110);
+    jest.setSystemTime(new Date('2026-01-01T00:00:10Z'));
+    resize(result, 120);
+    jest.useRealTimers();
+    expect(countUndosFrom(result) - base).toBe(1);
+  });
+
+  test('a gesture right after undo is recorded', () => {
+    const { result } = renderHook(() => useDiagram(), { wrapper });
+    act(() => { result.current.addElement(node('a', { size: { width: 100, height: 50 } })); });
+    resize(result, 110);
+    act(() => result.current.undo());
+    resize(result, 150);
+    expect(result.current.canUndo).toBe(true);
+    act(() => result.current.undo());
+    expect(result.current.elements[0].size.width).toBe(100);
+  });
+
+  test('discardElement marks the diagram dirty so autosave persists the removal', () => {
+    const { result } = renderHook(() => useDiagram(), { wrapper });
+    // state as persisted by autosave: node present, not dirty
+    act(() => { result.current.setDiagram({ id: 'd1', type: 'process-flow', elements: [node('fresh')], connections: [] }); });
+    expect(result.current.saveStatus.dirty).toBe(false);
+    act(() => { result.current.discardElement('fresh'); });
+    expect(result.current.saveStatus.dirty).toBe(true);
   });
 
   test('discardElement removes a fresh node and leaves no history trace', () => {

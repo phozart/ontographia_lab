@@ -77,7 +77,6 @@ const DiagramContext = createContext({
 // ============ HISTORY MANAGEMENT ============
 
 const MAX_HISTORY_SIZE = 50;
-const COALESCE_WINDOW_MS = 1000;
 
 function createHistorySnapshot(elements, connections) {
   return {
@@ -163,19 +162,30 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   // ============ HISTORY OPERATIONS ============
 
-  // Continuous gestures (e.g. resize) emit one update per mousemove. Passing the same
-  // coalesce key within COALESCE_WINDOW_MS keeps the whole gesture as a single undo entry.
-  const lastCoalesceRef = useRef({ key: null, time: 0 });
+  // Continuous gestures (resize, rotate, waypoint/segment/curve drags) emit one update per
+  // mousemove. Calls sharing a coalesce key are one undo entry until the gesture ends:
+  // a document mouseup (below) or undo/redo clears the key.
+  const lastCoalesceKeyRef = useRef(null);
+  const endGesture = useCallback(() => { lastCoalesceKeyRef.current = null; }, []);
+
+  useEffect(() => {
+    document.addEventListener('mouseup', endGesture, true);
+    return () => document.removeEventListener('mouseup', endGesture, true);
+  }, [endGesture]);
+
+  // State object references already snapshotted by an un-keyed record; a second call in the
+  // same tick (e.g. one updateElement per selected element) is a no-op without any copying.
+  const lastRecordedRef = useRef({ elements: null, connections: null });
 
   const recordHistory = useCallback((coalesceKey) => {
     if (typeof coalesceKey === 'string') {
-      const now = Date.now();
-      const last = lastCoalesceRef.current;
-      lastCoalesceRef.current = { key: coalesceKey, time: now };
-      if (last.key === coalesceKey && now - last.time < COALESCE_WINDOW_MS) return;
+      if (lastCoalesceKeyRef.current === coalesceKey) return;
+      lastCoalesceKeyRef.current = coalesceKey;
     } else {
-      lastCoalesceRef.current = { key: null, time: 0 };
+      lastCoalesceKeyRef.current = null;
+      if (lastRecordedRef.current.elements === elements && lastRecordedRef.current.connections === connections) return;
     }
+    lastRecordedRef.current = { elements, connections };
     const snapshot = createHistorySnapshot(elements, connections);
     setHistoryPast(prev => {
       // Skip no-op snapshots identical to the current top of the undo stack
@@ -192,6 +202,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   const undo = useCallback(() => {
     if (historyPast.length === 0) return;
+    lastCoalesceKeyRef.current = null;
 
     // Save current state to future
     const currentSnapshot = createHistorySnapshot(elements, connections);
@@ -207,6 +218,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   const redo = useCallback(() => {
     if (historyFuture.length === 0) return;
+    lastCoalesceKeyRef.current = null;
 
     // Save current state to past
     const currentSnapshot = createHistorySnapshot(elements, connections);
@@ -247,6 +259,8 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       if (end > 0 && snapshotsEqual(prev[end - 1], { elements: nextElements, connections: nextConnections })) end--;
       return end === prev.length ? prev : prev.slice(0, end);
     });
+    // The node may already have been autosaved; the removal must be persisted too
+    setSaveStatus(prev => ({ ...prev, dirty: true }));
   }, [elements, connections]);
 
   const setElements = useCallback((newElements) => {
