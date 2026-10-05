@@ -26,6 +26,8 @@ import ViewListIcon from '@mui/icons-material/ViewList';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
@@ -41,6 +43,7 @@ import { LogoIcon } from '../components/ui/Logo';
 import { DiagramGridSkeleton } from '../components/ui/LoadingSkeleton';
 import { ConfirmDialog, useConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useToast } from '../components/ui/ToastProvider';
+import { NameDialog } from '../components/ui/NameDialog';
 
 // Ethereal Sky Palette - defined directly to avoid module initialization issues
 const SKY = {
@@ -180,6 +183,8 @@ export default function DashboardPage() {
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedDiagram, setSelectedDiagram] = useState(null);
   const [creating, setCreating] = useState(false);
+  // { mode: 'create' } or { mode: 'rename', diagram }
+  const [nameDialog, setNameDialog] = useState(null);
   const nav = useResponsiveNav();
 
   // Auth check
@@ -215,7 +220,12 @@ export default function DashboardPage() {
     }
   }
 
-  async function createWorkspace() {
+  function openCreateDialog() {
+    if (creating) return;
+    setNameDialog({ mode: 'create' });
+  }
+
+  async function createWorkspace(name) {
     if (creating) return;
     setCreating(true);
 
@@ -225,22 +235,62 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'infinite-canvas',
-          name: 'Untitled Workspace',
+          name,
         }),
       });
 
       if (res.ok) {
         const diagram = await res.json();
+        setNameDialog(null);
         toast.success('Workspace created');
         router.push(`/diagram/${diagram.short_id || diagram.id}`);
       } else {
         toast.error('Failed to create workspace');
         setCreating(false);
+        setNameDialog(null);
       }
     } catch (err) {
       console.error('Failed to create workspace:', err);
       toast.error('Failed to create workspace');
       setCreating(false);
+    }
+  }
+
+  async function renameDiagram(diagram, name) {
+    try {
+      const res = await fetch(`/api/diagrams/${diagram.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        setDiagrams((prev) => prev.map((d) => (d.id === diagram.id ? { ...d, name } : d)));
+        toast.success('Workspace renamed');
+      } else {
+        toast.error('Failed to rename workspace');
+      }
+    } catch (err) {
+      console.error('Failed to rename workspace:', err);
+      toast.error('Failed to rename workspace');
+    } finally {
+      setNameDialog(null);
+    }
+  }
+
+  async function duplicateDiagram(diagram) {
+    setMenuAnchor(null);
+    try {
+      const res = await fetch(`/api/diagrams/${diagram.id}/duplicate`, { method: 'POST' });
+      if (res.ok) {
+        const copy = await res.json();
+        setDiagrams((prev) => [copy, ...prev]);
+        toast.success('Workspace duplicated');
+      } else {
+        toast.error('Failed to duplicate workspace');
+      }
+    } catch (err) {
+      console.error('Failed to duplicate workspace:', err);
+      toast.error('Failed to duplicate workspace');
     }
   }
 
@@ -301,7 +351,7 @@ export default function DashboardPage() {
 
       <div className="dashboard-layout">
         {/* Left Sidebar */}
-        <ResponsiveSidebar nav={nav} onCreateWorkspace={createWorkspace} />
+        <ResponsiveSidebar nav={nav} onCreateWorkspace={openCreateDialog} />
 
         {/* Main Content */}
         <div className="dashboard-main">
@@ -321,7 +371,9 @@ export default function DashboardPage() {
                 {session?.user?.name ? `Welcome back, ${session.user.name.split(' ')[0]}` : 'Welcome back'}
               </Typography>
               <Typography sx={{ color: 'var(--text-muted, #64748b)', fontSize: 15 }}>
-                {diagrams.length === 0
+                {loading
+                  ? '\u00A0'
+                  : diagrams.length === 0
                   ? 'Get started by creating your first workspace'
                   : `You have ${diagrams.length} workspace${diagrams.length !== 1 ? 's' : ''}`}
               </Typography>
@@ -336,7 +388,7 @@ export default function DashboardPage() {
                     icon={AddIcon}
                     label="New Workspace"
                     description="Start fresh"
-                    onClick={createWorkspace}
+                    onClick={openCreateDialog}
                     color={SKY.deepCyan}
                     primary
                   />
@@ -419,7 +471,7 @@ export default function DashboardPage() {
                     <Button
                       variant="contained"
                       startIcon={<PlayArrowIcon />}
-                      onClick={createWorkspace}
+                      onClick={openCreateDialog}
                       disabled={creating}
                       sx={{
                         fontWeight: 600,
@@ -473,7 +525,7 @@ export default function DashboardPage() {
                             variant="contained"
                             size="small"
                             startIcon={<AddIcon />}
-                            onClick={createWorkspace}
+                            onClick={openCreateDialog}
                             disabled={creating}
                             sx={{
                               fontWeight: 500,
@@ -518,6 +570,8 @@ export default function DashboardPage() {
                                   overflow: 'hidden',
                                   transition: 'all 0.2s ease',
                                   height: '100%',
+                                  width: '100%',
+                                  minWidth: 0,
                                   display: 'flex',
                                   flexDirection: 'column',
                                   '&:hover': {
@@ -541,14 +595,27 @@ export default function DashboardPage() {
                                       borderBottom: '1px solid var(--border, #e2e8f0)',
                                     }}
                                   >
-                                    <LogoIcon size={32} />
+                                    {diagram.thumbnail ? (
+                                      <Box
+                                        component="img"
+                                        src={diagram.thumbnail}
+                                        alt={`Preview of ${diagram.name}`}
+                                        sx={{ width: '100%', height: '100%', objectFit: 'contain', bgcolor: '#fff' }}
+                                      />
+                                    ) : (
+                                      <LogoIcon size={32} />
+                                    )}
                                   </Box>
                                 </Link>
 
                                 <Box sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <Box sx={{ flex: 1, minWidth: 0, pr: 1 }}>
-                                      <Link href={`/diagram/${diagram.short_id || diagram.id}`} style={{ textDecoration: 'none' }}>
+                                      <Link
+                                        href={`/diagram/${diagram.short_id || diagram.id}`}
+                                        style={{ textDecoration: 'none', display: 'block', minWidth: 0 }}
+                                        title={diagram.name}
+                                      >
                                         <Typography
                                           sx={{
                                             fontWeight: 600,
@@ -686,6 +753,20 @@ export default function DashboardPage() {
           Open
         </MenuItem>
         <MenuItem
+          onClick={() => {
+            if (!selectedDiagram) return;
+            setMenuAnchor(null);
+            setNameDialog({ mode: 'rename', diagram: selectedDiagram });
+          }}
+        >
+          <DriveFileRenameOutlineIcon fontSize="small" sx={{ mr: 1.5, color: 'var(--text-muted, #64748b)' }} />
+          Rename
+        </MenuItem>
+        <MenuItem onClick={() => selectedDiagram && duplicateDiagram(selectedDiagram)}>
+          <ContentCopyIcon fontSize="small" sx={{ mr: 1.5, color: 'var(--text-muted, #64748b)' }} />
+          Duplicate
+        </MenuItem>
+        <MenuItem
           onClick={() => selectedDiagram && deleteDiagram(selectedDiagram)}
           sx={{ color: '#dc2626' }}
         >
@@ -693,6 +774,18 @@ export default function DashboardPage() {
           Delete
         </MenuItem>
       </Menu>
+
+      <NameDialog
+        open={Boolean(nameDialog)}
+        title={nameDialog?.mode === 'rename' ? 'Rename Workspace' : 'New Workspace'}
+        initialValue={nameDialog?.mode === 'rename' ? nameDialog.diagram.name : 'Untitled Workspace'}
+        confirmText={nameDialog?.mode === 'rename' ? 'Rename' : 'Create'}
+        busy={creating}
+        onCancel={() => setNameDialog(null)}
+        onConfirm={(name) =>
+          nameDialog?.mode === 'rename' ? renameDiagram(nameDialog.diagram, name) : createWorkspace(name)
+        }
+      />
 
       {dialog}
     </>

@@ -8,9 +8,11 @@ jest.mock('../../lib/diagramRepository', () => ({
     createDiagram: jest.fn(),
     findAll: jest.fn(),
     deleteDiagram: jest.fn(),
+    duplicateDiagram: jest.fn(),
   },
 }));
 
+import duplicateHandler from '../../pages/api/diagrams/[id]/duplicate';
 import { diagramRepository as repo } from '../../lib/diagramRepository';
 import idHandler from '../../pages/api/diagrams/[id]';
 import indexHandler from '../../pages/api/diagrams/index';
@@ -81,5 +83,62 @@ describe('/api/diagrams', () => {
     await indexHandler({ method: 'GET', query: {}, body: {} }, res);
     expect(res.statusCode).toBe(500);
     expect(res.body.details).toBeUndefined();
+  });
+});
+
+describe('PUT thumbnail validation', () => {
+  test('rejects non-png or oversized thumbnails with 400', async () => {
+    repo.checkAccess.mockResolvedValue({ hasAccess: true, diagram: { id: UUID } });
+    for (const thumbnail of ['data:image/svg+xml;base64,AAAA', 'http://x/y.png', 'data:image/png;base64,' + 'A'.repeat(300 * 1024)]) {
+      const res = mockRes();
+      await idHandler({ method: 'PUT', query: { id: UUID }, body: { thumbnail } }, res);
+      expect(res.statusCode).toBe(400);
+    }
+    expect(repo.updateDiagram).not.toHaveBeenCalled();
+  });
+
+  test('accepts a valid png thumbnail', async () => {
+    repo.checkAccess.mockResolvedValue({ hasAccess: true, diagram: { id: UUID } });
+    repo.updateDiagram.mockResolvedValue({ id: UUID });
+    const res = mockRes();
+    await idHandler({ method: 'PUT', query: { id: UUID }, body: { thumbnail: 'data:image/png;base64,AAAA' } }, res);
+    expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('POST /api/diagrams/[id]/duplicate', () => {
+  test('405 for other methods', async () => {
+    const res = mockRes();
+    await duplicateHandler({ method: 'GET', query: { id: UUID }, body: {} }, res);
+    expect(res.statusCode).toBe(405);
+  });
+
+  test('malformed id -> 404 without DB call', async () => {
+    const res = mockRes();
+    await duplicateHandler({ method: 'POST', query: { id: 'nope' }, body: {} }, res);
+    expect(res.statusCode).toBe(404);
+    expect(repo.checkAccess).not.toHaveBeenCalled();
+  });
+
+  test('404 when missing, 403 when not owner', async () => {
+    repo.checkAccess.mockResolvedValueOnce({ hasAccess: false, diagram: null });
+    let res = mockRes();
+    await duplicateHandler({ method: 'POST', query: { id: UUID }, body: {} }, res);
+    expect(res.statusCode).toBe(404);
+    repo.checkAccess.mockResolvedValueOnce({ hasAccess: false, diagram: { id: UUID } });
+    res = mockRes();
+    await duplicateHandler({ method: 'POST', query: { id: UUID }, body: {} }, res);
+    expect(res.statusCode).toBe(403);
+    expect(repo.duplicateDiagram).not.toHaveBeenCalled();
+  });
+
+  test('201 with the copy for the owner, copy owned by the caller', async () => {
+    repo.checkAccess.mockResolvedValue({ hasAccess: true, diagram: { id: UUID, name: 'A' } });
+    repo.duplicateDiagram.mockResolvedValue({ id: 'new', name: 'A (copy)' });
+    const res = mockRes();
+    await duplicateHandler({ method: 'POST', query: { id: UUID }, body: {} }, res);
+    expect(res.statusCode).toBe(201);
+    expect(repo.duplicateDiagram).toHaveBeenCalledWith({ id: UUID, name: 'A' }, 'a@b.co');
+    expect(res.body.id).toBe('new');
   });
 });
