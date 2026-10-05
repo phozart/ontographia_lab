@@ -1,12 +1,11 @@
 // components/diagram-studio/migrations/migrateDiagram.js
 // Pure, idempotent migration of saved diagram content to current element types.
 
-const MIND_MAP_PACK_ID = 'mind-map';
-
-// Legacy element types (old Mind Map starter template) -> current Mind Map stencil ids
+// Legacy element types (old starter templates) -> current stencil id + pack
 const LEGACY_TYPE_MAP = {
-  'central-idea': 'central-topic',
-  branch: 'main-topic',
+  'central-idea': { type: 'central-topic', packId: 'mind-map' },
+  branch: { type: 'main-topic', packId: 'mind-map' },
+  'sticky-yellow': { type: 'sticky-medium', packId: 'sticky-notes' },
 };
 
 function migrateElements(list) {
@@ -16,7 +15,7 @@ function migrateElements(list) {
     const target = el && LEGACY_TYPE_MAP[el.type];
     if (!target) return el;
     changed = true;
-    return { ...el, type: target, packId: MIND_MAP_PACK_ID };
+    return { ...el, type: target.type, packId: target.packId };
   });
   return changed ? next : list;
 }

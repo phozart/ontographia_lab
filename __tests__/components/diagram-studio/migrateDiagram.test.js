@@ -50,4 +50,9 @@ describe('migrateDiagram', () => {
     const out = migrateDiagram({ nodes: [{ id: 'n', type: 'branch' }] });
     expect(out.nodes[0]).toMatchObject({ type: 'main-topic', packId: 'mind-map' });
   });
+
+  it('maps sticky-yellow to sticky-medium in the sticky-notes pack', () => {
+    const out = migrateDiagram({ elements: [{ id: 's', type: 'sticky-yellow', label: 'To Do', x: 5 }] });
+    expect(out.elements[0]).toMatchObject({ id: 's', type: 'sticky-medium', packId: 'sticky-notes', label: 'To Do', x: 5 });
+  });
 });

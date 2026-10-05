@@ -260,3 +260,20 @@ describe('DiagramContext', () => {
     });
   });
 });
+
+describe('setDiagram legacy migration', () => {
+  it('migrates legacy element types from content on load', () => {
+    const { result } = renderHook(() => useDiagram(), { wrapper });
+    act(() => {
+      result.current.setDiagram({
+        id: 'd1',
+        type: 'infinite-canvas',
+        content: { elements: [{ id: 'a', type: 'central-idea', label: 'X' }, { id: 'b', type: 'sticky-yellow' }], connections: [] },
+      });
+    });
+    expect(result.current.elements.map((e) => [e.type, e.packId])).toEqual([
+      ['central-topic', 'mind-map'],
+      ['sticky-medium', 'sticky-notes'],
+    ]);
+  });
+});
