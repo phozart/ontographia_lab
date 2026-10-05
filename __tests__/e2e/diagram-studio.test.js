@@ -765,7 +765,8 @@ describe('Diagram Studio E2E Tests', () => {
     it('9.1 one save = exactly one network PUT, stored content has the canonical shape and unique ids', async () => {
       const puts = [];
       page.on('request', (req) => {
-        if (req.method() === 'PUT' && /\/api\/diagrams\//.test(req.url())) {
+        // Thumbnail PUTs (throttled, separate from saves) carry no content
+        if (req.method() === 'PUT' && /\/api\/diagrams\//.test(req.url()) && !/"thumbnail"/.test(req.postData() || '')) {
           puts.push({ url: req.url(), body: req.postData() });
         }
       });
@@ -782,7 +783,7 @@ describe('Diagram Studio E2E Tests', () => {
       // Select the stencil, then draw it onto the canvas (drag = create with size)
       await stencilItem.click();
       await page.waitForTimeout(200);
-      const firstPut = page.waitForRequest((r) => r.method() === 'PUT' && /\/api\/diagrams\//.test(r.url()), { timeout: 15000 });
+      const firstPut = page.waitForRequest((r) => r.method() === 'PUT' && /\/api\/diagrams\//.test(r.url()) && !/"thumbnail"/.test(r.postData() || ''), { timeout: 15000 });
       await page.mouse.move(700, 400);
       await page.mouse.down();
       await page.mouse.move(860, 480, { steps: 10 });
@@ -898,16 +899,10 @@ describe('Diagram Studio E2E Tests', () => {
       }
     });
 
-    it('8.5 Collaboration bar is visible', async () => {
+    it('8.5 Share button is hidden until sharing ships (FEATURES.sharing)', async () => {
       await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
       await waitForDiagramStudio(page);
-
-      // Look for collaboration bar (top right area)
-      const collabBar = await page.$('.ds-collaboration-bar, [class*="collaboration"]');
-      const shareBtn = await page.$('[title*="Share"]');
-
-      // Either the bar or share button should exist
-      expect(collabBar !== null || shareBtn !== null).toBe(true);
+      expect(await page.$('[title="Share"]')).toBeNull();
     });
 
     it('8.6 Header with branding is visible', async () => {

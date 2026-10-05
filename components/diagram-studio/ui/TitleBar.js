@@ -7,6 +7,8 @@ import { LogoIcon } from '../../ui/Logo';
 import { useJsonImport } from '../export/useJsonImport';
 import ImportJsonDialog from './ImportJsonDialog';
 import { OPEN_EXPORT_DIALOG_EVENT } from './ExportDialog';
+import { FEATURES } from '../../../lib/features';
+import { formatShortcut } from '../../../lib/platform';
 
 // Icons
 import NearMeIcon from '@mui/icons-material/NearMe';
@@ -92,6 +94,10 @@ export default function TitleBar({
   isPreviewMode = false,
   collaborators = [],
 }) {
+  // Preferences live on the account page (no in-editor settings panel exists).
+  const openSettings = () => {
+    if (typeof window !== 'undefined') window.location.assign('/account');
+  };
   const diagramContext = useDiagram() || {};
   const {
     activeTool = 'select',
@@ -403,7 +409,7 @@ export default function TitleBar({
                       >
                         <UndoIcon style={{ fontSize: 18 }} />
                         <span>Undo</span>
-                        <span className="ds-key-hint">⌘Z</span>
+                        <span className="ds-key-hint">{formatShortcut('Mod+Z')}</span>
                       </button>
                       <button
                         className={`ds-compact-option ${!canRedo ? 'disabled' : ''}`}
@@ -412,7 +418,7 @@ export default function TitleBar({
                       >
                         <RedoIcon style={{ fontSize: 18 }} />
                         <span>Redo</span>
-                        <span className="ds-key-hint">⌘⇧Z</span>
+                        <span className="ds-key-hint">{formatShortcut('Mod+Shift+Z')}</span>
                       </button>
                     </div>
                   </>
@@ -499,8 +505,10 @@ export default function TitleBar({
             {!readOnly && (
               <>
                 <div className="ds-tool-dropdown-wrapper" ref={stickyMenuRef}>
-                  <button
-                    className={`ds-tool-btn ${activeTool === 'sticky' ? 'active' : ''}`}
+                  {/* Rendered via ToolButton: its styled-jsx scope owns the .ds-tool-btn rules
+                      (a bare <button className="ds-tool-btn"> here got none, so .active never showed). */}
+                  <ToolButton
+                    active={activeTool === 'sticky'}
                     onClick={() => {
                       if (activeTool === 'sticky') {
                         setShowStickyMenu(!showStickyMenu);
@@ -508,13 +516,14 @@ export default function TitleBar({
                         setActiveTool('sticky');
                       }
                     }}
-                    title="Sticky Note (N)"
-                  >
-                    <div
-                      className="ds-sticky-icon"
-                      style={{ backgroundColor: stickyNoteColor }}
-                    />
-                  </button>
+                    tooltip="Sticky Note (N)"
+                    icon={
+                      <div
+                        className="ds-sticky-icon"
+                        style={{ backgroundColor: stickyNoteColor }}
+                      />
+                    }
+                  />
                   {showStickyMenu && (
                     <div className="ds-tool-dropdown ds-color-dropdown">
                       <div className="ds-dropdown-header">Sticky Note Color</div>
@@ -614,13 +623,13 @@ export default function TitleBar({
                   icon={<UndoIcon />}
                   disabled={!canUndo}
                   onClick={undo}
-                  tooltip="Undo (⌘Z)"
+                  tooltip={`Undo (${formatShortcut('Mod+Z')})`}
                 />
                 <ToolButton
                   icon={<RedoIcon />}
                   disabled={!canRedo}
                   onClick={redo}
-                  tooltip="Redo (⌘⇧Z)"
+                  tooltip={`Redo (${formatShortcut('Mod+Shift+Z')})`}
                 />
 
                 <div className="ds-tools-divider" />
@@ -743,10 +752,12 @@ export default function TitleBar({
         </div>
 
         {/* Share button */}
-        <button className="ds-title-action-btn" onClick={onShare} title="Share">
-          <ShareIcon fontSize="small" />
-          <span>Share</span>
-        </button>
+        {FEATURES.sharing && onShare && (
+          <button className="ds-title-action-btn" onClick={onShare} title="Share">
+            <ShareIcon fontSize="small" />
+            <span>Share</span>
+          </button>
+        )}
 
         {/* Menu button */}
         <div className="ds-title-menu-wrapper" ref={menuRef}>
@@ -764,7 +775,7 @@ export default function TitleBar({
                 <button className="ds-dropdown-item" onClick={() => { onSave?.(); setShowMenu(false); }}>
                   <SaveIcon fontSize="small" />
                   <span>Save</span>
-                  <span className="ds-shortcut">⌘S</span>
+                  <span className="ds-shortcut">{formatShortcut('Mod+S')}</span>
                 </button>
               )}
               <button className="ds-dropdown-item" onClick={() => { openExportDialog(); setShowMenu(false); }}>
@@ -784,12 +795,12 @@ export default function TitleBar({
                 <span>Keyboard shortcuts</span>
                 <span className="ds-shortcut">?</span>
               </button>
-              <button className="ds-dropdown-item" onClick={() => setShowMenu(false)}>
+              <button className="ds-dropdown-item" onClick={() => { window.open('/guide', '_blank', 'noopener'); setShowMenu(false); }}>
                 <HelpOutlineIcon fontSize="small" />
                 <span>Help</span>
               </button>
               <div className="ds-dropdown-divider" />
-              <button className="ds-dropdown-item" onClick={() => setShowMenu(false)}>
+              <button className="ds-dropdown-item" onClick={() => { setShowMenu(false); openSettings(); }}>
                 <SettingsIcon fontSize="small" />
                 <span>Settings</span>
               </button>

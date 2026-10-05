@@ -735,7 +735,6 @@ export function useComments(diagramId) {
 
   // Start adding a new comment at position
   const startNewComment = useCallback((x, y, elementId = null) => {
-    console.log('[Comment Debug] startNewComment called with x:', x, 'y:', y, 'elementId:', elementId);
     setNewCommentPosition({ x, y, elementId });
     setActiveComment(null);
   }, []);
