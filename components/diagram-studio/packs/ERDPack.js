@@ -636,7 +636,7 @@ function renderNode(element, stencil, isSelected) {
       return <ERDAttributeRenderer element={element} stencil={stencil} />;
     case 'relationship-chen':
       // Chen relationship: SVG diamond on bbox midpoints (same renderer as Core diamond)
-      return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} />;
+      return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} outlined />;
     default:
       return null;
   }
