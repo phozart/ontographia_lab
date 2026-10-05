@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import { verifyCaptcha, isProvided } from '../../../lib/captcha';
 import { query } from '../../../lib/db';
 import { strictLimiter } from '../../../lib/rateLimit';
+import { isEmailConfigured, sendMail } from '../../../lib/email';
+import { passwordResetEmail } from '../../../lib/emailTemplates';
 
 // Token expires in 1 hour
 const TOKEN_EXPIRY_HOURS = 1;
@@ -72,19 +74,31 @@ export default async function handler(req, res) {
       [resetTokenHash, expiresAt, user.id]
     );
 
-    // No email transport is configured yet. Reset links are only surfaced
-    // in local development; in every other environment they are never logged.
     const isDev = process.env.NODE_ENV === 'development';
     const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${resetToken}`;
+    const emailConfigured = isEmailConfigured();
 
-    if (isDev) {
+    if (emailConfigured) {
+      // Deliver by email. A delivery failure must not leak to the client and
+      // must not invalidate the stored token, so a retry works.
+      try {
+        const message = passwordResetEmail({ resetUrl, expiresInHours: TOKEN_EXPIRY_HOURS });
+        await sendMail({ to: user.email, ...message });
+      } catch (sendError) {
+        console.error('Password reset email delivery failed:', sendError && sendError.message);
+      }
+    } else if (isDev) {
+      // Local development without SMTP: surface the link directly.
       console.log(`[dev] Password reset link for ${email}: ${resetUrl}`);
+    } else {
+      // Never log the token or URL outside development.
+      console.warn('Password reset requested but email transport not configured (set SMTP_HOST and EMAIL_FROM); no email sent.');
     }
 
     return res.status(200).json({
       success: true,
       message: successMessage,
-      ...(isDev && { resetUrl }),
+      ...(isDev && !emailConfigured && { resetUrl }),
     });
 
   } catch (error) {

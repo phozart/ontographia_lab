@@ -111,6 +111,12 @@ openssl rand -base64 32
 - `TRUST_PROXY_HOPS` (default `1`) is the number of trusted reverse proxies in front of the app. It determines which `X-Forwarded-For` entry is used as the client address for rate limiting.
   - `1`: the app runs behind one reverse proxy (for example nginx) that appends the client address to `X-Forwarded-For` (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`).
   - `0`: the app is directly exposed; the socket address is used and forwarding headers are ignored.
+- `NEXTAUTH_URL` must be the public base URL; password-reset links in emails are built from it.
+- Password-reset email (SMTP via nodemailer):
+  - `SMTP_HOST`, `SMTP_PORT` (default `587`), `SMTP_SECURE` (`true` for implicit TLS, e.g. port 465), `SMTP_USER`, `SMTP_PASS`.
+  - `EMAIL_FROM` is the sender address and is required when `SMTP_HOST` is set.
+  - If SMTP is not configured, no email is sent: in development the reset link is logged and returned by the API; in any other environment a server-side warning is logged and the user still sees the generic confirmation.
+- See [`.env.example`](.env.example) for every supported variable with placeholder values (copy it to `.env`).
 
 ## Database Commands
 
@@ -131,37 +137,37 @@ Ontographia Lab supports multiple authentication methods:
 
 ### User Roles
 
-| Role | Description |
-|------|-------------|
+| Role  | Description                                                 |
+| ----- | ----------------------------------------------------------- |
 | Admin | Full access, can approve/suspend users, manage all diagrams |
-| User | Standard access after admin approval |
+| User  | Standard access after admin approval                        |
 
 ### User Status
 
-| Status | Description |
-|--------|-------------|
-| Pending | Awaiting admin approval (new signups) |
-| Active | Full access to the application |
-| Suspended | Access revoked by admin |
+| Status    | Description                           |
+| --------- | ------------------------------------- |
+| Pending   | Awaiting admin approval (new signups) |
+| Active    | Full access to the application        |
+| Suspended | Access revoked by admin               |
 
 ## Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| `V` | Select tool |
-| `C` | Connect tool |
-| `H` | Pan tool |
-| `K` | Comment mode |
-| `M` | Toggle minimap |
-| `T` | Connection toolbar (when connection selected) |
-| `Delete` | Delete selected |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Y` | Redo |
-| `Ctrl+D` | Duplicate |
-| `Ctrl+C/V` | Copy/Paste |
-| `F` | Fit all to screen |
-| `G` | Toggle grid |
-| `?` | Show all shortcuts |
+| Key        | Action                                        |
+| ---------- | --------------------------------------------- |
+| `V`        | Select tool                                   |
+| `C`        | Connect tool                                  |
+| `H`        | Pan tool                                      |
+| `K`        | Comment mode                                  |
+| `M`        | Toggle minimap                                |
+| `T`        | Connection toolbar (when connection selected) |
+| `Delete`   | Delete selected                               |
+| `Ctrl+Z`   | Undo                                          |
+| `Ctrl+Y`   | Redo                                          |
+| `Ctrl+D`   | Duplicate                                     |
+| `Ctrl+C/V` | Copy/Paste                                    |
+| `F`        | Fit all to screen                             |
+| `G`        | Toggle grid                                   |
+| `?`        | Show all shortcuts                            |
 
 ## Supported Diagram Types
 
@@ -303,22 +309,22 @@ npm run test:e2e       # End-to-end tests
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DB_USER` | Database username | Yes |
-| `DB_PASSWORD` | Database password | Yes |
-| `DB_NAME` | Database name | Yes |
-| `DB_HOST` | Database host | Yes |
-| `DB_PORT` | Database port (default: 5434) | Yes |
-| `APP_PORT` | Application port (default: 3040) | No |
-| `NEXTAUTH_URL` | Application URL | Yes |
-| `NEXTAUTH_SECRET` | Session encryption key | Yes |
-| `ADMIN_EMAIL` | Initial admin email | Yes |
-| `ADMIN_PASSWORD` | Initial admin password | Yes |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID | No |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth secret | No |
-| `GITHUB_CLIENT_ID` | GitHub OAuth client ID | No |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth secret | No |
+| Variable               | Description                      | Required |
+| ---------------------- | -------------------------------- | -------- |
+| `DB_USER`              | Database username                | Yes      |
+| `DB_PASSWORD`          | Database password                | Yes      |
+| `DB_NAME`              | Database name                    | Yes      |
+| `DB_HOST`              | Database host                    | Yes      |
+| `DB_PORT`              | Database port (default: 5434)    | Yes      |
+| `APP_PORT`             | Application port (default: 3040) | No       |
+| `NEXTAUTH_URL`         | Application URL                  | Yes      |
+| `NEXTAUTH_SECRET`      | Session encryption key           | Yes      |
+| `ADMIN_EMAIL`          | Initial admin email              | Yes      |
+| `ADMIN_PASSWORD`       | Initial admin password           | Yes      |
+| `GOOGLE_CLIENT_ID`     | Google OAuth client ID           | No       |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth secret              | No       |
+| `GITHUB_CLIENT_ID`     | GitHub OAuth client ID           | No       |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth secret              | No       |
 
 **Note:** You can also set `DATABASE_URL` directly instead of individual `DB_*` variables. If both are set, `DATABASE_URL` takes precedence.
 

@@ -3,6 +3,10 @@ jest.mock('../../lib/rateLimit', () => {
   const ok = { check: jest.fn(async () => ({ success: true })) };
   return { authLimiter: ok, strictLimiter: ok, apiLimiter: ok };
 });
+jest.mock('../../lib/email', () => ({
+  isEmailConfigured: jest.fn(() => false),
+  sendMail: jest.fn(async () => ({})),
+}));
 jest.mock('bcryptjs', () => ({
   compare: jest.fn(async (pw, hash) => hash === `hash:${pw}`),
   hash: jest.fn(async (pw) => `hash:${pw}`),
@@ -15,6 +19,7 @@ jest.mock('next-auth/providers/credentials', () =>
 );
 
 import { query } from '../../lib/db';
+import { isEmailConfigured, sendMail } from '../../lib/email';
 import { createChallenge } from '../../lib/captcha';
 import signup from '../../pages/api/auth/signup';
 import forgot from '../../pages/api/auth/forgot-password';
@@ -41,6 +46,8 @@ const OLD_ENV = process.env;
 beforeEach(() => {
   process.env = { ...OLD_ENV, NEXTAUTH_SECRET: 'unit-test-secret' };
   query.mockReset();
+  isEmailConfigured.mockReset().mockReturnValue(false);
+  sendMail.mockReset().mockResolvedValue({});
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -124,6 +131,73 @@ describe('forgot-password reset-link handling', () => {
   test('development: URL returned', async () => {
     const res = await run('development');
     expect(res.body.resetUrl).toMatch(/reset-password\?token=/);
+  });
+});
+
+describe('forgot-password email delivery', () => {
+  const run = async (env) => {
+    process.env.NODE_ENV = env;
+    process.env.NEXTAUTH_URL = 'http://x.test';
+    const c = createChallenge();
+    query.mockResolvedValueOnce({ rows: [{ id: 1, email: 'a@b.co', provider: 'email' }] });
+    query.mockResolvedValueOnce({ rows: [] });
+    const res = mockRes();
+    await forgot(post({ email: 'a@b.co', captchaToken: c.token, captchaAnswer: solve(c.question) }), res);
+    return res;
+  };
+  const warned = () => console.warn.mock.calls.flat().join(' ');
+  const logged = () =>
+    [...console.log.mock.calls, ...console.warn.mock.calls, ...console.error.mock.calls].flat().join(' ');
+  beforeEach(() => { jest.spyOn(console, 'warn').mockImplementation(() => {}); });
+
+  test('configured: sends mail with link, generic response, no resetUrl', async () => {
+    isEmailConfigured.mockReturnValue(true);
+    const res = await run('production');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.resetUrl).toBeUndefined();
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    const arg = sendMail.mock.calls[0][0];
+    expect(arg.to).toBe('a@b.co');
+    expect(arg.text).toMatch(/http:\/\/x\.test\/reset-password\?token=[0-9a-f]{64}/);
+    expect(arg.html).toContain('http://x.test/reset-password?token=');
+    expect(arg.text).toMatch(/1 hour/);
+    expect(logged()).not.toMatch(/token=/);
+  });
+
+  test('configured in development: still sends, no resetUrl in body', async () => {
+    isEmailConfigured.mockReturnValue(true);
+    const res = await run('development');
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(res.body.resetUrl).toBeUndefined();
+  });
+
+  test('unconfigured production: no send, warning without token, generic 200', async () => {
+    const res = await run('production');
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.resetUrl).toBeUndefined();
+    expect(warned()).toMatch(/email transport not configured/);
+    expect(logged()).not.toMatch(/token=/);
+  });
+
+  test('unconfigured development: unchanged (resetUrl returned, no send)', async () => {
+    const res = await run('development');
+    expect(sendMail).not.toHaveBeenCalled();
+    expect(res.body.resetUrl).toMatch(/reset-password\?token=/);
+  });
+
+  test('send failure: generic 200, error logged without token, token not cleared', async () => {
+    isEmailConfigured.mockReturnValue(true);
+    sendMail.mockRejectedValueOnce(new Error('smtp down'));
+    const res = await run('production');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.resetUrl).toBeUndefined();
+    expect(console.error).toHaveBeenCalled();
+    expect(logged()).not.toMatch(/token=/);
+    // only SELECT + UPDATE (store token); nothing clears it afterwards
+    expect(query).toHaveBeenCalledTimes(2);
   });
 });
 
