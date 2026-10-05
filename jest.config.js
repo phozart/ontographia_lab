@@ -6,48 +6,50 @@ const createJestConfig = nextJest({
   dir: './',
 });
 
-// Add any custom config to be passed to Jest
-const customJestConfig = {
-  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-  testEnvironment: 'jest-environment-jsdom',
+// Shared options for every project
+const common = {
+  rootDir: __dirname,
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
-  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/__tests__/e2e/'],
   modulePathIgnorePatterns: ['<rootDir>/.next/'],
+};
+
+// Unit tests configuration
+const unitConfig = {
+  ...common,
+  displayName: 'unit',
+  testEnvironment: 'jest-environment-jsdom',
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+  testMatch: [
+    '<rootDir>/__tests__/**/*.test.{js,jsx,ts,tsx}',
+    '!<rootDir>/__tests__/e2e/**',
+  ],
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/__tests__/e2e/'],
+};
+
+// E2E tests configuration (uses Node environment for Puppeteer)
+const e2eConfig = {
+  ...common,
+  displayName: 'e2e',
+  testEnvironment: 'node',
+  testMatch: ['<rootDir>/__tests__/e2e/**/*.test.{js,jsx,ts,tsx}'],
+  testTimeout: 60000,
+  globalSetup: '<rootDir>/__tests__/e2e/setup.js',
+  globalTeardown: '<rootDir>/__tests__/e2e/teardown.js',
+};
+
+// Per-project configs do not inherit next/jest's SWC transform from the root,
+// so build each project through createJestConfig individually.
+module.exports = async () => ({
   collectCoverageFrom: [
     'components/**/*.{js,jsx}',
     'lib/**/*.{js,jsx}',
     'pages/**/*.{js,jsx}',
     '!**/node_modules/**',
   ],
-  // Projects configuration to support both unit tests and E2E tests
   projects: [
-    // Unit tests configuration
-    {
-      displayName: 'unit',
-      testEnvironment: 'jest-environment-jsdom',
-      setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
-      testMatch: [
-        '<rootDir>/__tests__/**/*.test.{js,jsx,ts,tsx}',
-        '!<rootDir>/__tests__/e2e/**',
-      ],
-      moduleNameMapper: {
-        '^@/(.*)$': '<rootDir>/$1',
-      },
-      testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/__tests__/e2e/'],
-    },
-    // E2E tests configuration (uses Node environment for Puppeteer)
-    {
-      displayName: 'e2e',
-      testEnvironment: 'node',
-      testMatch: ['<rootDir>/__tests__/e2e/**/*.test.{js,jsx,ts,tsx}'],
-      testTimeout: 60000,
-      globalSetup: '<rootDir>/__tests__/e2e/setup.js',
-      globalTeardown: '<rootDir>/__tests__/e2e/teardown.js',
-    },
+    await createJestConfig(unitConfig)(),
+    await createJestConfig(e2eConfig)(),
   ],
-};
-
-// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
-module.exports = createJestConfig(customJestConfig);
+});
