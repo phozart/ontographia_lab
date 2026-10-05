@@ -1,6 +1,8 @@
 // components/diagram-studio/packs/CorePack.js
 // Core pack with Frame/Canvas stencils for organizing content
 
+import React from 'react';
+
 // ============ STENCILS ============
 
 const stencils = [
@@ -306,6 +308,66 @@ function SectionNode({ element, stencil }) {
   );
 }
 
+// Diamond renderer - SVG polygon through the midpoints of the bounding box,
+// so it scales correctly at any width/height (a CSS-rotated box skews).
+function pickTextColor(bg) {
+  const m = /^#([0-9a-f]{6})$/i.exec(bg || '');
+  if (!m) return '#1f2937';
+  const n = parseInt(m[1], 16);
+  const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  return lum > 0.6 ? '#1f2937' : '#ffffff';
+}
+
+function DiamondNode({ element, stencil, isSelected }) {
+  const { width, height } = element.size || stencil?.defaultSize || { width: 80, height: 80 };
+  const color = element.color || stencil?.color || '#f59e0b';
+  const fill = element.backgroundColor || color;
+  const strokeWidth = element.borderWidth ?? 2;
+  const inset = strokeWidth / 2;
+  const label = element.label || element.name || '';
+  const points = `${width / 2},${inset} ${width - inset},${height / 2} ${width / 2},${height - inset} ${inset},${height / 2}`;
+
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        overflow="visible"
+        style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+      >
+        <polygon
+          points={points}
+          fill={fill}
+          fillOpacity={element.opacity ?? 1}
+          stroke={isSelected ? 'var(--accent, #4FB3CE)' : (element.borderColor || color)}
+          strokeWidth={strokeWidth}
+          strokeLinejoin="round"
+        />
+      </svg>
+      <div style={{
+        position: 'absolute',
+        top: '20%',
+        left: '15%',
+        width: '70%',
+        height: '60%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        fontSize: element.fontSize || 13,
+        fontWeight: element.fontWeight || 500,
+        color: element.textColor || pickTextColor(fill),
+        overflowWrap: 'break-word',
+        pointerEvents: 'none',
+        userSelect: 'none',
+      }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
 // Main render function
 // Returns undefined for basic shapes (rectangle, circle, diamond, etc.) to use default rendering
 function renderNode(element, stencil, isSelected) {
@@ -316,9 +378,11 @@ function renderNode(element, stencil, isSelected) {
       return <FrameNode element={element} stencil={stencil} isSelected={isSelected} />;
     case 'section':
       return <SectionNode element={element} stencil={stencil} />;
+    case 'diamond':
+      return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} />;
     default:
       // Return undefined (not null) to allow default rendering for basic shapes
-      // like rectangle, circle, diamond, text-block, divider
+      // like rectangle, circle, text-block, divider
       return undefined;
   }
 }

@@ -2,6 +2,7 @@
 // Causal Loop Diagram pack for system dynamics
 
 import React from 'react';
+import SvgNodeFrame from './SvgNodeFrame';
 
 // ============ STENCILS ============
 
@@ -659,7 +660,7 @@ function ReinforcingLoopNode({ element, stencil, isSelected }) {
         fill="none"
         stroke={color}
         strokeWidth={2}
-        markerEnd="url(#cld-arrow-marker)"
+        markerEnd={`url(#cld-arrow-marker-${element.id})`}
       />
       {/* R label */}
       <text
@@ -677,7 +678,7 @@ function ReinforcingLoopNode({ element, stencil, isSelected }) {
       {/* Define arrow marker */}
       <defs>
         <marker
-          id="cld-arrow-marker"
+          id={`cld-arrow-marker-${element.id}`}
           markerWidth="6"
           markerHeight="6"
           refX="5"
@@ -733,7 +734,7 @@ function BalancingLoopNode({ element, stencil, isSelected }) {
         fill="none"
         stroke={color}
         strokeWidth={2}
-        markerEnd="url(#cld-arrow-marker-b)"
+        markerEnd={`url(#cld-arrow-marker-b-${element.id})`}
       />
       {/* B label */}
       <text
@@ -751,7 +752,7 @@ function BalancingLoopNode({ element, stencil, isSelected }) {
       {/* Define arrow marker */}
       <defs>
         <marker
-          id="cld-arrow-marker-b"
+          id={`cld-arrow-marker-b-${element.id}`}
           markerWidth="6"
           markerHeight="6"
           refX="5"
@@ -955,7 +956,7 @@ function AnnotationNode({ element, stencil, isSelected }) {
 /**
  * Main render function for CLDPack
  */
-function renderNode(element, stencil, isSelected) {
+function renderShape(element, stencil, isSelected) {
   if (!stencil) return null;
 
   const props = { element, stencil, isSelected };
@@ -985,6 +986,12 @@ function renderNode(element, stencil, isSelected) {
       // Fallback to variable style
       return <VariableNode {...props} />;
   }
+}
+
+function renderNode(element, stencil, isSelected) {
+  const shape = renderShape(element, stencil, isSelected);
+  if (!shape) return shape;
+  return <SvgNodeFrame element={element} stencil={stencil}>{shape}</SvgNodeFrame>;
 }
 
 // ============ PACK EXPORT ============

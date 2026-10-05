@@ -2,6 +2,7 @@
 // Mind Map pack for hierarchical idea mapping
 
 import React from 'react';
+import SvgNodeFrame from './SvgNodeFrame';
 
 // ============ STENCILS ============
 
@@ -938,7 +939,7 @@ function SummaryNode({ element, stencil, isSelected }) {
 /**
  * Main render function for MindMapPack
  */
-function renderNode(element, stencil, isSelected) {
+function renderShape(element, stencil, isSelected) {
   if (!stencil) return null;
 
   const props = { element, stencil, isSelected };
@@ -967,6 +968,12 @@ function renderNode(element, stencil, isSelected) {
       // Fallback to sub-topic style for unknown types
       return <SubTopicNode {...props} />;
   }
+}
+
+function renderNode(element, stencil, isSelected) {
+  const shape = renderShape(element, stencil, isSelected);
+  if (!shape) return shape;
+  return <SvgNodeFrame element={element} stencil={stencil}>{shape}</SvgNodeFrame>;
 }
 
 // ============ PACK EXPORT ============

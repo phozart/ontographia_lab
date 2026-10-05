@@ -821,12 +821,12 @@
   /* transform is set via inline style to support rotation */
 }
 
-.ds-node-diamond .ds-node-content {
+.ds-node-diamond:not(.ds-node-custom-render) .ds-node-content {
   transform: rotate(45deg);
   border-radius: 4px;
 }
 
-.ds-node-diamond .ds-node-inner {
+.ds-node-diamond:not(.ds-node-custom-render) .ds-node-inner {
   transform: rotate(-45deg);
 }
 
