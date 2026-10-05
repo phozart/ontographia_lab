@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { resolveEditorShortcut, isTypingTarget } from './hooks/interaction/editorShortcuts';
 import { DiagramProvider, useDiagram, useDiagramViewport, useDiagramSelection } from './DiagramContext';
 import { getProfile, isActionAllowed, isModeAllowed } from './DiagramProfile';
 import { ResizablePanel, PanelGroup } from './ResizablePanel';
@@ -99,8 +100,8 @@ function DiagramStudioInner({
   diagramName,
 }) {
   const { data: session } = useSession();
-  const { diagram, setDiagram, activePack, saveStatus, saveDiagram, elements, connections, addElement, addConnection, selectAll, clearSelection, deleteSelected, activeTool, setActiveTool, selectedStencil, setSelectedStencil, drawingTool, drawingColor, drawingStrokeWidth, isDragging, isRotating, stickyNoteColor } = useDiagram();
-  const { viewport } = useDiagramViewport();
+  const { diagram, setDiagram, activePack, saveStatus, saveDiagram, elements, connections, addElement, addConnection, undo, redo, selectAll, clearSelection, deleteSelected, activeTool, setActiveTool, selectedStencil, setSelectedStencil, drawingTool, drawingColor, drawingStrokeWidth, isDragging, isRotating, stickyNoteColor } = useDiagram();
+  const { viewport, zoomIn, zoomOut } = useDiagramViewport();
   const { selection, selectedElements } = useDiagramSelection();
   const [draggingStencil, setDraggingStencil] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
@@ -487,8 +488,23 @@ function DiagramStudioInner({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Skip if typing in an input
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      // Skip if typing in an input / textarea / select / contenteditable
+      if (isTypingTarget(e.target)) return;
+
+      // Undo / redo / tool switching / zoom (V, H, +, -)
+      const editorAction = resolveEditorShortcut(e);
+      if (editorAction) {
+        const readOnly = profile.editingPolicy?.readOnly;
+        switch (editorAction) {
+          case 'undo': e.preventDefault(); if (!readOnly) undo?.(); return;
+          case 'redo': e.preventDefault(); if (!readOnly) redo?.(); return;
+          case 'tool-select': e.preventDefault(); setActiveTool?.('select'); return;
+          case 'tool-pan': e.preventDefault(); setActiveTool?.('pan'); return;
+          case 'zoom-in': e.preventDefault(); zoomIn?.(); return;
+          case 'zoom-out': e.preventDefault(); zoomOut?.(); return;
+          default: break;
+        }
+      }
 
       // Ctrl+S to save
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -540,10 +556,7 @@ function DiagramStudioInner({
         }
       }
 
-      // H key to toggle comment visibility
-      if (e.key === 'h' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        setShowComments(prev => !prev);
-      }
+      // (H is the Pan tool; comment visibility is toggled from the toolbar / command palette)
 
       // P key to toggle properties panel (when selection exists)
       if (e.key === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -586,7 +599,7 @@ function DiagramStudioInner({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveDiagram, profile.editingPolicy?.readOnly, focusMode, toggleLeftPanel, toggleCommentTool, activeTool, setActiveTool, setSelectedStencil, cancelNewComment, hasSelection, useFloatingUI, showPropertiesPanel, toggleContextualToolbar, viewport, addElement, stickyNoteColor, isPreviewMode]);
+  }, [saveDiagram, profile.editingPolicy?.readOnly, focusMode, toggleLeftPanel, toggleCommentTool, activeTool, setActiveTool, setSelectedStencil, cancelNewComment, hasSelection, useFloatingUI, showPropertiesPanel, toggleContextualToolbar, viewport, addElement, stickyNoteColor, isPreviewMode, undo, redo, zoomIn, zoomOut]);
 
   // UI visibility from profile
   const showLeftPalette = profile.uiPolicy?.showLeftPalette !== false;

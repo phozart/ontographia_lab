@@ -38,6 +38,8 @@ import { buildStraightPath } from './connections/geometry/pathBuilders';
 // Extracted hooks (refactored 2025-12-29)
 import { useClipboard, useQuickCreate, useAlignmentGuides } from './hooks';
 import { useCanvasInteractions } from './hooks/composite/useCanvasInteractions';
+import { getZIndexForOrder } from './hooks/interaction/zOrder';
+import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOptions';
 
 // Extracted utilities (refactored 2025-12-29)
 import {
@@ -545,7 +547,11 @@ function Node({
       return;
     }
 
-    onSelect?.(element.id);
+    // Shift+click toggles selection in the click handler; selecting here as well would
+    // replace the selection on mousedown and then toggle the node back off on click.
+    if (!e.shiftKey) {
+      onSelect?.(element.id);
+    }
     onDragStart?.(e, element);
   };
 
@@ -647,7 +653,7 @@ function Node({
       checkAndAutoResize(currentLabel);
     } else if (e.key === 'Escape') {
       setLocalLabel(element.label || element.name || '');
-      onEditingLabelDone?.(element.id, false);
+      onEditingLabelDone?.(element.id, false, true);
     }
   };
 
@@ -1399,6 +1405,8 @@ export default function DiagramCanvas({
   const [showConnectionToolbar, setShowConnectionToolbar] = useState(false); // Show connection toolbar on right-click
   const [hoveredElement, setHoveredElement] = useState(null);
   const [editingLabelId, setEditingLabelId] = useState(null);
+  // Nodes just created via Tab/Enter/quick-create and not yet given a label (Esc discards them)
+  const freshNodeIdsRef = useRef(new Set());
   const [editingConnectionId, setEditingConnectionId] = useState(null);
   const [hoveredConnectionId, setHoveredConnectionId] = useState(null);
   const [draggingWaypoint, setDraggingWaypoint] = useState(null); // { connectionId, waypointIndex }
@@ -2996,24 +3004,9 @@ export default function DiagramCanvas({
       return;
     }
 
-    // Element dragging is handled by the document-level handler (uses DOM transforms for performance)
-    // Only handle panning here since it updates viewport state
-    if (isPanning) {
-      const dx = e.clientX - panStart.x;
-      const dy = e.clientY - panStart.y;
-      const containerWidth = canvasRef.current?.clientWidth || 1200;
-      const containerHeight = canvasRef.current?.clientHeight || 800;
-      setViewport(prev => {
-        const newViewport = {
-          ...prev,
-          x: prev.x + dx / prev.scale,
-          y: prev.y + dy / prev.scale,
-        };
-        return clampViewport(newViewport, containerWidth, containerHeight);
-      });
-      setPanStart({ x: e.clientX, y: e.clientY });
-    }
-  }, [isPanning, panStart, isConnecting, connectSource, draggingWaypoint, draggingSegment, draggingEndpoint, resizing, marquee, drawing, connections, elements, packRegistry, setViewport, updateConnection]);
+    // Element dragging and panning are handled by the document-level handler.
+    // (Panning must be applied in exactly one place, otherwise the delta is doubled.)
+  }, [ isConnecting, connectSource, draggingWaypoint, draggingSegment, draggingEndpoint, resizing, marquee, drawing, connections, elements, packRegistry, setViewport, updateConnection]);
 
   const handleMouseUp = useCallback((e) => {
     // Complete draw-to-size (requires actual drag, not just click)
@@ -4176,6 +4169,7 @@ export default function DiagramCanvas({
 
             // Select the new child and start editing
             selectElement(childElement.id);
+            freshNodeIdsRef.current.add(childElement.id);
             setEditingLabelId(childElement.id);
           }
 
@@ -4222,6 +4216,7 @@ export default function DiagramCanvas({
 
                 // Select the new sibling and start editing
                 selectElement(siblingElement.id);
+                freshNodeIdsRef.current.add(siblingElement.id);
                 setEditingLabelId(siblingElement.id);
               }
             }
@@ -4660,14 +4655,16 @@ export default function DiagramCanvas({
     const defaultLineStyle = pack?.defaultLineStyle || 'curved';
 
     // Use hook to create element and connection
+    const qcOptions = resolveQuickCreateOptions(sourceElement, stencil);
     const result = hookQuickCreate(sourceElement, direction, {
-      stencil: stencil ? { ...stencil, packId: sourceElement.packId } : null,
-      label: stencil?.name || 'New Node',
+      stencil: qcOptions.stencil,
+      label: qcOptions.label,
       connectionOptions: { lineStyle: defaultLineStyle },
     });
 
     // Start editing label on the new element
     if (result?.element) {
+      freshNodeIdsRef.current.add(result.element.id);
       setEditingLabelId(result.element.id);
       // Ensure we're in select mode after quick-create
       setActiveTool('select');
@@ -4924,6 +4921,13 @@ export default function DiagramCanvas({
           removeElement(nodeId);
         }
         break;
+      case 'bring-front':
+      case 'send-back':
+        if (nodeId) {
+          const nextZ = getZIndexForOrder(elements, nodeId, action === 'bring-front' ? 'front' : 'back');
+          if (nextZ !== null) updateElement(nodeId, { zIndex: nextZ }); // records history
+        }
+        break;
       case 'delete-connection':
         if (connectionId) {
           removeConnection(connectionId);
@@ -5035,7 +5039,7 @@ export default function DiagramCanvas({
       default:
         break;
     }
-  }, [elements, connections, addElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar]);
+  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar]);
 
   // ============ RENDER ============
 
@@ -5403,7 +5407,15 @@ export default function DiagramCanvas({
               isConnectMode={activeTool === 'connect'}
               isConnecting={isConnecting}
               isEditingLabel={editingLabelId === element.id}
-              onEditingLabelDone={(id, editing) => setEditingLabelId(editing ? id : null)}
+              onEditingLabelDone={(id, editing, cancelled) => {
+                setEditingLabelId(editing ? id : null);
+                if (editing) return;
+                const wasFresh = freshNodeIdsRef.current.delete(id);
+                if (cancelled && wasFresh && !readOnly) {
+                  const el = elements.find(x => x.id === id);
+                  if (el && !(el.label || '').trim()) removeElement(id);
+                }
+              }}
               onShowProperties={onShowProperties}
               activePack={activePack}
               hasConnections={connections?.some(c => c.sourceId === element.id || c.targetId === element.id) || false}
