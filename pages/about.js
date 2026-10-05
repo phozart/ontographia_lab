@@ -336,7 +336,7 @@ export default function AboutPage() {
                   },
                 }}
               >
-                We're Building the Future of
+                We&apos;re Building the Future of
                 <Box
                   component="span"
                   sx={{
@@ -368,7 +368,7 @@ export default function AboutPage() {
                 }}
               >
                 Ontographia Lab started with a simple observation: the best ideas often
-                struggle to escape the minds that create them. We're here to change that.
+                struggle to escape the minds that create them. We&apos;re here to change that.
               </Typography>
             </Box>
 
@@ -433,7 +433,7 @@ export default function AboutPage() {
                   lineHeight: 1.8,
                 }}
               >
-                The best diagrams don't just describe things—they reveal the underlying structure
+                The best diagrams don&apos;t just describe things—they reveal the underlying structure
                 and relationships that make systems work. They illuminate what exists.
               </Typography>
             </Box>

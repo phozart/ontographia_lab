@@ -1585,7 +1585,7 @@ export default function ProductPage() {
             }}
           >
             Diagramming is a team sport. Real-time collaboration that feels natural,
-            whether you're in the same room or across the globe.
+            whether you&apos;re in the same room or across the globe.
           </Typography>
         </Box>
 
@@ -1760,7 +1760,7 @@ export default function ProductPage() {
           <Grid item xs={12} md={5}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, height: '100%', justifyContent: 'center' }}>
               <CapabilityItem icon={GroupsIcon} color={SKY.warmPeach}>
-                Real-time cursor presence shows who's working where
+                Real-time cursor presence shows who&apos;s working where
               </CapabilityItem>
               <CapabilityItem icon={AutoAwesomeIcon} color={SKY.warmPeach}>
                 Inline comments attached to specific elements
@@ -1892,14 +1892,14 @@ export default function ProductPage() {
                 <Box sx={{ color: 'rgba(255,255,255,0.4)' }}>{'// Auto-generated from diagram'}</Box>
                 <Box sx={{ color: SKY.mauveRose }}>{'{'}</Box>
                 <Box sx={{ pl: 2 }}>
-                  <Box><Box component="span" sx={{ color: SKY.deepCyan }}>"services"</Box>: {'['}</Box>
+                  <Box><Box component="span" sx={{ color: SKY.deepCyan }}>&quot;services&quot;</Box>: {'['}</Box>
                   <Box sx={{ pl: 2 }}>
                     <Box sx={{ color: 'rgba(255,255,255,0.7)' }}>{'{ "name": "API Gateway", "port": 8080 },'}</Box>
                     <Box sx={{ color: 'rgba(255,255,255,0.7)' }}>{'{ "name": "Auth Service", "port": 8081 },'}</Box>
                     <Box sx={{ color: 'rgba(255,255,255,0.7)' }}>{'{ "name": "User Service", "port": 8082 }'}</Box>
                   </Box>
                   <Box>{'],'}</Box>
-                  <Box><Box component="span" sx={{ color: SKY.deepCyan }}>"connections"</Box>: <Box component="span" sx={{ color: SKY.warmPeach }}>12</Box></Box>
+                  <Box><Box component="span" sx={{ color: SKY.deepCyan }}>&quot;connections&quot;</Box>: <Box component="span" sx={{ color: SKY.warmPeach }}>12</Box></Box>
                 </Box>
                 <Box sx={{ color: SKY.mauveRose }}>{'}'}</Box>
               </Box>
