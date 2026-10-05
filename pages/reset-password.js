@@ -42,31 +42,16 @@ const PASSWORD_REQUIREMENTS = [
   { key: 'special', label: 'One special character (!@#$%...)', test: (p) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(p) },
 ];
 
-// Generate a simple math CAPTCHA
-function generateCaptcha() {
-  const operations = ['+', '-', '×'];
-  const op = operations[Math.floor(Math.random() * operations.length)];
-  let a, b, answer;
-
-  switch (op) {
-    case '+':
-      a = Math.floor(Math.random() * 20) + 1;
-      b = Math.floor(Math.random() * 20) + 1;
-      answer = a + b;
-      break;
-    case '-':
-      a = Math.floor(Math.random() * 20) + 10;
-      b = Math.floor(Math.random() * a);
-      answer = a - b;
-      break;
-    case '×':
-      a = Math.floor(Math.random() * 10) + 1;
-      b = Math.floor(Math.random() * 10) + 1;
-      answer = a * b;
-      break;
+// Fetch a server-issued CAPTCHA challenge ({ question, token })
+async function fetchCaptcha() {
+  try {
+    const res = await fetch('/api/auth/captcha', { cache: 'no-store' });
+    if (!res.ok) throw new Error('captcha unavailable');
+    const data = await res.json();
+    return { question: data.question, token: data.token };
+  } catch (e) {
+    return { question: 'Verification unavailable - refresh to retry', token: '' };
   }
-
-  return { question: `${a} ${op} ${b} = ?`, answer: answer.toString() };
 }
 
 export default function ResetPasswordPage() {
@@ -77,14 +62,14 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [captchaAnswer, setCaptchaAnswer] = useState('');
-  const [captcha, setCaptcha] = useState({ question: '', answer: '' });
+  const [captcha, setCaptcha] = useState({ question: '', token: '' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showRequirements, setShowRequirements] = useState(false);
 
   useEffect(() => {
-    setCaptcha(generateCaptcha());
+    fetchCaptcha().then(setCaptcha);
   }, []);
 
   // Redirect if logged in
@@ -106,7 +91,7 @@ export default function ResetPasswordPage() {
   }, [password]);
 
   const refreshCaptcha = () => {
-    setCaptcha(generateCaptcha());
+    fetchCaptcha().then(setCaptcha);
     setCaptchaAnswer('');
   };
 
@@ -147,7 +132,7 @@ export default function ResetPasswordPage() {
           token,
           password,
           captchaAnswer,
-          captchaExpected: captcha.answer,
+          captchaToken: captcha.token,
         }),
       });
 

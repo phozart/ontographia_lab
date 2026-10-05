@@ -2,6 +2,7 @@
 // API endpoint for requesting a password reset
 
 import crypto from 'crypto';
+import { verifyCaptcha, isProvided } from '../../../lib/captcha';
 import { query } from '../../../lib/db';
 import { strictLimiter } from '../../../lib/rateLimit';
 
@@ -18,15 +19,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, captchaAnswer, captchaExpected } = req.body;
+    const { email, captchaAnswer, captchaToken } = req.body;
 
-    // CAPTCHA verification
-    if (!captchaAnswer || !captchaExpected) {
-      return res.status(400).json({ error: 'Please complete the verification challenge' });
-    }
-
-    if (captchaAnswer.toString().toLowerCase() !== captchaExpected.toString().toLowerCase()) {
-      return res.status(400).json({ error: 'Incorrect verification answer. Please try again.' });
+    // CAPTCHA verification (server-issued, signed challenge)
+    const captcha = verifyCaptcha(captchaToken, captchaAnswer);
+    if (!captcha.valid) {
+      return res.status(400).json({
+        error: isProvided(captchaAnswer) && isProvided(captchaToken)
+          ? 'Incorrect or expired verification. Please try again.'
+          : 'Please complete the verification challenge',
+      });
     }
 
     if (!email) {
@@ -53,7 +55,7 @@ export default async function handler(req, res) {
     if (user.provider && user.provider !== 'email') {
       // User signed up with OAuth - return success to prevent enumeration
       // but don't create token
-      console.log(`Password reset requested for OAuth user: ${email}`);
+      console.log('Password reset requested for an OAuth-only account');
       return res.status(200).json({ success: true, message: successMessage });
     }
 
@@ -70,25 +72,19 @@ export default async function handler(req, res) {
       [resetTokenHash, expiresAt, user.id]
     );
 
-    // In production, send email here
-    // For development, log the reset URL
+    // No email transport is configured yet. Reset links are only surfaced
+    // in local development; in every other environment they are never logged.
+    const isDev = process.env.NODE_ENV === 'development';
     const resetUrl = `${process.env.NEXTAUTH_URL}/reset-password?token=${resetToken}`;
 
-    console.log('═'.repeat(60));
-    console.log('PASSWORD RESET LINK (Development Only):');
-    console.log(`Email: ${email}`);
-    console.log(`URL: ${resetUrl}`);
-    console.log('This link expires in 1 hour.');
-    console.log('═'.repeat(60));
-
-    // TODO: In production, integrate with email service
-    // await sendPasswordResetEmail(user.email, user.name, resetUrl);
+    if (isDev) {
+      console.log(`[dev] Password reset link for ${email}: ${resetUrl}`);
+    }
 
     return res.status(200).json({
       success: true,
       message: successMessage,
-      // Include reset URL in development for testing
-      ...(process.env.NODE_ENV === 'development' && { resetUrl }),
+      ...(isDev && { resetUrl }),
     });
 
   } catch (error) {

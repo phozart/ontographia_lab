@@ -105,6 +105,13 @@ ADMIN_NAME=Administrator
 openssl rand -base64 32
 ```
 
+## Deployment / environment
+
+- `NEXTAUTH_SECRET` is required. It signs sessions and the verification challenge used by the sign-up, forgot-password and reset-password forms; without it those forms cannot be submitted.
+- `TRUST_PROXY_HOPS` (default `1`) is the number of trusted reverse proxies in front of the app. It determines which `X-Forwarded-For` entry is used as the client address for rate limiting.
+  - `1`: the app runs behind one reverse proxy (for example nginx) that appends the client address to `X-Forwarded-For` (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`).
+  - `0`: the app is directly exposed; the socket address is used and forwarding headers are ignored.
+
 ## Database Commands
 
 ```bash
