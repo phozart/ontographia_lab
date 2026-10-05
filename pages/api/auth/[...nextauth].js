@@ -89,9 +89,11 @@ export const authOptions = {
         }
 
         // For OAuth providers, check if user exists
+        const email = user.email?.toLowerCase();
+        if (!email) return false;
         const existing = await query(
           'SELECT id, role, status FROM users WHERE email = $1',
-          [user.email]
+          [email]
         );
 
         if (existing.rows.length > 0) {
@@ -101,18 +103,18 @@ export const authOptions = {
           // Update last login and profile info from OAuth
           await query(
             'UPDATE users SET last_login = NOW(), name = $1, image = $2 WHERE email = $3',
-            [user.name, user.image, user.email]
+            [user.name, user.image, email]
           );
         } else {
           // Create new user from OAuth
           // Check if this is the admin email (auto-approve)
-          const isAdmin = user.email === process.env.ADMIN_EMAIL;
+          const isAdmin = email === process.env.ADMIN_EMAIL?.toLowerCase();
 
           await query(
             `INSERT INTO users (email, name, image, provider, provider_id, role, status, approved_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [
-              user.email,
+              email,
               user.name,
               user.image,
               account.provider,
@@ -127,7 +129,7 @@ export const authOptions = {
         return true;
       } catch (error) {
         console.error('Error in signIn callback:', error);
-        return true; // Still allow sign in, but log the error
+        return false; // Fail closed: do not allow sign in if status could not be checked
       }
     },
 

@@ -47,8 +47,21 @@ describe('captcha', () => {
   test('rejects an expired token', () => {
     const t0 = 1700000000000;
     const { question, token } = createChallenge({ now: t0 });
-    expect(verifyCaptcha(token, solve(question), { now: t0 + 9 * 60 * 1000 }).valid).toBe(true);
-    expect(verifyCaptcha(token, solve(question), { now: t0 + 11 * 60 * 1000 }).valid).toBe(false);
+    expect(verifyCaptcha(token, solve(question), { now: t0 + 1 * 60 * 1000 }).valid).toBe(true);
+    expect(verifyCaptcha(token, solve(question), { now: t0 + 3 * 60 * 1000 }).valid).toBe(false);
+  });
+
+  test('a token verifies successfully only once', () => {
+    const { question, token } = createChallenge();
+    const answer = solve(question);
+    expect(verifyCaptcha(token, answer).valid).toBe(true);
+    expect(verifyCaptcha(token, answer).valid).toBe(false);
+  });
+
+  test('a token is spent by a wrong attempt as well', () => {
+    const { question, token } = createChallenge();
+    expect(verifyCaptcha(token, String(+solve(question) + 1)).valid).toBe(false);
+    expect(verifyCaptcha(token, solve(question)).valid).toBe(false);
   });
 
   test('token signed with a different secret is rejected', () => {

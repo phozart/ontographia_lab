@@ -160,7 +160,36 @@ describe('credentials authorize', () => {
   });
 });
 
+describe('captcha message', () => {
+  test('answer 0 is treated as provided (not as missing)', async () => {
+    const c = createChallenge();
+    const res = mockRes();
+    await forgot(post({ email: 'a@b.co', captchaToken: c.token, captchaAnswer: 0 }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/Incorrect or expired/);
+  });
+
+  test('missing answer gets the complete-challenge message', async () => {
+    const res = mockRes();
+    await forgot(post({ email: 'a@b.co' }), res);
+    expect(res.body.error).toMatch(/complete the verification/);
+  });
+});
+
 describe('signIn callback', () => {
+  test('returns false when the lookup fails', async () => {
+    query.mockRejectedValueOnce(new Error('db down'));
+    const r = await authOptions.callbacks.signIn({ user: { email: 'a@b.co' }, account: { provider: 'google' } });
+    expect(r).toBe(false);
+  });
+
+  test('looks up OAuth users by lowercased email', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: 1, role: 'user', status: 'active' }] });
+    query.mockResolvedValueOnce({ rows: [] });
+    await authOptions.callbacks.signIn({ user: { email: 'A@B.Co', name: 'A', image: null }, account: { provider: 'google' } });
+    expect(query.mock.calls[0][1]).toEqual(['a@b.co']);
+  });
+
   test('rejects suspended OAuth users', async () => {
     query.mockResolvedValueOnce({ rows: [{ id: 1, role: 'user', status: 'suspended' }] });
     const r = await authOptions.callbacks.signIn({ user: { email: 'a@b.co' }, account: { provider: 'google' } });

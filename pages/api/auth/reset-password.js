@@ -3,7 +3,7 @@
 
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { verifyCaptcha } from '../../../lib/captcha';
+import { verifyCaptcha, isProvided } from '../../../lib/captcha';
 import { query } from '../../../lib/db';
 import { strictLimiter } from '../../../lib/rateLimit';
 
@@ -70,7 +70,7 @@ export default async function handler(req, res) {
     const captcha = verifyCaptcha(captchaToken, captchaAnswer);
     if (!captcha.valid) {
       return res.status(400).json({
-        error: captchaAnswer && captchaToken
+        error: isProvided(captchaAnswer) && isProvided(captchaToken)
           ? 'Incorrect or expired verification. Please try again.'
           : 'Please complete the verification challenge',
       });
