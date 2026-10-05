@@ -71,6 +71,18 @@ describe('computeTemplatePlacement', () => {
   });
 });
 
+describe('computeTemplatePlacement canvas bounds', () => {
+  const bounds = { x: 50, y: 50, width: 400, height: 200 };
+  it('places below the content when right-of-content would leave the canvas', () => {
+    const contentBounds = { x: 98500, y: 50000, width: 400, height: 300 }; // right edge 98900
+    const { dx, dy } = computeTemplatePlacement({ bounds, contentBounds, viewport: { x: 0, y: 0, scale: 1 }, container, gap: 80, canvasMax: 99000 });
+    const placed = { x: bounds.x + dx, y: bounds.y + dy, width: 400, height: 200 };
+    expect(placed.x + placed.width).toBeLessThanOrEqual(99000);
+    expect(placed.y).toBe(50000 + 300 + 80);
+    expect(overlaps(placed, contentBounds)).toBe(false);
+  });
+});
+
 describe('computeFitViewport', () => {
   it('centres the rect in the container at scale 1 when it fits', () => {
     const rect = { x: 2000, y: 3000, width: 400, height: 200 };

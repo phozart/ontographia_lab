@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import { generateId } from './utils/ids';
 import { normalizeDiagramContent } from './migrations/normalizeContent';
 import { migrateDiagram } from './migrations/migrateDiagram';
-import { assignFrameOnCreate } from './utils/frameMembership';
+import { assignFrameOnCreate, remapDuplicateParent } from './utils/frameMembership';
 
 // ============ CONTEXT ============
 
@@ -557,6 +557,13 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       };
     });
 
+    // Frame membership of the copies (needs the full idMapping first)
+    newElements.forEach((copy, i) => {
+      if (selectedElements[i].parentFrameId !== undefined) {
+        copy.parentFrameId = remapDuplicateParent(selectedElements[i], copy, idMapping, elements);
+      }
+    });
+
     // Add new elements
     setElementsState(prev => [...prev, ...newElements]);
 
@@ -571,6 +578,9 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
         id: generateId('conn'),
         sourceId: idMapping[conn.sourceId] || conn.sourceId,
         targetId: idMapping[conn.targetId] || conn.targetId,
+        ...(conn.parentFrameId !== undefined
+          ? { parentFrameId: idMapping[conn.parentFrameId] || null }
+          : {}),
       }));
       setConnectionsState(prev => [...prev, ...newConnections]);
     }

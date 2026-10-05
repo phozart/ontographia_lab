@@ -48,8 +48,16 @@ export function getContentBounds(elements) {
  * sits to the right of existing content (top-aligned, `gap` apart), or centred
  * in the viewport when the canvas is empty.
  */
-export function computeTemplatePlacement({ bounds, contentBounds, viewport, container, gap = 80 }) {
+export function computeTemplatePlacement({ bounds, contentBounds, viewport, container, gap = 80, canvasMax = 99000 }) {
   if (contentBounds) {
+    const rightEdge = contentBounds.x + contentBounds.width + gap + bounds.width;
+    if (rightEdge > canvasMax) {
+      // No room to the right: first empty region is below the content
+      return {
+        dx: Math.round(contentBounds.x - bounds.x),
+        dy: Math.round(contentBounds.y + contentBounds.height + gap - bounds.y),
+      };
+    }
     return {
       dx: Math.round(contentBounds.x + contentBounds.width + gap - bounds.x),
       dy: Math.round(contentBounds.y - bounds.y),

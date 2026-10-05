@@ -4,6 +4,7 @@ import {
   computeFrameMembershipChanges,
   deriveLegacyFrameMembership,
   assignFrameOnCreate,
+  getFrameDescendants,
 } from '../../../components/diagram-studio/utils/frameMembership';
 
 const frame = (id, x, y, w, h, extra = {}) => ({ id, type: 'frame', x, y, size: { width: w, height: h }, ...extra });
@@ -100,5 +101,22 @@ describe('deriveLegacyFrameMembership', () => {
   });
   it('returns non-arrays unchanged', () => {
     expect(deriveLegacyFrameMembership(undefined)).toBeUndefined();
+  });
+});
+
+describe('getFrameDescendants (nested frames)', () => {
+  it('includes an inner frame and its members, recursively', () => {
+    const els = [
+      frame('outer', 0, 0, 900, 900),
+      frame('inner', 50, 50, 400, 400, { parentFrameId: 'outer' }),
+      box('a', 60, 60, { parentFrameId: 'inner' }),
+      box('b', 600, 600, { parentFrameId: 'outer' }),
+      box('free', 70, 70),
+    ];
+    expect(getFrameDescendants('outer', els).map((e) => e.id).sort()).toEqual(['a', 'b', 'inner']);
+  });
+  it('survives a cycle', () => {
+    const els = [frame('x', 0, 0, 9, 9, { parentFrameId: 'y' }), frame('y', 0, 0, 9, 9, { parentFrameId: 'x' })];
+    expect(getFrameDescendants('x', els).map((e) => e.id)).toEqual(['y']);
   });
 });

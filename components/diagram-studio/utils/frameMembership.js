@@ -19,6 +19,23 @@ export function getFrameMembers(frameId, elements) {
   return elements.filter((el) => el.id !== frameId && el.parentFrameId === frameId);
 }
 
+/** Members of a frame including nested frames and, recursively, their members. */
+export function getFrameDescendants(frameId, elements) {
+  const out = [];
+  const seen = new Set([frameId]);
+  const queue = [frameId];
+  while (queue.length) {
+    const id = queue.shift();
+    getFrameMembers(id, elements).forEach((el) => {
+      if (seen.has(el.id)) return;
+      seen.add(el.id);
+      out.push(el);
+      if (isFrame(el)) queue.push(el.id);
+    });
+  }
+  return out;
+}
+
 /**
  * The frame (id) whose bounds contain the element's centre, or null.
  * Later frames in the list win (they render on top).
@@ -101,4 +118,22 @@ export function deriveLegacyFrameMembership(elements) {
     if (adopt.has(el.id)) return { ...el, parentFrameId: adopt.get(el.id) };
     return el;
   });
+}
+
+/**
+ * Parent frame for a duplicated element. If its frame was duplicated too, the copy
+ * joins the copied frame; otherwise it keeps the original frame only when the copy
+ * lands fully inside it, else it is released (null).
+ */
+export function remapDuplicateParent(original, copy, idMapping, elements) {
+  const parentId = original.parentFrameId;
+  if (!parentId) return parentId === undefined ? undefined : null;
+  if (idMapping[parentId]) return idMapping[parentId];
+  const frame = (elements || []).find((e) => e.id === parentId);
+  if (!frame) return null;
+  const fs = sizeOf(frame);
+  const s = sizeOf(copy);
+  const inside = copy.x >= frame.x && copy.y >= frame.y &&
+    copy.x + s.width <= frame.x + fs.width && copy.y + s.height <= frame.y + fs.height;
+  return inside ? parentId : null;
 }

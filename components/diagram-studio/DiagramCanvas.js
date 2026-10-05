@@ -42,7 +42,7 @@ import { useCanvasInteractions } from './hooks/composite/useCanvasInteractions';
 import { getZIndexForOrder, compareByZOrder } from './hooks/interaction/zOrder';
 import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOptions';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
-import { getFrameMembers, computeFrameMembershipChanges } from './utils/frameMembership';
+import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
 
 // Extracted utilities (refactored 2025-12-29)
 import {
@@ -87,12 +87,12 @@ import {
 // ============ HELPER FUNCTIONS ============
 // (Pure geometry utilities moved to ./utils/)
 
-// Elements that belong to a frame. Membership is explicit (parentFrameId): set when a
+// Elements that belong to a frame (nested frames travel with it, with their own members). Membership is explicit (parentFrameId): set when a
 // shape is dropped into / created inside the frame or inserted with a template, and
 // cleared when the shape is dragged out. It is never recomputed from geometry here.
 function getElementsInsideFrame(frame, elements) {
   if (!frame || frame.type !== 'frame') return [];
-  return getFrameMembers(frame.id, elements).filter(el => el.type !== 'frame');
+  return getFrameDescendants(frame.id, elements);
 }
 
 // Get connections where both source and target are in the given element list
