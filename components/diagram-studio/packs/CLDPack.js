@@ -4,6 +4,58 @@
 import React from 'react';
 import SvgNodeFrame from './SvgNodeFrame';
 
+// ============ LOOP LABEL FIT ============
+
+const LOOP_FONT_MAX = 14;
+const LOOP_FONT_MIN = 9;
+const LATIN_EM = 0.55; // typical bold sans-serif Latin glyph width in em
+const WIDE_EM = 1.0; // East Asian wide / full-width characters and emoji
+
+// Estimated glyph width in em for one code point (string of one user char).
+function glyphEm(ch) {
+  const cp = ch.codePointAt(0);
+  if (cp === 0x200d || (cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0x300 && cp <= 0x36f)) return 0;
+  if (
+    (cp >= 0x1100 && cp <= 0x115f) ||
+    (cp >= 0x2e80 && cp <= 0xa4cf) ||
+    (cp >= 0xac00 && cp <= 0xd7a3) ||
+    (cp >= 0xf900 && cp <= 0xfaff) ||
+    (cp >= 0xfe30 && cp <= 0xfe6f) ||
+    (cp >= 0xff00 && cp <= 0xff60) ||
+    (cp >= 0xffe0 && cp <= 0xffe6) ||
+    (cp >= 0x20000 && cp <= 0x3fffd) ||
+    /\p{Extended_Pictographic}/u.test(ch)
+  ) {
+    return WIDE_EM;
+  }
+  return LATIN_EM;
+}
+
+// Fit a label inside a loop-marker circle: shrink the font down to a minimum,
+// then truncate with an ellipsis. Returns { text, fontSize, truncated }.
+export function fitLoopLabel(label, diameter) {
+  const raw = String(label ?? '');
+  if (raw.trim() === '') return { text: '', fontSize: LOOP_FONT_MAX, truncated: false };
+  const chars = Array.from(raw);
+  const ems = chars.map(glyphEm);
+  const totalEm = ems.reduce((a, b) => a + b, 0);
+  const available = Math.max(0, diameter * 0.7);
+
+  for (let size = LOOP_FONT_MAX; size >= LOOP_FONT_MIN; size--) {
+    if (totalEm * size <= available) return { text: raw, fontSize: size, truncated: false };
+  }
+  const budget = available / LOOP_FONT_MIN - LATIN_EM; // leave room for the ellipsis
+  let used = 0;
+  let out = '';
+  for (let i = 0; i < chars.length; i++) {
+    if (used + ems[i] > budget) break;
+    used += ems[i];
+    out += chars[i];
+  }
+  if (out === '') out = chars[0];
+  return { text: out.trimEnd() + '…', fontSize: LOOP_FONT_MIN, truncated: true };
+}
+
 // ============ STENCILS ============
 
 const stencils = [
@@ -627,6 +679,7 @@ function ReinforcingLoopNode({ element, stencil, isSelected }) {
   const color = element.color || stencil.color;
   const label = element.label || 'R';
   const r = Math.min(width, height) / 2 - 2;
+  const fit = fitLoopLabel(label, r * 2);
   const cx = width / 2;
   const cy = height / 2;
 
@@ -669,11 +722,12 @@ function ReinforcingLoopNode({ element, stencil, isSelected }) {
         textAnchor="middle"
         dominantBaseline="central"
         fill={color}
-        fontSize="14"
+        fontSize={fit.fontSize}
         fontWeight="700"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
-        {label}
+        {fit.truncated && <title>{label}</title>}
+        {fit.text}
       </text>
       {/* Define arrow marker */}
       <defs>
@@ -701,6 +755,7 @@ function BalancingLoopNode({ element, stencil, isSelected }) {
   const color = element.color || stencil.color;
   const label = element.label || 'B';
   const r = Math.min(width, height) / 2 - 2;
+  const fit = fitLoopLabel(label, r * 2);
   const cx = width / 2;
   const cy = height / 2;
 
@@ -743,11 +798,12 @@ function BalancingLoopNode({ element, stencil, isSelected }) {
         textAnchor="middle"
         dominantBaseline="central"
         fill={color}
-        fontSize="14"
+        fontSize={fit.fontSize}
         fontWeight="700"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
-        {label}
+        {fit.truncated && <title>{label}</title>}
+        {fit.text}
       </text>
       {/* Define arrow marker */}
       <defs>
