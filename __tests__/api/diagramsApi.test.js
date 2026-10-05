@@ -13,6 +13,7 @@ jest.mock('../../lib/diagramRepository', () => ({
     findById: jest.fn(),
     updateDiagram: jest.fn(),
     updateThumbnail: jest.fn(),
+    duplicateDiagram: jest.fn(),
     createDiagram: jest.fn(),
     findAll: jest.fn(),
     deleteDiagram: jest.fn(),
@@ -21,6 +22,7 @@ jest.mock('../../lib/diagramRepository', () => ({
 
 import { query } from '../../lib/db';
 import { diagramRepository as repo } from '../../lib/diagramRepository';
+import duplicateHandler from '../../pages/api/diagrams/[id]/duplicate';
 import idHandler from '../../pages/api/diagrams/[id]';
 import indexHandler from '../../pages/api/diagrams/index';
 
@@ -251,7 +253,7 @@ describe('PUT thumbnail-only (background preview refresh)', () => {
     expect(repo.updateThumbnail).not.toHaveBeenCalled();
   });
 
-  test.each([['javascript:alert(1)'], [123], ['data:image/png;base64,' + 'A'.repeat(300000)]])('invalid thumbnail %#, -> 400', async (t) => {
+  test.each([['javascript:alert(1)'], ['data:image/svg+xml;base64,AAAA'], ['http://x/y.png'], [123], ['data:image/png;base64,' + 'A'.repeat(300 * 1024)]])('invalid thumbnail %#, -> 400', async (t) => {
     expect((await put({ thumbnail: t })).statusCode).toBe(400);
     expect(repo.updateThumbnail).not.toHaveBeenCalled();
   });
@@ -343,5 +345,35 @@ describe('GET/POST /api/diagrams', () => {
     const res = await call(indexHandler, { method: 'GET' });
     expect(res.statusCode).toBe(500);
     expect(JSON.stringify(res.body)).not.toMatch(/password/);
+  });
+});
+
+describe('POST /api/diagrams/[id]/duplicate', () => {
+  const dup = (id = UUID, method = 'POST') => call(duplicateHandler, { method, query: { id } });
+  beforeEach(() => repo.duplicateDiagram.mockResolvedValue({ id: 'new', name: 'D (copy)', revision: '0' }));
+
+  test('owner: 201, copy owned by the caller (email + user id)', async () => {
+    const res = await dup();
+    expect(res.statusCode).toBe(201);
+    expect(repo.duplicateDiagram).toHaveBeenCalledWith(row, 'a@b.co', OWNER);
+    expect(res.body.id).toBe('new');
+  });
+
+  test.each(['stranger', 'admin'])('%s -> 404, nothing copied', async (who) => {
+    mockUser = users[who];
+    expect((await dup()).statusCode).toBe(404);
+    expect(repo.duplicateDiagram).not.toHaveBeenCalled();
+  });
+
+  test('405 for other methods; malformed id -> 404 without DB call', async () => {
+    expect((await dup(UUID, 'GET')).statusCode).toBe(405);
+    query.mockClear();
+    expect((await dup('nope')).statusCode).toBe(404);
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  test('unauthenticated -> 401', async () => {
+    mockUser = null;
+    expect((await dup()).statusCode).toBe(401);
   });
 });

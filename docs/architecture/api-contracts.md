@@ -1,6 +1,6 @@
 # API contracts — Groups B and C
 
-Status: **Proposed**. Pages-router layout: `pages/api/diagrams/[id].js` becomes `pages/api/diagrams/[id]/index.js` so nested routes can live beside it.
+Status: **Proposed**; the authorization wrapper (section 1) and the `GET`/`PUT`/`DELETE /api/diagrams/{id}` rows of section 2 shipped in slice 1 (as built: `[id].js` was not moved to `[id]/index.js`; only the `If-Match` header is supported, not a `baseRevision` body field; content over 5 MB answers 413, other content violations 400 `VALIDATION_FAILED`, unsafe URL fields are stripped and reported in a `warnings` array; a PUT whose body is only `thumbnail` requires `diagram.write`, ignores `If-Match` and does not change `revision`). Pages-router layout: `pages/api/diagrams/[id].js` becomes `pages/api/diagrams/[id]/index.js` so nested routes can live beside it.
 
 ## Conventions
 

@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useDiagram } from '../DiagramContext';
+import { isMac } from '../../../lib/platform';
 
 // Action categories
 const CATEGORIES = {
@@ -274,7 +275,7 @@ export default function CommandPalette({
                           <div className="ds-command-palette-shortcut">
                             {item.shortcut.split('+').map((key, i) => (
                               <span key={i} className="ds-command-palette-key">
-                                {key === 'Cmd' ? '⌘' : key}
+                                {key === 'Cmd' ? (isMac() ? '⌘' : 'Ctrl') : key}
                               </span>
                             ))}
                           </div>

@@ -5,15 +5,14 @@
 import { diagramRepository } from '../../../lib/diagramRepository';
 import { withDiagramAuth } from '../../../lib/authz/next';
 import { validateDiagramContent } from '../../../lib/diagramContent';
-import { MAX_CONTENT_BYTES } from '../../../lib/diagramLimits';
-import { isSafeUrl } from '../../../lib/safeUrl';
+import { isValidThumbnail } from '../../../lib/thumbnail';
 import { migrateDiagram } from '../../../components/diagram-studio/migrations/migrateDiagram';
 
 const MAX_NAME_LENGTH = 255;
 
-// Content may be up to MAX_CONTENT_BYTES (validated precisely in lib/diagramContent); allow headroom for the
+// Content is capped at 5 MB (lib/diagramLimits, validated in lib/diagramContent); 6 MB leaves headroom
 // rest of the body. Next's default body limit is 1 MB.
-export const config = { api: { bodyParser: { sizeLimit: Math.ceil(MAX_CONTENT_BYTES * 1.25) } } };
+export const config = { api: { bodyParser: { sizeLimit: '6mb' } } };
 
 const IF_MATCH_RE = /^(?:W\/)?"?(\d{1,15})"?$/;
 
@@ -39,8 +38,6 @@ async function handleGet(req, res, { diagram, role, source, capabilities }) {
   return res.status(200).json(body);
 }
 
-const MAX_THUMBNAIL_CHARS = 300000;
-
 /**
  * Thumbnail-only PUT: a background preview refresh. Same permission as any edit (diagram.write; there is no
  * separate thumbnail action), but it ignores If-Match and never bumps revision, so it cannot cause a false 409
@@ -48,8 +45,8 @@ const MAX_THUMBNAIL_CHARS = 300000;
  */
 async function handleThumbnailOnly(req, res, { diagram }) {
   const { thumbnail } = req.body;
-  if (thumbnail !== null && (typeof thumbnail !== 'string' || thumbnail.length > MAX_THUMBNAIL_CHARS || !isSafeUrl(thumbnail))) {
-    return res.status(400).json({ error: 'thumbnail must be an image data URL or http(s) URL of reasonable size', code: 'VALIDATION_FAILED' });
+  if (thumbnail !== null && !isValidThumbnail(thumbnail)) {
+    return res.status(400).json({ error: 'thumbnail must be a PNG data URL of at most 200 KB', code: 'VALIDATION_FAILED' });
   }
   const row = await diagramRepository.updateThumbnail(diagram.id, thumbnail);
   if (!row) return res.status(404).json({ error: 'Diagram not found', code: 'NOT_FOUND' });
@@ -71,6 +68,10 @@ async function handlePut(req, res, ctx) {
         code: 'VALIDATION_FAILED',
       });
     }
+  }
+
+  if (body.thumbnail !== undefined && body.thumbnail !== null && !isValidThumbnail(body.thumbnail)) {
+    return res.status(400).json({ error: 'thumbnail must be a PNG data URL of at most 200 KB', code: 'VALIDATION_FAILED' });
   }
 
   let expectedRevision = null;

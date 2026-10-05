@@ -5,9 +5,8 @@
 import { diagramRepository } from '../../../lib/diagramRepository';
 import { withUserAuth } from '../../../lib/authz/next';
 import { validateDiagramContent } from '../../../lib/diagramContent';
-import { MAX_CONTENT_BYTES } from '../../../lib/diagramLimits';
 
-export const config = { api: { bodyParser: { sizeLimit: Math.ceil(MAX_CONTENT_BYTES * 1.25) } } };
+export const config = { api: { bodyParser: { sizeLimit: '6mb' } } };
 
 const toApi = (row, extra = {}) => ({ ...row, revision: Number(row.revision), ...extra });
 
