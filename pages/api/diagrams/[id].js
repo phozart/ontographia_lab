@@ -3,6 +3,7 @@
 
 import { diagramRepository } from '../../../lib/diagramRepository';
 import { requireActiveUser } from '../../../lib/useAuth';
+import { isValidThumbnail } from '../../../lib/thumbnail';
 import { migrateDiagram } from '../../../components/diagram-studio/migrations/migrateDiagram';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -62,6 +63,11 @@ export default async function handler(req, res) {
         if (typeof name !== 'string' || name.length > MAX_NAME_LENGTH) {
           return res.status(400).json({ error: `name must be a string of at most ${MAX_NAME_LENGTH} characters` });
         }
+      }
+
+      const thumbnail = req.body?.thumbnail;
+      if (thumbnail !== undefined && thumbnail !== null && !isValidThumbnail(thumbnail)) {
+        return res.status(400).json({ error: 'thumbnail must be a PNG data URL of at most 200 KB' });
       }
 
       const updated = await diagramRepository.updateDiagram(diagram.id, req.body);
