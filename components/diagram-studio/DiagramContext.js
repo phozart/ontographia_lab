@@ -3,6 +3,8 @@
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
+import { generateId } from './utils/ids';
+import { normalizeDiagramContent } from './migrations/normalizeContent';
 import { migrateDiagram } from './migrations/migrateDiagram';
 
 // ============ CONTEXT ============
@@ -272,7 +274,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   const addElement = useCallback((element) => {
     recordHistory();
     const newElement = {
-      id: element.id || `el-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: element.id || generateId('el'),
       createdAt: new Date().toISOString(),
       ...element,
     };
@@ -313,7 +315,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   const addConnection = useCallback((connection) => {
     recordHistory();
     const newConnection = {
-      id: connection.id || `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: connection.id || generateId('conn'),
       createdAt: new Date().toISOString(),
       // Default to arrow on target endpoint
       targetMarker: connection.targetMarker ?? 'arrow',
@@ -352,7 +354,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   const addLayer = useCallback((layer) => {
     recordHistory();
     const newLayer = {
-      id: layer.id || `layer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: layer.id || generateId('layer'),
       name: layer.name || `Layer ${layers.length + 1}`,
       visible: layer.visible !== false,
       locked: layer.locked || false,
@@ -394,7 +396,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     if (elementIds.length < 2) return null;
     recordHistory();
 
-    const groupId = `group-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const groupId = generateId('group');
 
     // Get the bounding box of all elements to position the group
     const groupedElements = elements.filter(el => elementIds.includes(el.id));
@@ -536,7 +538,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
     // Duplicate elements
     const newElements = selectedElements.map(el => {
-      const newId = `el-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newId = generateId('el');
       idMapping[el.id] = newId;
       return {
         ...el,
@@ -558,7 +560,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     if (selectedConnections.length > 0) {
       const newConnections = selectedConnections.map(conn => ({
         ...conn,
-        id: `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: generateId('conn'),
         sourceId: idMapping[conn.sourceId] || conn.sourceId,
         targetId: idMapping[conn.targetId] || conn.targetId,
       }));
@@ -592,12 +594,13 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     if (newDiagram) {
       // Extract elements and connections from content field (database format)
       // or from top-level fields (legacy/direct format)
-      // migrateDiagram upgrades legacy element types (pure, idempotent)
-      const content = migrateDiagram(newDiagram.content) || {};
-      const elements = migrateDiagram({ elements: newDiagram.elements }).elements || content.elements || content.nodes || [];
-      const connections = newDiagram.connections || content.connections || content.edges || [];
-      const layers = newDiagram.layers || content.layers || [DEFAULT_LAYER];
-      const groups = newDiagram.groups || content.groups || [];
+      // normalize first (legacy nodes/edges, nested double-write shape), then upgrade legacy
+      // element types; migrateDiagram only looks at top-level elements, so order matters
+      const content = migrateDiagram(normalizeDiagramContent(newDiagram.content));
+      const elements = migrateDiagram({ elements: newDiagram.elements }).elements || content.elements;
+      const connections = newDiagram.connections || content.connections;
+      const layers = newDiagram.layers || content.layers;
+      const groups = newDiagram.groups || content.groups;
 
       setElementsState(elements);
       setConnectionsState(connections);
@@ -690,7 +693,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
         connections,
         layers,
         groups,
-        viewport: diagram.content?.viewport || { x: 0, y: 0, zoom: 1 },
+        viewport: normalizeDiagramContent(diagram.content).viewport,
       };
 
       // Use overrides if provided (for immediate saves after state changes)

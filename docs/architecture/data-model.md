@@ -1,6 +1,6 @@
 # Data model — proposed changes for Groups B and C
 
-Status: **Proposed**. DDL below is design-level; exact column lengths may be adjusted at implementation. Each migration maps to a slice in [delivery-plan.md](delivery-plan.md).
+Status: **Proposed** (except §1 and `0001_baseline`, which shipped in slice 0 and are described as built). DDL below is design-level; exact column lengths may be adjusted at implementation. Each migration maps to a slice in [delivery-plan.md](delivery-plan.md).
 
 ## 1. Migration mechanism (minimal)
 
@@ -23,10 +23,18 @@ Today: `init.sql` runs once on a fresh Docker volume; `lib/db.js#runMigrations` 
 - Rollback: forward-fix only (write a new migration); take a `pg_dump` before deploys that include migrations.
 - Requires a `Dockerfile`/`package.json` change → needs explicit approval (config-file guardrail).
 
+**As built (slice 0)** — deviations/details beyond the proposal:
+- Each migration file runs in one transaction together with its ledger insert (files must not contain their own `BEGIN`/`COMMIT`; the runner rejects them). The checksum check for *all* applied files happens before any pending file runs. Applied-but-missing files only warn (app rolled back). The runner retries the initial connection (10 x 2 s) to tolerate DB start-up.
+- `node scripts/migrate.js status` (`npm run db:migrate:status`) lists applied/pending without changing anything.
+- Hooks: `npm run db:migrate`; `prestart` runs it before `npm start`; `db:setup` = init + migrate + seed; the container `CMD` is `node scripts/migrate.js && exec node server.js` (the image copies `db/migrations` and `scripts/migrate.js`). A failed migration exits non-zero so the container never serves a half-migrated schema.
+- Each migration runs with `SET LOCAL lock_timeout = '15s'` and `statement_timeout = '5min'`: a migration blocked by a long-running transaction fails (non-zero exit, nothing recorded) and the container restart retries, instead of queueing behind that transaction and blocking application traffic behind its pending lock. The initial connection fails fast (no retries) on bad password (`28P01`) and missing database (`3D000`).
+- Future note: `CREATE INDEX CONCURRENTLY` cannot run inside a transaction. When an index migration on a large table needs it, add a non-transactional path to the runner then (e.g. a file-name or header marker); it is deliberately not built now because no current table is large.
+- `0001_baseline` is a full idempotent re-statement of `init.sql` (tables, the `users` columns formerly added by `scripts/init-db.js`, indexes) plus the `short_id` column and a backfill that only touches rows with `short_id IS NULL`, numbering after the highest existing `LAB-n` (it never rewrites issued ids). It does not insert sample data. `init.sql` is untouched.
+
 ## 2. Migrations
 
-### 0001_baseline
-Moves the `short_id` add/backfill from `lib/db.js` into a recorded, idempotent migration. Creates `schema_migrations`.
+### 0001_baseline  *(shipped, slice 0)*
+Moves the `short_id` add/backfill from `lib/db.js` into a recorded, idempotent migration and brings any pre-ledger database (fresh, `init.sql`-created, or older production) to the baseline schema. `schema_migrations` is created by the runner itself, before any file is applied.
 
 ### 0002_diagram_identity_and_revision (slice 1)
 ```sql

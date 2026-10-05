@@ -1,0 +1,20 @@
+# Implementation log
+
+One entry per merged slice of [docs/architecture/delivery-plan.md](../architecture/delivery-plan.md): PR title, slice/ADR references, branch, files changed, test result.
+This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
+
+---
+
+## Slice 0 — Foundations
+
+- **PR title:** `feat: slice 0 foundations - single PUT per save, uuid ids, migration runner`
+- **Refs:** delivery-plan slice 0; ADR-0001 (prerequisite: single PUT before snapshots), ADR-0004 prerequisite P1 (stable unique ids), data-model.md §1 + `0001_baseline`.
+- **Branch:** `feat/slice-0-foundations`
+- **What changed**
+  - **Single PUT per save.** `DiagramContext.saveDiagram` is the only writer. The editor page (`pages/diagram/[id].js`) no longer passes an `onSave` that issued a second PUT with `{elements, ..., diagram: <row>}` (that write nested a full copy at `content.diagram.content` and dropped `viewport`). Stored shape: `{elements, connections, layers, groups, viewport}`.
+  - **Normalize on read.** New pure, idempotent `components/diagram-studio/migrations/normalizeContent.js` (`normalizeDiagramContent`) handles legacy `nodes`/`edges` and the nested double-write shape (recovers `viewport` from the nested copy). Used by `DiagramContext.setDiagram` and the save path. `createDiagram` default content is now canonical.
+  - **Stable unique ids.** New `components/diagram-studio/utils/ids.js` (`generateId(prefix)` -> `<prefix>-<uuid v4>`; `crypto.randomUUID`, with `getRandomValues` fallback for non-secure contexts). All diagram-id generators replaced (context add/duplicate/group/layer, clipboard paste/duplicate, canvas create/sticky, drawing layer, frame copy, starter packs, template instantiate, pack registry). Existing ids untouched. Comment ids (ADR-0002 replaces them) and template/profile ids are out of scope.
+  - **Migrations.** `db/migrations/0001_baseline.sql` (idempotent; safe on empty, `init.sql`-created and pre-ledger production DBs), `scripts/migrate.js` (ledger `schema_migrations` with sha256 checksums, advisory lock, per-file transaction), `npm run db:migrate` / `db:migrate:status`, `prestart` hook, `db:setup` includes migrate, Dockerfile copies the runner + migrations and runs `node scripts/migrate.js && exec node server.js`. `lib/db.js#runMigrations` removed. `init.sql` and `docker-compose.yml` unchanged.
+- **Deviations from the docs:** none in intent. Details recorded in data-model.md ("As built"): connection retry, `status` command, checksum check before any apply, files may not contain `BEGIN`/`COMMIT`. `viewport` stays in shared content in this slice (ADR-0004 P3 moves it to per-user state in a later slice); note the editor never wrote a live viewport there, it only round-trips the stored value (default `{x:0,y:0,zoom:1}`).
+- **Files changed:** `.gitignore`, `Dockerfile`, `package.json`, `README.md`, `db/migrations/0001_baseline.sql`, `scripts/migrate.js`, `lib/db.js`, `lib/diagramRepository.js`, `pages/diagram/[id].js`, `components/diagram-studio/{DiagramContext,DiagramStudio,DiagramCanvas,DrawingLayer}.js`, `components/diagram-studio/{hooks/interaction/useClipboard,packs/PackRegistry,templates/TemplateManager,ui/ContextualToolbar}.js`, `components/diagram-studio/utils/ids.js`, `components/diagram-studio/migrations/normalizeContent.js`, `docs/architecture/{README.md,data-model.md,adr/0004-realtime-collaboration.md}`, `docs/release/IMPLEMENTATION-LOG.md`; tests: `__tests__/components/diagram-studio/{normalizeContent,ids,savePath}.test.js`, `__tests__/pages/diagramEditorSave.test.js`, `__tests__/scripts/migrate.test.js`, `__tests__/e2e/diagram-studio.test.js` (section 9).
+- **Tests:** unit 271/271 (baseline 236 + 35 new; the DB-backed migrate tests create and drop their own throwaway databases and are skipped when no database is configured); e2e 32/32 (31 + new "one save = one PUT" assertion via request interception); `npm run lint` 0 errors; `next build --webpack` OK. Runner also verified against the local dev DB (existing data, pre-ledger) and a simulated container layout (standalone output + copied runner).

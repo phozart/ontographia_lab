@@ -2,6 +2,7 @@
 // Main DiagramStudio component - unified diagramming tool
 
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
+import { generateId } from './utils/ids';
 import { useSession } from 'next-auth/react';
 import { resolveEditorShortcut, isTypingTarget } from './hooks/interaction/editorShortcuts';
 import { DiagramProvider, useDiagram, useDiagramViewport, useDiagramSelection } from './DiagramContext';
@@ -343,7 +344,7 @@ function DiagramStudioInner({
     // Create frame first (so it renders behind elements in z-order)
     let frameId = null;
     if (starterPack.frame) {
-      frameId = `frame_${Date.now()}`;
+      frameId = generateId('frame');
       addElement({
         type: 'frame',
         packId: 'core',
@@ -362,7 +363,7 @@ function DiagramStudioInner({
     // Generate unique IDs and add elements (with frame reference)
     const idMap = {};
     starterPack.elements.forEach((el, idx) => {
-      const newId = `el_${Date.now()}_${idx}`;
+      const newId = generateId('el');
       idMap[idx] = newId;
       addElement({
         ...el,

@@ -45,3 +45,4 @@ mcp.json
 !docs/
 docs/*
 !docs/architecture/
+!docs/release/
