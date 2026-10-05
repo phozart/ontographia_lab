@@ -2,6 +2,7 @@
 // Template management for DiagramStudio
 
 import { useState, useMemo, useCallback } from 'react';
+import { generateId } from '../utils/ids';
 
 // ============ TEMPLATE MANAGER ============
 
@@ -71,7 +72,7 @@ export class TemplateManager {
     // Deep clone elements and connections with new IDs
     const idMap = {};
     const elements = (template.elements || []).map(el => {
-      const newId = `el_${Math.random().toString(36).substr(2, 9)}`;
+      const newId = generateId('el');
       idMap[el.id] = newId;
       return {
         ...el,
@@ -83,7 +84,7 @@ export class TemplateManager {
 
     const connections = (template.connections || []).map(conn => ({
       ...conn,
-      id: `conn_${Math.random().toString(36).substr(2, 9)}`,
+      id: generateId('conn'),
       sourceId: idMap[conn.sourceId] || conn.sourceId,
       targetId: idMap[conn.targetId] || conn.targetId,
     }));

@@ -2,6 +2,7 @@
 // Main DiagramStudio component - unified diagramming tool
 
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
+import { generateId } from './utils/ids';
 import { useSession } from 'next-auth/react';
 import { resolveEditorShortcut, isTypingTarget } from './hooks/interaction/editorShortcuts';
 import { getTemplateBounds, getContentBounds, computeTemplatePlacement, computeFitViewport } from './utils/templatePlacement';
@@ -348,13 +349,12 @@ function DiagramStudioInner({
       viewport,
       container,
     });
-    const stamp = Date.now();
     const insertedIds = [];
 
     // Create frame first (so it renders behind elements in z-order)
     let frameId = null;
     if (starterPack.frame) {
-      frameId = `frame_${stamp}`;
+      frameId = generateId('frame');
       insertedIds.push(frameId);
       addElement({
         type: 'frame',
@@ -375,7 +375,7 @@ function DiagramStudioInner({
     // there is none, so nothing underneath is ever adopted)
     const idMap = {};
     starterPack.elements.forEach((el, idx) => {
-      const newId = `el_${stamp}_${idx}`;
+      const newId = generateId('el');
       idMap[idx] = newId;
       insertedIds.push(newId);
       addElement({

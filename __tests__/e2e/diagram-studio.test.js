@@ -758,6 +758,57 @@ describe('Diagram Studio E2E Tests', () => {
   // ============================================================
   // SECTION 8: Additional Tests
   // ============================================================
+  // ============================================================
+  // SECTION 9: Save path (slice 0 - foundations)
+  // ============================================================
+  describe('9. Save path', () => {
+    it('9.1 one save = exactly one network PUT, stored content has the canonical shape and unique ids', async () => {
+      const puts = [];
+      page.on('request', (req) => {
+        if (req.method() === 'PUT' && /\/api\/diagrams\//.test(req.url())) {
+          puts.push({ url: req.url(), body: req.postData() });
+        }
+      });
+
+      await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
+      await waitForDiagramStudio(page);
+
+      const packButtons = await page.$$(`${SELECTORS.iconBar} ${SELECTORS.iconBtn}`);
+      expect(packButtons.length).toBeGreaterThan(0);
+      await packButtons[0].click();
+      await page.waitForTimeout(500);
+      const stencilItem = await page.$(SELECTORS.stencilItem);
+      expect(stencilItem).not.toBeNull();
+      // Select the stencil, then draw it onto the canvas (drag = create with size)
+      await stencilItem.click();
+      await page.waitForTimeout(200);
+      const firstPut = page.waitForRequest((r) => r.method() === 'PUT' && /\/api\/diagrams\//.test(r.url()), { timeout: 15000 });
+      await page.mouse.move(700, 400);
+      await page.mouse.down();
+      await page.mouse.move(860, 480, { steps: 10 });
+      await page.mouse.up();
+
+      // autosave debounce is 1 s; once the first PUT is seen, wait well past any would-be second write
+      await firstPut;
+      await page.waitForTimeout(4000);
+
+      expect(puts).toHaveLength(1);
+      const sent = JSON.parse(puts[0].body);
+      expect(Object.keys(sent.content).sort()).toEqual(['connections', 'elements', 'groups', 'layers', 'viewport']);
+      expect(sent.content.elements.length).toBeGreaterThan(0);
+
+      // What is actually stored matches (no nested `diagram` copy, viewport kept)
+      const stored = await page.evaluate(async (id) => (await fetch(`/api/diagrams/${id}`)).json(), fixtureDiagramId);
+      expect(Object.keys(stored.content).sort()).toEqual(['connections', 'elements', 'groups', 'layers', 'viewport']);
+      expect(JSON.stringify(stored.content)).not.toMatch(/"diagram"/);
+
+      // New ids are `<prefix>-<uuid>`
+      const ids = stored.content.elements.map((e) => e.id);
+      expect(new Set(ids).size).toBe(ids.length);
+      expect(ids.every((id) => /^[a-z]+-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id))).toBe(true);
+    });
+  });
+
   describe('8. Additional Functionality', () => {
     it('8.1 Zoom controls work', async () => {
       await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });

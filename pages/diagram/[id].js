@@ -118,24 +118,8 @@ export default function DiagramEditorPage({ theme }) {
     }
   }
 
-  async function handleSave(content) {
-    try {
-      const res = await fetch(`/api/diagrams/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
-      });
-      if (!res.ok) {
-        throw new Error('Failed to save diagram');
-      }
-      return true;
-    } catch (err) {
-      console.error('Failed to save diagram:', err);
-      return false;
-    }
-  }
+  // Note: persistence is owned by DiagramContext.saveDiagram (exactly one PUT per save).
+  // The page must not write the diagram itself (slice 0: removed the duplicate PUT).
 
   if (loading || !packRegistry) {
     return <LoadingScreen />;
@@ -171,7 +155,6 @@ export default function DiagramEditorPage({ theme }) {
           diagramId={id}
           profile={profile}
           packRegistry={packRegistry}
-          onSave={handleSave}
           onExport={(format) => console.log('Export:', format)}
         />
       </Box>
