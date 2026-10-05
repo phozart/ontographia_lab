@@ -39,7 +39,6 @@ coverage/
 docs/
 
 .claude
-__tests__/
 IMPROVEMENT_SESSION.md
 CLAUDE.md
 mcp.json
