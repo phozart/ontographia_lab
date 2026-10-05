@@ -29,11 +29,6 @@
   border-radius: 8px;
 }
 
-/* Layout with sidebar */
-.ds-container.ds-with-sidebar {
-  flex-direction: row;
-}
-
 .ds-workspace {
   display: flex;
   flex-direction: column;
@@ -48,99 +43,6 @@
   flex: 1;
   overflow: hidden;
   position: relative;
-}
-
-/* Top Bar Actions - Right side of topbar */
-.ds-topbar-actions {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  z-index: 101;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Legacy: Floating Top Right Area */
-.ds-floating-top-right {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ds-floating-top-right > * {
-  background: var(--ds-surface-floating, rgba(255, 255, 255, 0.95));
-  backdrop-filter: blur(12px);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.05);
-}
-
-/* ============ TOP BAR ============ */
-
-.ds-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 48px;
-  padding: 0 12px;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  gap: 12px;
-}
-
-.ds-topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-
-.ds-topbar-center {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ds-topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Logo in TopBar */
-.ds-topbar-logo {
-  display: flex;
-  align-items: center;
-  text-decoration: none;
-  flex-shrink: 0;
-}
-
-.ds-logo-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #0e74a3 0%, #0284c7 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.ds-logo-icon span {
-  color: white;
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.ds-topbar-logo:hover .ds-logo-icon {
-  transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(14, 116, 163, 0.4);
 }
 
 /* Breadcrumb separator */
@@ -1843,10 +1745,6 @@
 /* ============ RESPONSIVE ============ */
 
 @media (max-width: 768px) {
-  .ds-topbar {
-    padding: 0 8px;
-  }
-
   .ds-toolbar-btn span {
     display: none;
   }
@@ -1856,9 +1754,6 @@
     display: none;
   }
 
-  .ds-container.embedded .ds-topbar {
-    height: 40px;
-  }
 }
 
 /* ============ QUICK CREATE BUTTONS ============ */
@@ -3993,15 +3888,6 @@
   pointer-events: auto;
 }
 
-.ds-focus-mode .ds-topbar {
-  opacity: 0.5;
-  transition: opacity 0.3s ease;
-}
-
-.ds-focus-mode .ds-topbar:hover {
-  opacity: 1;
-}
-
 /* ============ COMMENT SYSTEM ============ */
 
 .ds-comment-marker {
@@ -4457,11 +4343,6 @@
 
 .ds-preview-exit-btn svg {
   opacity: 0.8;
-}
-
-/* Hide floating toolbar in new layout (zoom is in title bar) */
-.ds-container.ds-new-layout .ds-floating-toolbar {
-  display: none;
 }
 
 /* Hide save status indicator in new layout (shown in title bar) */

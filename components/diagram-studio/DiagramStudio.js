@@ -13,12 +13,7 @@ import DrawingToolbar from './ui/DrawingToolbar';
 import LeftPalette from './LeftPalette';
 import PropertiesPanel from './PropertiesPanel';
 import CommandPalette, { useCommandPalette } from './ui/CommandPalette';
-import FloatingEditBar from './ui/FloatingEditBar';
-import FloatingToolbar from './ui/FloatingToolbar';
 import FrameNavigator from './ui/FrameNavigator';
-import FloatingIconBar from './ui/FloatingIconBar';
-import FloatingHeader from './ui/FloatingHeader';
-import CollaborationBar from './ui/CollaborationBar';
 import TitleBar from './ui/TitleBar';
 import ShapeSidebar from './ui/ShapeSidebar';
 import ContextualToolbar from './ui/ContextualToolbar';
@@ -27,7 +22,6 @@ import KeyboardShortcutsOverlay, { useKeyboardShortcutsOverlay } from './ui/Keyb
 import ContextMenu, { useContextMenu } from './ui/ContextMenu';
 import { CommentMarker, CommentThread, NewCommentInput, useComments } from './ui/CommentSystem';
 import StarterPackModal from './StarterPackModal';
-import AppSidebar from '../ui/AppSidebar';
 import { LogoIcon } from '../ui/Logo';
 import { ExportManager, downloadExport } from './export/ExportManager';
 import ExportDialog, { useExportDialog } from './ui/ExportDialog';
@@ -108,13 +102,11 @@ function DiagramStudioInner({
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [showComments, setShowComments] = useState(true);
   const [showStarterPacks, setShowStarterPacks] = useState(false);
-  const [useFloatingUI, setUseFloatingUI] = useState(true); // Use floating toolbar UI
-  const [useNewLayout, setUseNewLayout] = useState(true); // Use new macOS-style layout
   const [showPropertiesPanel, setShowPropertiesPanel] = useState(false); // On-demand properties panel
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const canvasContainerRef = useRef(null); // Ref for canvas container (used by FrameNavigator)
-  const iconBarRef = useRef(null); // Ref for FloatingIconBar (used by empty canvas welcome)
+  const iconBarRef = useRef(null); // Ref for ShapeSidebar (used by empty canvas welcome)
 
   // User settings state - loaded from API
   const [userSettings, setUserSettings] = useState(DEFAULT_SETTINGS);
@@ -174,12 +166,6 @@ function DiagramStudioInner({
       console.error('Failed to save user setting:', error);
     }
   }, []);
-
-  // Toolbar position from settings
-  const toolbarPosition = userSettings.toolbarPosition || 'top';
-  const setToolbarPosition = useCallback((position) => {
-    updateUserSetting('toolbarPosition', position);
-  }, [updateUserSetting]);
 
   // Contextual toolbar visibility setting
   const showContextualToolbarOnSelect = userSettings.showContextualToolbarOnSelect ?? true;
@@ -300,11 +286,6 @@ function DiagramStudioInner({
     }
   }, [profile, onExport, diagram, elements, connections, activePack]);
 
-  // Quick export (PNG with default settings)
-  const handleQuickExport = useCallback(() => {
-    handleExport('png');
-  }, [handleExport]);
-
   // Handle stencil drag start (for visual feedback)
   const handleStencilDragStart = useCallback((stencil) => {
     setDraggingStencil(stencil);
@@ -329,7 +310,7 @@ function DiagramStudioInner({
 
   // Open the stencil panel (called by EmptyCanvasWelcome)
   const handleOpenStencilPanel = useCallback(() => {
-    // Open the first pack's flyout in the FloatingIconBar
+    // Open the first pack's flyout in the ShapeSidebar
     iconBarRef.current?.openFirstPack();
   }, []);
 
@@ -560,7 +541,7 @@ function DiagramStudioInner({
 
       // P key to toggle properties panel (when selection exists)
       if (e.key === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (hasSelection && useFloatingUI) {
+        if (hasSelection) {
           setShowPropertiesPanel(prev => !prev);
         }
       }
@@ -599,10 +580,9 @@ function DiagramStudioInner({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveDiagram, profile.editingPolicy?.readOnly, focusMode, toggleLeftPanel, toggleCommentTool, activeTool, setActiveTool, setSelectedStencil, cancelNewComment, hasSelection, useFloatingUI, showPropertiesPanel, toggleContextualToolbar, viewport, addElement, stickyNoteColor, isPreviewMode, undo, redo, zoomIn, zoomOut]);
+  }, [saveDiagram, profile.editingPolicy?.readOnly, focusMode, toggleLeftPanel, toggleCommentTool, activeTool, setActiveTool, setSelectedStencil, cancelNewComment, hasSelection, showPropertiesPanel, toggleContextualToolbar, viewport, addElement, stickyNoteColor, isPreviewMode, undo, redo, zoomIn, zoomOut]);
 
   // UI visibility from profile
-  const showLeftPalette = profile.uiPolicy?.showLeftPalette !== false;
   const showRightPanel = profile.uiPolicy?.showRightPanel !== false;
 
   // Embedded mode: minimal UI
@@ -618,12 +598,12 @@ function DiagramStudioInner({
   }
 
   return (
-    <div className={`ds-container ${useNewLayout ? 'ds-new-layout' : useFloatingUI ? 'ds-floating-layout' : 'ds-with-sidebar'} ${focusMode ? 'ds-focus-mode' : ''} ${isPreviewMode ? 'ds-preview-mode' : ''} ${className}`}>
+    <div className={`ds-container ds-new-layout ${focusMode ? 'ds-focus-mode' : ''} ${isPreviewMode ? 'ds-preview-mode' : ''} ${className}`}>
       {/* Loading Screen - shows on initial load with animated logo */}
       <LoadingScreen visible={showLoadingScreen} />
 
-      {/* NEW LAYOUT: TitleBar + ShapeSidebar */}
-      {useNewLayout && !isPreviewMode && (
+      {/* TitleBar + ShapeSidebar */}
+      {!isPreviewMode && (
         <>
           <TitleBar
             diagramName={diagram?.name || 'Untitled Diagram'}
@@ -683,103 +663,14 @@ function DiagramStudioInner({
         </>
       )}
 
-      {/* Left Navigation Sidebar - Only show when NOT using floating UI or new layout */}
-      {!useFloatingUI && !useNewLayout && <AppSidebar />}
-
       {/* Main workspace area */}
-      <div className={`ds-workspace ${useNewLayout ? 'ds-workspace-new' : ''}`}>
+      <div className={`ds-workspace ds-workspace-new`}>
         {/* Command Palette */}
         <CommandPalette
           isOpen={commandPalette.isOpen}
           onClose={commandPalette.close}
           packRegistry={packRegistry}
           onAction={handleCommandAction}
-        />
-
-        {/* LEGACY: Floating Icon Bar (left side - stencils only) */}
-        {useFloatingUI && !useNewLayout && (
-          <FloatingIconBar
-            ref={iconBarRef}
-            packRegistry={packRegistry}
-            enabledPacks={enabledPacks}
-            onPackSelect={(packId) => {
-              // Expand/select the pack when clicked
-            }}
-            onAddPack={() => setShowStarterPacks(true)}
-            onTogglePack={handleTogglePack}
-            onStencilDragStart={(packId, stencilId) => {
-              const pack = packRegistry?.get?.(packId);
-              const stencil = pack?.stencils?.find(s => s.id === stencilId);
-              if (stencil) {
-                handleStencilDragStart({ ...stencil, packId });
-              }
-            }}
-            onStencilSelect={(packId, stencilId) => {
-              const pack = packRegistry?.get?.(packId);
-              const stencil = pack?.stencils?.find(s => s.id === stencilId);
-              if (stencil) {
-                setSelectedStencil({ ...stencil, packId });
-                setActiveTool('draw');
-              }
-            }}
-            selectedStencil={selectedStencil}
-            readOnly={profile?.editingPolicy?.readOnly}
-          />
-        )}
-
-        {/* LEGACY: Floating Header (top left with menu + branding) */}
-        {useFloatingUI && !useNewLayout && (
-          <FloatingHeader
-            diagramName={diagram?.name || 'Untitled Diagram'}
-            onNameChange={(name) => {
-              if (diagram) {
-                setDiagram({ ...diagram, name });
-                // Trigger save with the new name directly (state update is async)
-                saveDiagram?.({ force: true, name });
-              }
-            }}
-            onSave={() => saveDiagram?.(true)}
-            onExport={handleExport}
-            onShowShortcuts={shortcutsHelp.open}
-            onGoHome={() => {
-              if (typeof window !== 'undefined') {
-                window.location.href = '/dashboard';
-              }
-            }}
-            readOnly={profile?.editingPolicy?.readOnly}
-          />
-        )}
-
-        {/* LEGACY: Collaboration Bar (top right) */}
-        {useFloatingUI && !useNewLayout && (
-          <CollaborationBar
-            currentUser={currentUser}
-            collaborators={[]} // TODO: Add real collaborators
-            onShare={() => {
-              // TODO: Implement share functionality
-            }}
-            onInvite={() => {
-              // TODO: Implement invite functionality
-            }}
-            diagramId={diagramId}
-          />
-        )}
-
-        {/* Floating Edit Bar - only show when NOT using new layout */}
-        {!useNewLayout && (
-          <FloatingEditBar
-            readOnly={profile?.editingPolicy?.readOnly}
-            position={toolbarPosition}
-            onPositionChange={setToolbarPosition}
-            onQuickExport={isActionAllowed(profile, 'export') ? handleQuickExport : undefined}
-            onAdvancedExport={isActionAllowed(profile, 'export') ? exportDialog.open : undefined}
-          />
-        )}
-
-        {/* Floating Bottom Controls - Zoom + Export */}
-        <FloatingToolbar
-          profile={profile}
-          onExport={handleExport}
         />
 
         {/* Preview Mode Exit Button */}
@@ -850,56 +741,6 @@ function DiagramStudioInner({
         {/* Main Content Area */}
         <div className="ds-main">
           <PanelGroup>
-            {/* Left Stencil Palette - Only show when NOT using floating UI */}
-            {showLeftPalette && !useFloatingUI && (
-              <div className={`ds-panel-wrapper ds-panel-left ${leftPanelCollapsed ? 'collapsed' : ''}`}>
-                {leftPanelCollapsed ? (
-                  <div
-                    className="ds-panel-collapsed-toggle"
-                    onClick={toggleLeftPanel}
-                    onDoubleClick={toggleLeftPanel}
-                    title="Expand stencils panel (press 1 or double-click)"
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      padding: '12px 8px',
-                      cursor: 'pointer',
-                      height: '100%',
-                    }}
-                  >
-                    <LogoIcon size={28} />
-                  </div>
-                ) : (
-                  <ResizablePanel
-                    position="left"
-                    defaultSize={260}
-                    minSize={200}
-                    maxSize={400}
-                    storageKey="ds-left-panel"
-                  >
-                    <div className="ds-panel-with-toggle">
-                      <button
-                        className="ds-panel-toggle left"
-                        onClick={toggleLeftPanel}
-                        title="Collapse panel (press 1)"
-                      >
-                        {'<'}
-                      </button>
-                      <LeftPalette
-                        packRegistry={packRegistry}
-                        profile={profile}
-                        onStencilDragStart={handleStencilDragStart}
-                        onOpenStarterPacks={() => setShowStarterPacks(true)}
-                        enabledPacks={enabledPacks}
-                        onEnabledPacksChange={setEnabledPacks}
-                      />
-                    </div>
-                  </ResizablePanel>
-                )}
-              </div>
-            )}
-
             {/* Canvas (center) */}
             <div className={`ds-canvas-container ${activeTool === 'comment' ? 'comment-mode' : ''}`} ref={canvasContainerRef}>
               <DiagramCanvas
@@ -945,8 +786,8 @@ function DiagramStudioInner({
             </div>
 
             {/* Right Properties Panel - On-demand in floating UI mode */}
-            {showRightPanel && hasSelection && (!useFloatingUI || showPropertiesPanel) && (
-              <div className={`ds-panel-wrapper ds-panel-right ${useFloatingUI ? 'ds-panel-slide-in' : ''}`}>
+            {showRightPanel && hasSelection && showPropertiesPanel && (
+              <div className={`ds-panel-wrapper ds-panel-right ds-panel-slide-in`}>
                 <ResizablePanel
                   position="right"
                   defaultSize={280}
@@ -957,7 +798,7 @@ function DiagramStudioInner({
                   <PropertiesPanel
                     packRegistry={packRegistry}
                     profile={profile}
-                    onClose={useFloatingUI ? () => setShowPropertiesPanel(false) : undefined}
+                    onClose={() => setShowPropertiesPanel(false)}
                   />
                 </ResizablePanel>
               </div>
