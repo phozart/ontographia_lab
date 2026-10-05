@@ -17,11 +17,13 @@ jest.mock('@mui/material/useMediaQuery', () => ({
   __esModule: true,
   default: () => mockMatches,
 }));
-jest.mock('../../components/ui/AppSidebar', () => () => (
+jest.mock('../../components/ui/AppSidebar', () => function MockAppSidebar() {
+  return (
   <aside data-testid="sidebar">
     <a href="#home" onClick={(e) => e.preventDefault()}>Home</a>
   </aside>
-));
+  );
+});
 
 const diagram = { id: '1', name: 'WS One', type: 'mindmap', updated_at: new Date().toISOString() };
 
