@@ -121,3 +121,31 @@ describe('all registered packs', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+describe('Core diamond has no rotation wrapper', () => {
+  const stencil = CorePack.stencils.find((s) => s.id === 'diamond');
+  const fs = require('fs');
+  const path = require('path');
+
+  test('custom diamond DOM contains no transform/rotate styles', () => {
+    const el = makeElement(stencil, 'd1');
+    const { container } = render(<div>{CorePack.renderNode(el, stencil, false)}</div>);
+    expect(container.innerHTML).not.toMatch(/rotate\(/);
+    expect(container.querySelector('[style*="transform"]')).toBeNull();
+  });
+
+  test('diamond CSS rotation is scoped away from custom-rendered nodes', () => {
+    const css = fs.readFileSync(path.join(__dirname, '../../../styles/diagram-studio.css'), 'utf8');
+    expect(css).toMatch(/\.ds-node-diamond:not\(\.ds-node-custom-render\) \.ds-node-content\s*\{[^}]*rotate\(45deg\)/);
+    expect(css).not.toMatch(/\.ds-node-diamond \.ds-node-content\s*\{/);
+    expect(css).toMatch(/\.ds-node-diamond:not\(\.ds-node-custom-render\) \.ds-node-inner\s*\{[^}]*rotate\(-45deg\)/);
+  });
+
+  test('label box is wide and breaks at word boundaries', () => {
+    const el = makeElement(stencil, 'd1', { label: 'Diamond' });
+    const { container } = render(<div>{CorePack.renderNode(el, stencil, false)}</div>);
+    const label = [...container.querySelectorAll('div')].find((d) => d.textContent === 'Diamond' && d.style.overflowWrap);
+    expect(label.style.overflowWrap).toBe('break-word');
+    expect(parseInt(label.style.width, 10)).toBeGreaterThanOrEqual(70);
+  });
+});

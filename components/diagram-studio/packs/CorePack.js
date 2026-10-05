@@ -327,10 +327,8 @@ function DiamondNode({ element, stencil, isSelected }) {
   const label = element.label || element.name || '';
   const points = `${width / 2},${inset} ${width - inset},${height / 2} ${width / 2},${height - inset} ${inset},${height / 2}`;
 
-  // diagram-studio.css rotates `.ds-node-diamond .ds-node-content` by 45deg for the
-  // legacy default diamond; counter-rotate so the polygon renders upright.
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative', transform: 'rotate(-45deg)' }}>
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <svg
         width={width}
         height={height}
@@ -349,10 +347,10 @@ function DiamondNode({ element, stencil, isSelected }) {
       </svg>
       <div style={{
         position: 'absolute',
-        top: '25%',
-        left: '25%',
-        width: '50%',
-        height: '50%',
+        top: '20%',
+        left: '15%',
+        width: '70%',
+        height: '60%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -360,7 +358,7 @@ function DiamondNode({ element, stencil, isSelected }) {
         fontSize: element.fontSize || 13,
         fontWeight: element.fontWeight || 500,
         color: element.textColor || pickTextColor(fill),
-        overflowWrap: 'anywhere',
+        overflowWrap: 'break-word',
         pointerEvents: 'none',
         userSelect: 'none',
       }}>
