@@ -199,7 +199,7 @@ describe('forgot-password email delivery', () => {
     isEmailConfigured.mockReturnValue(true);
     sendMail.mockRejectedValueOnce(new Error('smtp down'));
     const res = await run('production');
-    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setTimeout(r, 0));
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.resetUrl).toBeUndefined();
