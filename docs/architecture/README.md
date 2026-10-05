@@ -1,6 +1,6 @@
 # Architecture — Ontographia Lab Diagram Studio
 
-Status: **baseline (as-built, derived from code on `main` @ df9facb)** plus pointers to proposed designs.
+Status: **baseline (as-built, derived from code on `main` @ df9facb)** plus pointers to proposed designs. Slice 0 (save path, ids, migrations) has since shipped; its effects are marked *(slice 0)* below.
 Proposed work is in the ADRs and companion docs below; nothing here is implemented until the matching slice in [delivery-plan.md](delivery-plan.md) ships.
 
 | Doc | Purpose |
@@ -82,9 +82,9 @@ erDiagram
   }
 ```
 
-- **Content blob**: `diagrams.content` is one JSONB document `{ elements[], connections[], layers[], groups[], viewport }` (legacy rows may use `nodes`/`edges`; `setDiagram` reads both). Element/connection ids are client-generated strings (`el-<ms>-<rand>`, `conn-<ms>-<rand>`; some paths use `el_<ms>_<idx>` / `frame_<ms>`).
+- **Content blob**: `diagrams.content` is one JSONB document `{ elements[], connections[], layers[], groups[], viewport }`. Legacy rows may use `nodes`/`edges` or the pre-slice-0 "double write" shape (a nested `diagram` copy, no `viewport`); `normalizeDiagramContent` (`components/diagram-studio/migrations/normalizeContent.js`) maps all of them to the canonical shape on read, and the next save rewrites the row canonically *(slice 0)*. New ids are `<prefix>-<uuid v4>` from `crypto.randomUUID()` via `components/diagram-studio/utils/ids.js` (`el-`, `conn-`, `layer-`, `group-`, `frame-`, `sticky-`, `drawing-`); existing ids (`el-<ms>-<rand>`, `el_<ms>_<idx>`, `frame_<ms>`) remain valid and are never rewritten *(slice 0)*.
 - **Ownership** is effectively `diagrams.created_by = users.email`. `owner_id` exists but `createDiagram` never sets it.
-- **Schema evolution**: `init.sql` runs only on a fresh Docker volume; `lib/db.js#runMigrations` contains one hand-written, non-recorded migration (`short_id`). There is no migration ledger.
+- **Schema evolution** *(slice 0)*: `init.sql` is frozen and only bootstraps a fresh Docker volume. Every change is a forward-only file in `db/migrations/` applied by `scripts/migrate.js` (`npm run db:migrate`; also before `npm start` and in the container `CMD`), recorded in `schema_migrations` with a checksum. `0001_baseline` is idempotent and replaces the former `lib/db.js#runMigrations`; the app no longer migrates lazily.
 
 ## 3. Request flow (save)
 
@@ -99,15 +99,15 @@ sequenceDiagram
   API->>API: requireActiveUser → checkAccess(created_by==email || admin)
   API->>DB: UPDATE diagrams SET content=… (COALESCE per field)
   API-->>C: row
-  C->>P: onSaveCallback({elements,…,diagram})
-  P->>API: PUT {content: {elements,…,diagram}}  (second write)
+  C->>P: onSaveCallback({elements,…,diagram})  (notification only; the page does not write)
 ```
+Before slice 0 the page's `onSave` handler issued a second PUT with `{elements,…,diagram}`, nesting a full copy of the row at `content.diagram.content` and dropping `viewport`.
 
 Authorization today: `requireActiveUser` (session + `status==='active'`) then `diagramRepository.checkAccess` → access iff `role==='admin'` or `created_by===email`. List (`GET /api/diagrams`) filters by `created_by` for non-admins and returns full rows including `content`.
 
 ## 4. Baseline observations that affect Groups B–D
 
-1. **Double write per save.** `DiagramContext.saveDiagram` PUTs the content, then `onSaveCallback` makes the page PUT again with a differently-shaped `content` (nested copy of the returned row, no `viewport`). Must be fixed before version snapshots exist, otherwise every snapshot inherits the bloat and the race (delivery slice 0).
+1. ~~**Double write per save.**~~ **Fixed in slice 0.** `DiagramContext.saveDiagram` is the only writer; the editor page no longer passes a PUT-ing `onSave`. Rows written before the fix keep the nested copy until their next save; reads normalize them.
 2. **Whole-blob last-write-wins.** No revision/precondition on PUT. Harmless with one editor; unsafe as soon as Group C allows a second editor (addressed in ADR-0003 §Concurrency).
 3. **Ownership by email string.** Grants should key on `users.id`; `owner_id` needs a backfill (data-model.md, migration 0003).
 4. **Authorization is per-route and binary.** Group C replaces it with one policy function (ADR-0003).

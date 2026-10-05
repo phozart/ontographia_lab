@@ -122,9 +122,11 @@ openssl rand -base64 32
 
 ```bash
 npm run db:init      # Initialize database tables
+npm run db:migrate   # Apply pending SQL migrations from db/migrations/ (idempotent; also runs before `npm start` and on container start)
+npm run db:migrate:status # Show applied / pending migrations without changing anything
 npm run db:seed      # Create admin account from .env
 npm run db:seed:list # List all admin accounts
-npm run db:setup     # Run init + seed together
+npm run db:setup     # Run init + migrate + seed together
 ```
 
 ## Authentication

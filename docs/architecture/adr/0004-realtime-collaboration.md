@@ -40,7 +40,7 @@ So the unit of merging must be **an element's property**, not the document.
 
 | # | Prerequisite | Where |
 |---|--------------|-------|
-| P1 | **Ids stable and globally unique** for elements, connections, layers, groups (use `crypto.randomUUID()`; ids never rewritten on save/load; replace `el_<ms>_<idx>` / `frame_<ms>` patterns). Comment anchors and diffs depend on it too. | slice 0 |
+| P1 | **Ids stable and globally unique** for elements, connections, layers, groups (use `crypto.randomUUID()`; ids never rewritten on save/load; replace `el_<ms>_<idx>` / `frame_<ms>` patterns). Comment anchors and diffs depend on it too. | slice 0 ✓ — new ids are `<prefix>-<uuid v4>` (the prefix keeps ids valid in CSS/SVG selectors and readable); the legacy patterns remain only in already-stored data |
 | P2 | **Content model is a set of entities keyed by id**, no derived global state that must be recomputed on every edit; ordering expressed as a property, not array position (can start by adding `z` alongside array order). | slice 0 (note), D |
 | P3 | **Per-viewer state out of shared content**: `viewport` moves to per-user state (`user_settings` keyed by diagram) — shared content must not change when someone pans. | slice C-UI |
 | P4 | **Annotations separate from content** (comments in their own tables). | ADR-0002 ✓ |

@@ -7,6 +7,7 @@
     "dev": "next dev",
     "dev:test": "next dev -p 3002",
     "build": "next build",
+    "prestart": "npm run db:migrate",
     "start": "next start",
     "lint": "eslint .",
     "test": "jest --selectProjects unit",
@@ -16,9 +17,11 @@
     "test:e2e:headed": "HEADLESS=false jest --selectProjects e2e --runInBand",
     "test:all": "jest --runInBand",
     "db:init": "node scripts/init-db.js",
+    "db:migrate": "node scripts/migrate.js",
+    "db:migrate:status": "node scripts/migrate.js status",
     "db:seed": "node scripts/seed-admin.js",
     "db:seed:list": "node scripts/seed-admin.js list",
-    "db:setup": "npm run db:init && npm run db:seed"
+    "db:setup": "npm run db:init && npm run db:migrate && npm run db:seed"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

@@ -2,6 +2,7 @@
 // Clipboard operations for diagram elements (copy, paste, duplicate)
 
 import { useState, useCallback } from 'react';
+import { generateId } from '../../utils/ids';
 
 /**
  * Hook for clipboard operations on diagram elements.
@@ -73,7 +74,7 @@ export function useClipboard({
 
     // Create new elements with new IDs
     const newElements = clipboard.elements.map(el => {
-      const newId = `el-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newId = generateId('el');
       idMap[el.id] = newId;
       return {
         ...el,
@@ -86,7 +87,7 @@ export function useClipboard({
     // Create new connections with updated IDs
     const newConnections = clipboard.connections.map(conn => ({
       ...conn,
-      id: `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: generateId('conn'),
       sourceId: idMap[conn.sourceId],
       targetId: idMap[conn.targetId],
     }));
@@ -136,7 +137,7 @@ export function useClipboard({
     const pasteOffset = 40;
 
     const newElements = tempClipboard.elements.map(el => {
-      const newId = `el-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const newId = generateId('el');
       idMap[el.id] = newId;
       return {
         ...el,
@@ -148,7 +149,7 @@ export function useClipboard({
 
     const newConnections = tempClipboard.connections.map(conn => ({
       ...conn,
-      id: `conn-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: generateId('conn'),
       sourceId: idMap[conn.sourceId],
       targetId: idMap[conn.targetId],
     }));
