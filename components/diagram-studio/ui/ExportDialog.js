@@ -4,6 +4,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ExportManager, downloadExport } from '../export/ExportManager';
+import { renderPreview, nextFrames } from '../export/exportRenderer';
+import { useDiagram } from '../DiagramContext';
 
 // MUI Icons
 import CloseIcon from '@mui/icons-material/Close';
@@ -13,18 +15,35 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import CropFreeIcon from '@mui/icons-material/CropFree';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import GridOnIcon from '@mui/icons-material/GridOn';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import DataObjectIcon from '@mui/icons-material/DataObject';
+import HighlightAltIcon from '@mui/icons-material/HighlightAlt';
+
+export const OPEN_EXPORT_DIALOG_EVENT = 'ds:open-export-dialog';
 
 const FORMAT_OPTIONS = [
   { id: 'png', label: 'PNG', icon: ImageIcon, description: 'Best for sharing, supports transparency' },
   { id: 'svg', label: 'SVG', icon: CodeIcon, description: 'Vector format, scalable' },
   { id: 'jpeg', label: 'JPEG', icon: PhotoCameraIcon, description: 'Smaller file size' },
+  { id: 'pdf', label: 'PDF', icon: PictureAsPdfIcon, description: 'Print-ready page (high-resolution image)' },
+  { id: 'json', label: 'JSON', icon: DataObjectIcon, description: 'Editable diagram data you can import again' },
+];
+
+const PDF_PAGE_OPTIONS = [
+  { value: 'auto', label: 'Fit to diagram' },
+  { value: 'a4', label: 'A4' },
+  { value: 'letter', label: 'US Letter' },
+];
+const PDF_ORIENTATION_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'landscape', label: 'Landscape' },
+  { value: 'portrait', label: 'Portrait' },
 ];
 
 const SCALE_OPTIONS = [
   { value: 1, label: '1x' },
   { value: 2, label: '2x' },
   { value: 3, label: '3x' },
-  { value: 4, label: '4x' },
 ];
 
 const PADDING_OPTIONS = [0, 20, 40, 60, 80];
@@ -38,6 +57,30 @@ export default function ExportDialog({
   diagramName = 'diagram',
 }) {
   const dialogRef = useRef(null);
+  const ctx = useDiagram() || {};
+  if (ctx.elements) elements = ctx.elements;
+  if (ctx.connections) connections = ctx.connections;
+  const clearSelection = ctx.clearSelection;
+  const diagramRecord = ctx.diagram;
+  if (diagramRecord?.name) diagramName = diagramRecord.name;
+
+  // Snapshot of the selection when the dialog opens (the live selection is cleared while capturing)
+  const [selectionSnapshot, setSelectionSnapshot] = useState({ nodeIds: [], connectionIds: [] });
+  useEffect(() => {
+    if (isOpen) {
+      setSelectionSnapshot({
+        nodeIds: [...(ctx.selection?.nodeIds || [])],
+        connectionIds: [...(ctx.selection?.connectionIds || [])],
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+  const hasSelection = selectionSnapshot.nodeIds.length + selectionSnapshot.connectionIds.length > 0;
+
+  const [pdfPageSize, setPdfPageSize] = useState('auto');
+  const [pdfOrientation, setPdfOrientation] = useState('auto');
+  const [preview, setPreview] = useState({ url: null, width: 0, height: 0, loading: false, error: null });
+  const [exportError, setExportError] = useState(null);
 
   // Export options state
   const [format, setFormat] = useState('png');
@@ -46,7 +89,6 @@ export default function ExportDialog({
   const [scale, setScale] = useState(2);
   const [background, setBackground] = useState('white');
   const [customColor, setCustomColor] = useState('#ffffff');
-  const [includeGrid, setIncludeGrid] = useState(false);
   const [padding, setPadding] = useState(40);
   const [jpegQuality, setJpegQuality] = useState(0.9);
   const [isExporting, setIsExporting] = useState(false);
@@ -55,6 +97,11 @@ export default function ExportDialog({
   const frames = useMemo(() => {
     return elements.filter(el => el.type === 'frame' || el.isFrame);
   }, [elements]);
+
+  // Fall back from selection scope if there is no selection
+  useEffect(() => {
+    if (scope === 'selection' && !hasSelection) setScope('canvas');
+  }, [scope, hasSelection]);
 
   // Auto-select first frame when switching to frame scope
   useEffect(() => {
@@ -91,53 +138,79 @@ export default function ExportDialog({
     };
   }, [scope, selectedFrameId, frames, viewport, elements, padding, scale]);
 
+  // Options shared by preview and export
+  const captureOptions = useMemo(() => {
+    const selectedFrame = scope === 'frame' && selectedFrameId
+      ? frames.find(f => f.id === selectedFrameId)
+      : null;
+    return {
+      scope,
+      elements,
+      connections,
+      selection: selectionSnapshot,
+      frame: selectedFrame,
+      padding,
+      background,
+      backgroundColor: background === 'custom' ? customColor : undefined,
+      scale,
+      quality: jpegQuality,
+      pdf: { pageSize: pdfPageSize, orientation: pdfOrientation },
+    };
+  }, [scope, selectedFrameId, frames, elements, connections, selectionSnapshot, padding, background, customColor, scale, jpegQuality, pdfPageSize, pdfOrientation]);
+
+  // Live preview thumbnail (debounced)
+  useEffect(() => {
+    if (!isOpen || format === 'json') return undefined;
+    let cancelled = false;
+    setPreview(p => ({ ...p, loading: true, error: null }));
+    const timer = setTimeout(async () => {
+      try {
+        const res = await renderPreview({ ...captureOptions, previewFormat: format });
+        if (!cancelled) setPreview({ url: res.dataUrl, width: res.width, height: res.height, loading: false, error: null });
+      } catch (err) {
+        if (!cancelled) setPreview({ url: null, width: 0, height: 0, loading: false, error: err.message || 'Preview failed' });
+      }
+    }, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [isOpen, format, captureOptions]);
+
   // Handle export
   const handleExport = useCallback(async () => {
     setIsExporting(true);
+    setExportError(null);
     try {
       const exportManager = new ExportManager();
-
-      // Determine background color
-      const bgColor = background === 'transparent' ? 'transparent' :
-                      background === 'custom' ? customColor : '#ffffff';
-
-      // Get frame if scope is frame
-      const selectedFrame = scope === 'frame' && selectedFrameId
-        ? frames.find(f => f.id === selectedFrameId)
-        : null;
-
       const diagram = {
+        id: diagramRecord?.id,
         name: diagramName,
+        type: diagramRecord?.type,
         elements,
         connections,
-      };
-
-      const options = {
-        padding: scope === 'frame' ? 0 : padding,
-        backgroundColor: bgColor,
-        includeGrid,
-        scale,
-        quality: jpegQuality,
-        scope,
-        viewport,
-        frame: selectedFrame,
+        layers: ctx.layers,
+        groups: ctx.groups,
       };
 
       let result;
-      if (scope === 'canvas') {
-        result = await exportManager.export(diagram, format, options);
+      if (format === 'json') {
+        result = exportManager.exportJSON(diagram);
       } else {
-        result = await exportManager.exportWithScope(diagram, format, options);
+        // Capture without editor selection styling
+        if (clearSelection) {
+          clearSelection();
+          await nextFrames(2);
+        }
+        result = await exportManager.export(diagram, format, captureOptions);
       }
 
       downloadExport(result);
       onClose();
     } catch (error) {
       console.error('Export failed:', error);
+      setExportError(error.message || 'Export failed');
     } finally {
       setIsExporting(false);
     }
-  }, [format, scope, selectedFrameId, frames, scale, background, customColor, includeGrid, padding, jpegQuality, elements, connections, viewport, diagramName, onClose]);
+  }, [format, captureOptions, elements, connections, diagramName, diagramRecord, ctx.layers, ctx.groups, clearSelection, onClose]);
 
   // Handle escape key
   useEffect(() => {
@@ -160,6 +233,7 @@ export default function ExportDialog({
   if (!isOpen) return null;
 
   const supportsTransparency = format === 'png' || format === 'svg';
+  if (!supportsTransparency && background === 'transparent') setBackground('white');
 
   const content = (
     <div className="export-dialog-overlay" onClick={handleBackdropClick}>
@@ -176,15 +250,33 @@ export default function ExportDialog({
         <div className="export-dialog-content">
           {/* Left: Preview */}
           <div className="export-preview-section">
-            <div className="export-preview-container">
-              <div className="export-preview-placeholder">
-                <CropFreeIcon style={{ fontSize: 48, opacity: 0.3 }} />
-                <span>Preview</span>
+            <div className="export-preview-container" data-testid="export-preview">
+              {format === 'json' ? (
+                <div className="export-preview-placeholder">
+                  <DataObjectIcon style={{ fontSize: 48, opacity: 0.3 }} />
+                  <span>{elements.length} elements, {connections.length} connections</span>
+                </div>
+              ) : preview.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  className={`export-preview-img ${preview.loading ? 'loading' : ''} ${background === 'transparent' ? 'checkered' : ''}`}
+                  src={preview.url}
+                  alt="Export preview"
+                />
+              ) : (
+                <div className="export-preview-placeholder">
+                  <CropFreeIcon style={{ fontSize: 48, opacity: 0.3 }} />
+                  <span>{preview.error ? preview.error : 'Rendering preview...'}</span>
+                </div>
+              )}
+            </div>
+            {format !== 'json' && (
+              <div className="export-dimensions">
+                {preview.width
+                  ? `${Math.round(preview.width * (format === 'svg' || format === 'pdf' ? 1 : scale))} × ${Math.round(preview.height * (format === 'svg' || format === 'pdf' ? 1 : scale))} px`
+                  : `${exportDimensions.width} × ${exportDimensions.height} px`}
               </div>
-            </div>
-            <div className="export-dimensions">
-              {exportDimensions.width} × {exportDimensions.height} px
-            </div>
+            )}
           </div>
 
           {/* Right: Options */}
@@ -210,6 +302,12 @@ export default function ExportDialog({
               </div>
             </div>
 
+            {format === 'json' ? (
+              <div className="export-option-group">
+                <p className="export-json-note">Exports all elements and connections as a versioned JSON file. Use Menu &gt; Import JSON to bring it back into any diagram.</p>
+              </div>
+            ) : (
+              <>
             {/* Scope */}
             <div className="export-option-group">
               <label className="export-option-label">Scope</label>
@@ -225,6 +323,19 @@ export default function ExportDialog({
                   <CropFreeIcon fontSize="small" />
                   <span>Full canvas</span>
                 </label>
+                {hasSelection && (
+                  <label className="export-radio">
+                    <input
+                      type="radio"
+                      name="scope"
+                      value="selection"
+                      checked={scope === 'selection'}
+                      onChange={() => setScope('selection')}
+                    />
+                    <HighlightAltIcon fontSize="small" />
+                    <span>Selection</span>
+                  </label>
+                )}
                 <label className="export-radio">
                   <input
                     type="radio"
@@ -302,6 +413,13 @@ export default function ExportDialog({
                   White
                 </button>
                 <button
+                  className={`export-bg-btn ${background === 'grid' ? 'active' : ''}`}
+                  onClick={() => setBackground('grid')}
+                >
+                  <span className="color-swatch" style={{ background: 'radial-gradient(circle, #9aa5b5 1px, #fff 1.4px) 0 0/6px 6px' }} />
+                  Grid
+                </button>
+                <button
                   className={`export-bg-btn ${background === 'custom' ? 'active' : ''}`}
                   onClick={() => setBackground('custom')}
                 >
@@ -318,6 +436,32 @@ export default function ExportDialog({
                 </button>
               </div>
             </div>
+
+            {format === 'pdf' && (
+              <div className="export-option-group">
+                <label className="export-option-label">PDF page</label>
+                <div className="export-padding-row">
+                  <select
+                    aria-label="PDF page size"
+                    value={pdfPageSize}
+                    onChange={(e) => setPdfPageSize(e.target.value)}
+                    className="export-padding-select"
+                  >
+                    {PDF_PAGE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  {pdfPageSize !== 'auto' && (
+                    <select
+                      aria-label="PDF orientation"
+                      value={pdfOrientation}
+                      onChange={(e) => setPdfOrientation(e.target.value)}
+                      className="export-padding-select"
+                    >
+                      {PDF_ORIENTATION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* JPEG Quality (only for JPEG) */}
             {format === 'jpeg' && (
@@ -340,15 +484,7 @@ export default function ExportDialog({
             {/* Additional Options */}
             <div className="export-option-group">
               <label className="export-option-label">Options</label>
-              <label className="export-checkbox">
-                <input
-                  type="checkbox"
-                  checked={includeGrid}
-                  onChange={(e) => setIncludeGrid(e.target.checked)}
-                />
-                <span>Include grid</span>
-              </label>
-              {scope === 'canvas' && (
+              {(scope === 'canvas' || scope === 'selection') && (
                 <div className="export-padding-row">
                   <span>Padding:</span>
                   <select
@@ -363,11 +499,14 @@ export default function ExportDialog({
                 </div>
               )}
             </div>
+              </>
+            )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="export-dialog-footer">
+          {exportError && <span className="export-error" role="alert">{exportError}</span>}
           <button className="export-btn-secondary" onClick={onClose}>
             Cancel
           </button>
@@ -493,6 +632,19 @@ export default function ExportDialog({
           font-size: 13px;
         }
 
+        .export-preview-img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+          transition: opacity 0.15s;
+        }
+        .export-preview-img.loading { opacity: 0.55; }
+        .export-preview-img.checkered {
+          background: repeating-conic-gradient(#e5e7eb 0% 25%, #fff 0% 50%) 50% / 12px 12px;
+        }
+        .export-json-note { margin: 0; font-size: 13px; color: var(--text-muted, #6b7280); line-height: 1.5; }
+        .export-error { margin-right: auto; color: #b91c1c; font-size: 13px; align-self: center; }
+
         .export-dimensions {
           text-align: center;
           font-size: 13px;
@@ -523,11 +675,12 @@ export default function ExportDialog({
 
         .export-format-buttons {
           display: flex;
+          flex-wrap: wrap;
           gap: 8px;
         }
 
         .export-format-btn {
-          flex: 1;
+          flex: 1 0 auto;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -624,11 +777,12 @@ export default function ExportDialog({
 
         .export-bg-options {
           display: flex;
+          flex-wrap: wrap;
           gap: 8px;
         }
 
         .export-bg-btn {
-          flex: 1;
+          flex: 1 0 auto;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -788,8 +942,13 @@ export function useExportDialog() {
         setIsOpen(prev => !prev);
       }
     };
+    const handleOpenEvent = () => setIsOpen(true);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener(OPEN_EXPORT_DIALOG_EVENT, handleOpenEvent);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener(OPEN_EXPORT_DIALOG_EVENT, handleOpenEvent);
+    };
   }, []);
 
   return { isOpen, open, close };

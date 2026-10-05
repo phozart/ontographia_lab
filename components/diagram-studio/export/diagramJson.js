@@ -53,7 +53,6 @@ export function buildExportEnvelope(diagram = {}, now = new Date()) {
  */
 export function sanitizeFilename(name, fallback = 'diagram') {
   if (typeof name !== 'string') return fallback;
-  // eslint-disable-next-line no-control-regex
   let out = name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '-');
   out = out.replace(/-{2,}/g, '-').replace(/^[\s.-]+|[\s.-]+$/g, '');
   if (out.length > 120) out = out.slice(0, 120).replace(/[\s.-]+$/g, '');

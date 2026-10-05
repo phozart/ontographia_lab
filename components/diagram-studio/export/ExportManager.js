@@ -1,5 +1,13 @@
 // components/diagram-studio/export/ExportManager.js
-// Export diagrams to various formats: SVG, PNG, JSON
+// Export diagrams to various formats: PNG, JPEG, SVG, PDF (live canvas capture) and JSON (versioned envelope).
+// When no live canvas is mounted (e.g. headless/tests), PNG/JPEG/SVG fall back to data-generated output.
+
+import { buildExportEnvelope, sanitizeFilename } from './diagramJson';
+import { exportFromCanvas } from './exportRenderer';
+
+function hasLiveCanvas() {
+  return typeof document !== 'undefined' && !!document.querySelector('.ds-canvas-inner');
+}
 
 // ============ EXPORT MANAGER CLASS ============
 
@@ -16,7 +24,19 @@ export class ExportManager {
    * @param {Object} options - Export options
    */
   async export(diagram, format, options = {}) {
-    switch (format.toLowerCase()) {
+    const fmt = format.toLowerCase();
+    if (['png', 'jpeg', 'jpg', 'svg', 'pdf'].includes(fmt)) {
+      if (hasLiveCanvas()) {
+        return exportFromCanvas(fmt === 'jpg' ? 'jpeg' : fmt, {
+          elements: diagram.elements || [],
+          connections: diagram.connections || [],
+          ...options,
+          name: diagram.name || 'diagram',
+        });
+      }
+      if (fmt === 'pdf') throw new Error('PDF export needs the canvas to be open.');
+    }
+    switch (fmt) {
       case 'svg':
         return this.exportSVG(diagram, options);
       case 'png':
@@ -258,38 +278,14 @@ export class ExportManager {
    * Export diagram as JSON
    */
   exportJSON(diagram, options = {}) {
-    const { pretty = true, includeMetadata = true } = options;
-
-    const exportData = {
-      version: '1.0',
-      exportedAt: new Date().toISOString(),
-      diagram: {
-        id: diagram.id,
-        name: diagram.name,
-        type: diagram.type,
-        description: diagram.description,
-        elements: diagram.elements || [],
-        connections: diagram.connections || [],
-        settings: diagram.settings || {},
-      },
-    };
-
-    if (includeMetadata) {
-      exportData.metadata = {
-        elementCount: diagram.elements?.length || 0,
-        connectionCount: diagram.connections?.length || 0,
-      };
-    }
-
-    const content = pretty
-      ? JSON.stringify(exportData, null, 2)
-      : JSON.stringify(exportData);
-
+    const { pretty = true } = options;
+    const envelope = buildExportEnvelope(diagram);
+    const content = pretty ? JSON.stringify(envelope, null, 2) : JSON.stringify(envelope);
     return {
       format: 'json',
       content,
       mimeType: 'application/json',
-      filename: `${diagram.name || 'diagram'}.json`,
+      filename: `${sanitizeFilename(diagram.name)}.json`,
     };
   }
 

@@ -4,6 +4,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useDiagram, useDiagramHistory, useDiagramViewport } from '../DiagramContext';
 import { LogoIcon } from '../../ui/Logo';
+import { useJsonImport } from '../export/useJsonImport';
+import ImportJsonDialog from './ImportJsonDialog';
+import { OPEN_EXPORT_DIALOG_EVENT } from './ExportDialog';
 
 // Icons
 import NearMeIcon from '@mui/icons-material/NearMe';
@@ -26,6 +29,7 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import SaveIcon from '@mui/icons-material/Save';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import SettingsIcon from '@mui/icons-material/Settings';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
@@ -103,6 +107,13 @@ export default function TitleBar({
     stickyNoteColor = '#fef08a',
     setStickyNoteColor = () => {},
   } = diagramContext;
+
+  // JSON import (file picker + drag-and-drop requests)
+  const jsonImport = useJsonImport({ readOnly });
+  const importInputRef = useRef(null);
+  const openExportDialog = useCallback(() => {
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_EXPORT_DIALOG_EVENT));
+  }, []);
 
   const historyContext = useDiagramHistory() || {};
   const { canUndo = false, canRedo = false, undo = () => {}, redo = () => {} } = historyContext;
@@ -756,14 +767,17 @@ export default function TitleBar({
                   <span className="ds-shortcut">⌘S</span>
                 </button>
               )}
-              <button className="ds-dropdown-item" onClick={() => { onExport?.('png'); setShowMenu(false); }}>
+              <button className="ds-dropdown-item" onClick={() => { openExportDialog(); setShowMenu(false); }}>
                 <FileDownloadIcon fontSize="small" />
-                <span>Export as PNG</span>
+                <span>Export...</span>
+                <span className="ds-shortcut">PNG, SVG, PDF, JSON</span>
               </button>
-              <button className="ds-dropdown-item" onClick={() => { onExport?.('svg'); setShowMenu(false); }}>
-                <FileDownloadIcon fontSize="small" />
-                <span>Export as SVG</span>
-              </button>
+              {!readOnly && (
+                <button className="ds-dropdown-item" onClick={() => { importInputRef.current?.click(); setShowMenu(false); }}>
+                  <FileUploadIcon fontSize="small" />
+                  <span>Import JSON...</span>
+                </button>
+              )}
               <div className="ds-dropdown-divider" />
               <button className="ds-dropdown-item" onClick={() => { onShowShortcuts?.(); setShowMenu(false); }}>
                 <KeyboardIcon fontSize="small" />
@@ -788,6 +802,28 @@ export default function TitleBar({
           )}
         </div>
       </div>
+
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".json,application/json"
+        data-testid="import-json-input"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) jsonImport.importFile(file);
+        }}
+      />
+      <ImportJsonDialog
+        pending={jsonImport.pending}
+        error={jsonImport.error}
+        busy={jsonImport.busy}
+        readOnly={readOnly}
+        onMerge={jsonImport.mergeIntoCurrent}
+        onCreateNew={jsonImport.createNewDiagram}
+        onClose={jsonImport.dismiss}
+      />
 
       <style jsx>{`
         .ds-title-bar {
