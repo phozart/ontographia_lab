@@ -1,4 +1,3 @@
-/** @jest-environment node */
 import {
   FORMAT_ID,
   FORMAT_VERSION,
