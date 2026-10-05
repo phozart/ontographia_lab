@@ -85,7 +85,7 @@ export default function ContactPage() {
               mb: 5,
             }}
           >
-            Have a question, suggestion, or just want to say hello? We'd love to hear from you.
+            Have a question, suggestion, or just want to say hello? We&apos;d love to hear from you.
             Our team typically responds within 24 hours.
           </Typography>
 
@@ -272,7 +272,7 @@ export default function ContactPage() {
                 textAlign: 'center',
               }}
             >
-              We'll get back to you as soon as possible.
+              We&apos;ll get back to you as soon as possible.
             </Typography>
           </Box>
         </Grid>

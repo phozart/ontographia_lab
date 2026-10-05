@@ -8,7 +8,7 @@ jest.mock('next-auth/react', () => ({
   signOut: jest.fn(),
 }));
 jest.mock('next/router', () => ({ useRouter: () => ({ push, pathname: '/account', query: {} }) }));
-jest.mock('../../components/ui/AppSidebar', () => () => <aside />);
+jest.mock('../../components/ui/AppSidebar', () => function MockAppSidebar() { return <aside />; });
 
 const authed = {
   data: { user: { name: 'Ada', email: 'ada@x.io', role: 'user', status: 'active' } },

@@ -211,10 +211,10 @@ function SuccessState() {
           mb: 2,
         }}
       >
-        You're on the list!
+        You&apos;re on the list!
       </Typography>
       <Typography sx={{ color: 'rgba(255, 255, 255, 0.6)', fontSize: 16, maxWidth: 400, mx: 'auto' }}>
-        We'll be in touch soon. Keep an eye on your inbox for your invitation.
+        We&apos;ll be in touch soon. Keep an eye on your inbox for your invitation.
       </Typography>
     </Box>
   );
@@ -375,7 +375,7 @@ export default function AccessPage() {
                   },
                 }}
               >
-                We're Building
+                We&apos;re Building
                 <Box
                   component="span"
                   sx={{
@@ -411,8 +411,8 @@ export default function AccessPage() {
                   },
                 }}
               >
-                Ontographia Lab is currently in private beta. We're working with a select group of users
-                to craft the diagramming tool we've always wanted to use.
+                Ontographia Lab is currently in private beta. We&apos;re working with a select group of users
+                to craft the diagramming tool we&apos;ve always wanted to use.
               </Typography>
             </Box>
 
@@ -474,7 +474,7 @@ export default function AccessPage() {
                   fontWeight: 300,
                 }}
               >
-                Great tools aren't built in isolation. They're shaped by real workflows, honest feedback,
+                Great tools aren&apos;t built in isolation. They&apos;re shaped by real workflows, honest feedback,
                 and countless small improvements that only come from watching people actually use them.
               </Typography>
               <Typography
@@ -486,8 +486,8 @@ export default function AccessPage() {
                   fontStyle: 'italic',
                 }}
               >
-                This isn't about artificial scarcity.{' '}
-                <Box component="span" sx={{ color: SKY.deepCyan }}>It's about getting it right.</Box>
+                This isn&apos;t about artificial scarcity.{' '}
+                <Box component="span" sx={{ color: SKY.deepCyan }}>It&apos;s about getting it right.</Box>
               </Typography>
             </Box>
 
@@ -582,7 +582,7 @@ export default function AccessPage() {
                       Request Access
                     </Typography>
                     <Typography sx={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 15 }}>
-                      We're adding new testers every week.
+                      We&apos;re adding new testers every week.
                     </Typography>
                   </Box>
 
@@ -740,7 +740,7 @@ export default function AccessPage() {
             {/* Contact */}
             <Box sx={{ textAlign: 'center', py: 6 }}>
               <Typography sx={{ color: 'rgba(255, 255, 255, 0.4)', mb: 2, fontSize: 15 }}>
-                Questions? We're here to help.
+                Questions? We&apos;re here to help.
               </Typography>
               <Box
                 component="a"
@@ -760,7 +760,7 @@ export default function AccessPage() {
                 hello@ontographia.com
               </Box>
               <Typography sx={{ color: 'rgba(255, 255, 255, 0.35)', mt: 2, fontSize: 14 }}>
-                We're a small team and we actually reply.
+                We&apos;re a small team and we actually reply.
               </Typography>
             </Box>
           </Container>

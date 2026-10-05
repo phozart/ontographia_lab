@@ -33,7 +33,7 @@ export default function TermsPage() {
 
       <PageSection title="Agreement to Terms">
         <Typography paragraph>
-          By accessing or using Ontographia Lab ("the Service"), you agree to be bound by these Terms of Service.
+          By accessing or using Ontographia Lab (&quot;the Service&quot;), you agree to be bound by these Terms of Service.
           If you disagree with any part of these terms, you may not access the Service.
         </Typography>
       </PageSection>

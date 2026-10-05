@@ -38,7 +38,7 @@ export default function PrivacyPage() {
         </Typography>
         <Typography paragraph>
           We believe in transparency and want you to understand exactly what data we collect and why.
-          If you have questions, please don't hesitate to contact us.
+          If you have questions, please don&apos;t hesitate to contact us.
         </Typography>
       </PageSection>
 

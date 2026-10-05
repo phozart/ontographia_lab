@@ -418,7 +418,7 @@ export default function RoadmapPage() {
             mb: 2,
           }}
         >
-          What We're Building
+          What We&apos;re Building
         </Typography>
         <Typography
           sx={{
@@ -482,7 +482,7 @@ export default function RoadmapPage() {
               mx: 'auto',
             }}
           >
-            We're creating a platform for visual thinking.
+            We&apos;re creating a platform for visual thinking.
           </Typography>
         </Box>
 
