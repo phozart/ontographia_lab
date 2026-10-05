@@ -98,6 +98,11 @@ export default function ExportDialog({
     return elements.filter(el => el.type === 'frame' || el.isFrame);
   }, [elements]);
 
+  // JPEG/PDF have no transparency
+  useEffect(() => {
+    if ((format === 'jpeg' || format === 'pdf') && background === 'transparent') setBackground('white');
+  }, [format, background]);
+
   // Fall back from selection scope if there is no selection
   useEffect(() => {
     if (scope === 'selection' && !hasSelection) setScope('canvas');
@@ -233,7 +238,6 @@ export default function ExportDialog({
   if (!isOpen) return null;
 
   const supportsTransparency = format === 'png' || format === 'svg';
-  if (!supportsTransparency && background === 'transparent') setBackground('white');
 
   const content = (
     <div className="export-dialog-overlay" onClick={handleBackdropClick}>

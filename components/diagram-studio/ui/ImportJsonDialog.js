@@ -42,7 +42,7 @@ export default function ImportJsonDialog({ pending, error, busy, onMerge, onCrea
               </ul>
             )}
             <p className="import-hint">
-              Adding places the content at the center of your view with new IDs. Existing content is not changed.
+              Adding places the content at the center of your view with new IDs. Existing content is not changed. Group and layer membership from the file is not carried over.
             </p>
           </div>
         )}

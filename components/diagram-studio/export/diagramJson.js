@@ -2,6 +2,8 @@
 // Pure helpers for the JSON export envelope and JSON import (validation, sanitizing, re-id/offset).
 // No DOM or React dependencies so everything here is unit-testable.
 
+import { isSafeUrl, isUrlKey } from './safeUrl';
+
 export const FORMAT_ID = 'ontographia-diagram';
 export const FORMAT_VERSION = 1;
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -67,18 +69,22 @@ const isFiniteNumber = (v) => typeof v === 'number' && Number.isFinite(v);
 /**
  * Deep-copy JSON data dropping prototype-pollution keys, overlong strings and runaway nesting.
  */
-export function deepSanitize(value, depth = 0) {
+export function deepSanitize(value, depth = 0, stats = null) {
   if (depth > MAX_DEPTH) return undefined;
   if (typeof value === 'string') return value.length > MAX_STRING ? value.slice(0, MAX_STRING) : value;
   if (value === null || typeof value === 'number' || typeof value === 'boolean') return value;
   if (Array.isArray(value)) {
-    return value.slice(0, MAX_ELEMENTS * 2).map(v => deepSanitize(v, depth + 1));
+    return value.slice(0, MAX_ELEMENTS * 2).map(v => deepSanitize(v, depth + 1, stats));
   }
   if (isPlainObject(value)) {
     const out = {};
     for (const key of Object.keys(value)) {
       if (FORBIDDEN_KEYS.has(key)) continue;
-      const v = deepSanitize(value[key], depth + 1);
+      if (typeof value[key] === 'string' && isUrlKey(key) && value[key] !== '' && !isSafeUrl(value[key])) {
+        if (stats) stats.urls = (stats.urls || 0) + 1;
+        continue;
+      }
+      const v = deepSanitize(value[key], depth + 1, stats);
       if (v !== undefined) out[key] = v;
     }
     return out;
@@ -95,7 +101,7 @@ function fail(error) {
   return { ok: false, error };
 }
 
-function sanitizeElements(rawElements, warnings) {
+function sanitizeElements(rawElements, warnings, stats) {
   const seen = new Set();
   const out = [];
   let dropped = 0;
@@ -111,13 +117,13 @@ function sanitizeElements(rawElements, warnings) {
       }
     }
     seen.add(raw.id);
-    out.push(deepSanitize(raw));
+    out.push(deepSanitize(raw, 0, stats));
   }
   if (dropped > 0) warnings.push(`${dropped} invalid element${dropped === 1 ? '' : 's'} skipped.`);
   return out;
 }
 
-function sanitizeConnections(rawConnections, elementIds, warnings) {
+function sanitizeConnections(rawConnections, elementIds, warnings, stats) {
   const seen = new Set();
   const out = [];
   let dropped = 0;
@@ -130,7 +136,7 @@ function sanitizeConnections(rawConnections, elementIds, warnings) {
     if (!sourceOk || !targetOk) { dropped++; continue; }
     if (typeof raw.id === 'string' && seen.has(raw.id)) { dropped++; continue; }
     if (typeof raw.id === 'string') seen.add(raw.id);
-    out.push(deepSanitize(raw));
+    out.push(deepSanitize(raw, 0, stats));
   }
   if (dropped > 0) warnings.push(`${dropped} invalid connection${dropped === 1 ? '' : 's'} skipped.`);
   return out;
@@ -160,9 +166,11 @@ export function sanitizeContent(rawContent) {
     return fail(`Too many connections (${rawConnections.length}). The limit is ${MAX_CONNECTIONS}.`);
   }
   const warnings = [];
-  const elements = sanitizeElements(rawContent.elements, warnings);
+  const stats = { urls: 0 };
+  const elements = sanitizeElements(rawContent.elements, warnings, stats);
   const elementIds = new Set(elements.map(e => e.id));
-  const connections = sanitizeConnections(rawConnections, elementIds, warnings);
+  const connections = sanitizeConnections(rawConnections, elementIds, warnings, stats);
+  if (stats.urls > 0) warnings.push(`${stats.urls} unsafe URL${stats.urls === 1 ? '' : 's'} removed (only http, https and image data URLs are allowed).`);
 
   const asList = (v) => (Array.isArray(v) ? v.filter(isPlainObject).slice(0, MAX_COLLECTION).map(x => deepSanitize(x)) : []);
   const content = {
