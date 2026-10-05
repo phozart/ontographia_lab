@@ -187,10 +187,19 @@ describe('forgot-password email delivery', () => {
     expect(res.body.resetUrl).toMatch(/reset-password\?token=/);
   });
 
+  test('response does not wait for delivery (never-resolving sendMail still yields 200)', async () => {
+    isEmailConfigured.mockReturnValue(true);
+    sendMail.mockReturnValueOnce(new Promise(() => {}));
+    const res = await run('production');
+    expect(res.statusCode).toBe(200);
+    expect(sendMail).toHaveBeenCalledTimes(1);
+  });
+
   test('send failure: generic 200, error logged without token, token not cleared', async () => {
     isEmailConfigured.mockReturnValue(true);
     sendMail.mockRejectedValueOnce(new Error('smtp down'));
     const res = await run('production');
+    await new Promise((r) => setImmediate(r));
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.resetUrl).toBeUndefined();

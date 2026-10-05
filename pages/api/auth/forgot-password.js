@@ -79,13 +79,16 @@ export default async function handler(req, res) {
     const emailConfigured = isEmailConfigured();
 
     if (emailConfigured) {
-      // Deliver by email. A delivery failure must not leak to the client and
-      // must not invalidate the stored token, so a retry works.
+      // Fire-and-forget: awaiting delivery would make response time reveal
+      // whether the account exists. A failure is only logged (no token) and
+      // the stored token stays valid so a retry works.
+      const logFailure = (sendError) =>
+        console.error('Password reset email delivery failed:', sendError && sendError.message);
       try {
         const message = passwordResetEmail({ resetUrl, expiresInHours: TOKEN_EXPIRY_HOURS });
-        await sendMail({ to: user.email, ...message });
+        Promise.resolve(sendMail({ to: user.email, ...message })).catch(logFailure);
       } catch (sendError) {
-        console.error('Password reset email delivery failed:', sendError && sendError.message);
+        logFailure(sendError);
       }
     } else if (isDev) {
       // Local development without SMTP: surface the link directly.
