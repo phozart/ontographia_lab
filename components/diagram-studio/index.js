@@ -24,7 +24,6 @@ export {
 
 // UI Components
 export { default as DiagramCanvas } from './DiagramCanvas';
-export { default as TopBar } from './TopBar';
 export { default as LeftPalette } from './LeftPalette';
 export { default as PropertiesPanel } from './PropertiesPanel';
 export { ResizablePanel, PanelGroup, usePanelState } from './ResizablePanel';

@@ -47,7 +47,6 @@ const SELECTORS = {
   iconBtn: '.ds-packs-section .ds-sidebar-btn',
   header: '.ds-floating-header',
   titleBar: '.ds-title-bar',
-  toolbar: '.ds-floating-toolbar',
 
   // Stencils
   stencilFlyout: '.ds-stencil-flyout',
@@ -243,7 +242,7 @@ describe('Diagram Studio E2E Tests', () => {
       expect(canvasBounds.height).toBeGreaterThan(100);
     });
 
-    it('1.3 Left stencil bar (FloatingIconBar) is visible', async () => {
+    it('1.3 Left stencil bar (ShapeSidebar) is visible', async () => {
       await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
       await waitForDiagramStudio(page);
 
@@ -258,17 +257,14 @@ describe('Diagram Studio E2E Tests', () => {
       }
     });
 
-    it('1.4 Zoom controls live in the title bar (floating toolbar is hidden by design)', async () => {
+    it('1.4 Zoom controls live in the title bar (no floating toolbar)', async () => {
       await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
       await waitForDiagramStudio(page);
 
-      // New layout hides .ds-floating-toolbar via CSS; zoom is in the title bar
+      // Zoom is in the title bar; the legacy floating toolbar no longer exists
       const zoomIn = await page.$(`${SELECTORS.titleBar} [title*="Zoom In"]`);
       expect(zoomIn).not.toBeNull();
-      const toolbar = await page.$(SELECTORS.toolbar);
-      if (toolbar) {
-        expect(await toolbar.boundingBox()).toBeNull();
-      }
+      expect(await page.$('.ds-floating-toolbar')).toBeNull();
     });
 
     it('1.5 Top title bar with tools is visible', async () => {
