@@ -157,7 +157,7 @@ export default function ShortcutsHelp({ isOpen, onClose }) {
         <div className="ds-shortcuts-content">
           {filteredCategories.length === 0 ? (
             <div className="ds-shortcuts-empty">
-              No shortcuts found for "{searchTerm}"
+              No shortcuts found for &quot;{searchTerm}&quot;
             </div>
           ) : (
             <div className="ds-shortcuts-grid">

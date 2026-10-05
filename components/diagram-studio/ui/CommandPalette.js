@@ -228,7 +228,7 @@ export default function CommandPalette({
         <div className="ds-command-palette-results" ref={resultsRef}>
           {filteredItems.length === 0 ? (
             <div className="ds-command-palette-empty">
-              No results for "{search}"
+              No results for &quot;{search}&quot;
             </div>
           ) : (
             <>
