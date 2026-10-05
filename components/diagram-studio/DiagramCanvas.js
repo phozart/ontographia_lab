@@ -3,6 +3,7 @@
 // Handles rendering, pan/zoom, selection, drag, and connections
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { generateId } from './utils/ids';
 import { createPortal } from 'react-dom';
 import {
   useDiagram,
@@ -3036,7 +3037,7 @@ export default function DiagramCanvas({
           // Keep sticky notes square, use the larger dimension
           const stickySize = Math.max(width, height, 100); // Minimum 100px
           const newElement = {
-            id: `sticky-${Date.now()}`,
+            id: generateId('sticky'),
             type: 'sticky-medium',
             packId: 'sticky-notes',
             label: '',
@@ -3060,7 +3061,7 @@ export default function DiagramCanvas({
           const finalHeight = snapToGrid(Math.max(height, 40)); // Minimum 40px
 
           const newElement = {
-            id: `el-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: generateId('el'),
             type: selectedStencil.id,
             packId: selectedStencil.packId,
             name: selectedStencil.name,
@@ -3561,7 +3562,7 @@ export default function DiagramCanvas({
             // Shift+click: instant placement at default size
             const stickySize = 150;
             const newElement = {
-              id: `sticky-${Date.now()}`,
+              id: generateId('sticky'),
               type: 'sticky-medium',
               packId: 'sticky-notes',
               label: '',

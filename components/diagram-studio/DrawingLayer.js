@@ -2,6 +2,7 @@
 // Freehand drawing layer for pen, highlighter, and eraser tools
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { generateId } from './utils/ids';
 import { useDiagram, useDiagramViewport } from './DiagramContext';
 
 // Drawing tool configurations
@@ -204,7 +205,7 @@ export default function DrawingLayer({
 
       // Create drawing element
       const drawingElement = {
-        id: `drawing-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: generateId('drawing'),
         type: `drawing-${currentTool}`,
         x: bounds.minX,
         y: bounds.minY,

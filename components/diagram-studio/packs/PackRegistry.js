@@ -1,3 +1,4 @@
+import { generateId as generateUniqueId } from '../utils/ids';
 // components/diagram-studio/packs/PackRegistry.js
 // Registry for diagram packs (stencil sets)
 
@@ -113,7 +114,7 @@ export function createRegistry() {
 // ============ HELPERS ============
 
 function generateId() {
-  return 'el_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now().toString(36);
+  return generateUniqueId('el');
 }
 
 function getDefaultPorts() {

@@ -3,6 +3,7 @@
 // Includes styling controls (color, style variant, text formatting) and layout tools
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { generateId } from '../utils/ids';
 import { useDiagram, useDiagramSelection } from '../DiagramContext';
 import {
   COLOR_PALETTE,
@@ -641,7 +642,7 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
     const offsetY = 0;
 
     // Create new frame with offset position
-    const newFrameId = `frame-${Date.now()}`;
+    const newFrameId = generateId('frame');
     const newFrame = {
       ...frame,
       id: newFrameId,
@@ -653,7 +654,7 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
     // Create copies of elements inside frame with offset positions
     const newElements = elementsInFrame.map((el, index) => ({
       ...el,
-      id: `${el.type || 'element'}-${Date.now()}-${index}`,
+      id: generateId('el'),
       x: (el.x || 0) + offsetX,
       y: (el.y || 0) + offsetY,
     }));
