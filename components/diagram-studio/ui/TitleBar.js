@@ -258,7 +258,7 @@ export default function TitleBar({
       {/* Left: Logo + Name */}
       <div className="ds-title-left">
         {/* Logo - goes home */}
-        <div className="ds-title-logo" onClick={onGoHome} title="Go to Dashboard">
+        <div className="ds-title-logo" onClick={onGoHome} title="Go to Dashboard" role="img" aria-label="Ontographia Lab">
           <LogoIcon size={22} />
         </div>
 

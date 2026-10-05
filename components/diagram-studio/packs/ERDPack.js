@@ -1,6 +1,9 @@
 // components/diagram-studio/packs/ERDPack.js
 // Entity Relationship Diagram pack with fields, keys, and cardinality
 
+import React from 'react';
+import { DiamondNode } from './CorePack';
+
 // ============ STENCILS ============
 
 const stencils = [
@@ -631,6 +634,9 @@ function renderNode(element, stencil, isSelected) {
       return <ERDEntityRenderer element={element} stencil={stencil} isSelected={isSelected} />;
     case 'attribute':
       return <ERDAttributeRenderer element={element} stencil={stencil} />;
+    case 'relationship-chen':
+      // Chen relationship: SVG diamond on bbox midpoints (same renderer as Core diamond)
+      return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} outlined />;
     default:
       return null;
   }

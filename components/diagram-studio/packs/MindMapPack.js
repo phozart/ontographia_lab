@@ -3,6 +3,7 @@
 
 import React from 'react';
 import SvgNodeFrame from './SvgNodeFrame';
+import { parseColor, pickLabelColor } from './colorUtils';
 
 // ============ STENCILS ============
 
@@ -472,7 +473,8 @@ const nodeProperties = [
  * Lighten a hex color by a percentage
  */
 function lightenColor(hex, percent) {
-  const num = parseInt(hex.replace('#', ''), 16);
+  const rgb = parseColor(hex) || [128, 128, 128];
+  const num = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
   const amt = Math.round(2.55 * percent);
   const R = Math.min(255, (num >> 16) + amt);
   const G = Math.min(255, ((num >> 8) & 0x00FF) + amt);
@@ -484,7 +486,8 @@ function lightenColor(hex, percent) {
  * Darken a hex color by a percentage
  */
 function darkenColor(hex, percent) {
-  const num = parseInt(hex.replace('#', ''), 16);
+  const rgb = parseColor(hex) || [128, 128, 128];
+  const num = (rgb[0] << 16) | (rgb[1] << 8) | rgb[2];
   const amt = Math.round(2.55 * percent);
   const R = Math.max(0, (num >> 16) - amt);
   const G = Math.max(0, ((num >> 8) & 0x00FF) - amt);
@@ -519,7 +522,7 @@ function CollapsedBadge({ x, y, count, color }) {
         y={badgeHeight / 2}
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#fff"
+        fill={pickLabelColor(color)}
         fontSize="10"
         fontWeight="600"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -573,7 +576,7 @@ function CentralTopicNode({ element, stencil, isSelected }) {
         y={height / 2}
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#fff"
+        fill={pickLabelColor(color)}
         fontSize="16"
         fontWeight="700"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -631,7 +634,7 @@ function MainTopicNode({ element, stencil, isSelected }) {
         y={height / 2}
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#fff"
+        fill={pickLabelColor(color)}
         fontSize="14"
         fontWeight="600"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -682,7 +685,7 @@ function SubTopicNode({ element, stencil, isSelected }) {
         y={height / 2}
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#fff"
+        fill={pickLabelColor(color)}
         fontSize="12"
         fontWeight="500"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -780,7 +783,7 @@ function ColoredTopicNode({ element, stencil, isSelected }) {
         y={height / 2}
         textAnchor="middle"
         dominantBaseline="central"
-        fill="#fff"
+        fill={pickLabelColor(color)}
         fontSize="12"
         fontWeight="500"
         style={{ pointerEvents: 'none', userSelect: 'none' }}

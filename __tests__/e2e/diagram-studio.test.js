@@ -43,10 +43,10 @@ const SELECTORS = {
   connections: 'svg.ds-connections',
 
   // UI Components
-  iconBar: '.ds-icon-bar',
-  iconBtn: '.ds-icon-btn',
+  iconBar: '.ds-shape-sidebar',
+  iconBtn: '.ds-packs-section .ds-sidebar-btn',
   header: '.ds-floating-header',
-  editBar: '.floating-edit-bar',
+  titleBar: '.ds-title-bar',
   toolbar: '.ds-floating-toolbar',
 
   // Stencils
@@ -247,7 +247,7 @@ describe('Diagram Studio E2E Tests', () => {
       await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
       await waitForDiagramStudio(page);
 
-      // Look for the icon bar on the left (uses class .ds-icon-bar)
+      // Left shape sidebar (ShapeSidebar, class .ds-shape-sidebar)
       const iconBar = await page.$(SELECTORS.iconBar);
       expect(iconBar).not.toBeNull();
 
@@ -258,28 +258,27 @@ describe('Diagram Studio E2E Tests', () => {
       }
     });
 
-    it('1.4 Right toolbar (FloatingToolbar) is visible', async () => {
+    it('1.4 Zoom controls live in the title bar (floating toolbar is hidden by design)', async () => {
       await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
       await waitForDiagramStudio(page);
 
-      // Look for the floating toolbar
+      // New layout hides .ds-floating-toolbar via CSS; zoom is in the title bar
+      const zoomIn = await page.$(`${SELECTORS.titleBar} [title*="Zoom In"]`);
+      expect(zoomIn).not.toBeNull();
       const toolbar = await page.$(SELECTORS.toolbar);
-      expect(toolbar).not.toBeNull();
-
-      // Verify it's on the right side
       if (toolbar) {
-        const bounds = await toolbar.boundingBox();
-        expect(bounds.x).toBeGreaterThan(800); // Should be near right edge
+        expect(await toolbar.boundingBox()).toBeNull();
       }
     });
 
-    it('1.5 Top edit bar (FloatingEditBar) is visible', async () => {
+    it('1.5 Top title bar with tools is visible', async () => {
       await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
       await waitForDiagramStudio(page);
 
-      // Look for the edit bar (uses class .floating-edit-bar)
-      const editBar = await page.$(SELECTORS.editBar);
-      expect(editBar).not.toBeNull();
+      const titleBar = await page.$(SELECTORS.titleBar);
+      expect(titleBar).not.toBeNull();
+      const bounds = await titleBar.boundingBox();
+      expect(bounds.y).toBeLessThan(50);
     });
   });
 
@@ -382,9 +381,7 @@ describe('Diagram Studio E2E Tests', () => {
       await waitForDiagramStudio(page);
 
       // Press ? (Shift + /)
-      await page.keyboard.down('Shift');
-      await page.keyboard.press('/');
-      await page.keyboard.up('Shift');
+      await page.keyboard.press('?');
 
       await page.waitForTimeout(500);
 
@@ -404,9 +401,7 @@ describe('Diagram Studio E2E Tests', () => {
       await waitForDiagramStudio(page);
 
       // Open shortcuts overlay first
-      await page.keyboard.down('Shift');
-      await page.keyboard.press('/');
-      await page.keyboard.up('Shift');
+      await page.keyboard.press('?');
       await page.waitForTimeout(300);
 
       // Verify it's open
@@ -622,6 +617,15 @@ describe('Diagram Studio E2E Tests', () => {
       if (page) {
         await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
         await clearLocalStorage(page);
+        // Earlier sections place shapes (autosaved); empty the canvas so the
+        // welcome state can appear. Ctrl+A then Delete.
+        await waitForDiagramStudio(page);
+        await page.mouse.click(900, 600);
+        await page.keyboard.down('Control');
+        await page.keyboard.press('a');
+        await page.keyboard.up('Control');
+        await page.keyboard.press('Delete');
+        await page.waitForTimeout(2000); // allow autosave
       }
     });
 
@@ -863,13 +867,9 @@ describe('Diagram Studio E2E Tests', () => {
       await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
       await waitForDiagramStudio(page);
 
-      // Look for Ontographia branding
-      const branding = await page.evaluate(() => {
-        const text = document.body.textContent;
-        return text.includes('Ontographia') || text.includes('ontographia');
-      });
-
-      expect(branding).toBe(true);
+      // Logo is an SVG; it exposes an accessible name
+      const logo = await page.$('.ds-title-logo[aria-label="Ontographia Lab"]');
+      expect(logo).not.toBeNull();
     });
   });
 });
