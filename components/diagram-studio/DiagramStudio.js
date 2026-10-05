@@ -18,6 +18,7 @@ import FrameNavigator from './ui/FrameNavigator';
 import TitleBar from './ui/TitleBar';
 import ShapeSidebar from './ui/ShapeSidebar';
 import ContextualToolbar from './ui/ContextualToolbar';
+import { useThumbnailCapture } from './hooks/useThumbnailCapture';
 import ShortcutsHelp, { useShortcutsHelp } from './ui/ShortcutsHelp';
 import KeyboardShortcutsOverlay, { useKeyboardShortcutsOverlay } from './ui/KeyboardShortcutsOverlay';
 import ContextMenu, { useContextMenu } from './ui/ContextMenu';
@@ -97,6 +98,13 @@ function DiagramStudioInner({
   const { data: session } = useSession();
   const { diagram, setDiagram, activePack, saveStatus, saveDiagram, elements, connections, addElement, addConnection, undo, redo, selectAll, clearSelection, deleteSelected, activeTool, setActiveTool, selectedStencil, setSelectedStencil, drawingTool, drawingColor, drawingStrokeWidth, isDragging, isRotating, stickyNoteColor } = useDiagram();
   const { viewport, zoomIn, zoomOut } = useDiagramViewport();
+  useThumbnailCapture({
+    diagramId: diagram?.id,
+    lastSaved: saveStatus?.lastSaved,
+    elements,
+    connections,
+    readOnly: profile?.editingPolicy?.readOnly,
+  });
   const { selection, selectedElements } = useDiagramSelection();
   const [draggingStencil, setDraggingStencil] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
@@ -463,7 +471,7 @@ function DiagramStudioInner({
         shortcutsHelp.open();
         break;
       default:
-        console.log('Command action:', action);
+        break;
     }
   }, [selectAll, clearSelection, deleteSelected, saveDiagram, handleExport, toggleCommentTool, shortcutsHelp]);
 
@@ -629,9 +637,6 @@ function DiagramStudioInner({
             onSave={() => saveDiagram?.(true)}
             onExport={handleExport}
             onShowShortcuts={shortcutsHelp.open}
-            onShare={() => {
-              // TODO: Implement share
-            }}
             readOnly={profile?.editingPolicy?.readOnly}
             isFullscreen={isFullscreen}
             isPreviewMode={isPreviewMode}
