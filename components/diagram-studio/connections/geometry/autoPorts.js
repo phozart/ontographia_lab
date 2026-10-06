@@ -4,9 +4,11 @@
 /**
  * @param {{x:number,y:number,width:number,height:number}} s source bounds
  * @param {{x:number,y:number,width:number,height:number}} t target bounds
+ * @param {{ sourcePort?: string }} [hint] previously used ports; on a diagonal the
+ *   currently used axis gets a 12% bias so the ports do not flicker when gapX ~ gapY
  * @returns {{ sourcePort: string, targetPort: string }}
  */
-export function selectAutoPorts(s, t) {
+export function selectAutoPorts(s, t, hint) {
   if (!s || !t) return { sourcePort: 'right', targetPort: 'left' };
 
   const gapRight = t.x - (s.x + s.width); // > 0: target entirely right of source
@@ -17,7 +19,13 @@ export function selectAutoPorts(s, t) {
   const gapY = Math.max(gapDown, gapUp);
 
   let horizontal;
-  if (gapX > 0 && gapY > 0) horizontal = gapX >= gapY; // diagonal: larger gap wins
+  if (gapX > 0 && gapY > 0) {
+    // diagonal: larger gap wins, with hysteresis towards the axis already in use
+    const hintH = hint?.sourcePort === 'left' || hint?.sourcePort === 'right';
+    const hintV = hint?.sourcePort === 'top' || hint?.sourcePort === 'bottom';
+    const bias = 1.12;
+    horizontal = hintH ? gapX * bias >= gapY : hintV ? gapX >= gapY * bias : gapX >= gapY;
+  }
   else if (gapX > 0) horizontal = true;
   else if (gapY > 0) horizontal = false;
   else {
@@ -52,5 +60,23 @@ export function resolveConnectionPorts(connection, sourceBounds, targetBounds) {
   };
   if (!connection.autoPorts || !sourceBounds || !targetBounds) return stored;
   if (Array.isArray(connection.waypoints) && connection.waypoints.length > 0) return stored;
-  return selectAutoPorts(sourceBounds, targetBounds);
+  return selectAutoPorts(sourceBounds, targetBounds, stored);
+}
+
+/**
+ * Update payload for saving hand-placed waypoints. The effective ports in use
+ * are pinned at the same time (and `autoPorts` cleared) because
+ * `resolveConnectionPorts` returns the stored ports whenever waypoints exist;
+ * without this the route would jump to stale stored ports on the next render.
+ * @param {object} connection connection as seen by the canvas (ports already resolved)
+ * @param {{x:number,y:number}[]} waypoints
+ */
+export function manualWaypointUpdate(connection, waypoints) {
+  const update = { waypoints, hasManualWaypoints: true };
+  if (connection) {
+    if (connection.sourcePort) update.sourcePort = connection.sourcePort;
+    if (connection.targetPort) update.targetPort = connection.targetPort;
+    if (connection.autoPorts) update.autoPorts = false;
+  }
+  return update;
 }

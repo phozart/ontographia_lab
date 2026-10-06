@@ -8,7 +8,7 @@
 // and canvas ref needed for coordinate conversion. The hooks in ./interaction/ provide
 // reference implementations that could be used in alternative components or for testing.
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useRef } from 'react';
 
 // Renderers
 import StraightLineRenderer from './renderers/StraightLineRenderer';
@@ -403,6 +403,17 @@ function getOptimalPorts(sourceEl, targetEl, packRegistry, allElements = []) {
  * Renders a connection between two elements (or freehand endpoints)
  * Following the CLAUDE.md spec for text interaction model
  */
+const EMPTY_WAYPOINTS = [];
+
+// Keep the previous point object while its coordinates are unchanged so memoized
+// routing downstream is not invalidated by a fresh-but-equal object every render.
+function useStablePoint(point) {
+  const ref = useRef(point);
+  const prev = ref.current;
+  if (prev !== point && !(prev && point && prev.x === point.x && prev.y === point.y)) ref.current = point;
+  return ref.current;
+}
+
 export default function Connection({
   connection,
   elements = [],
@@ -474,12 +485,13 @@ export default function Connection({
   );
 
   // Calculate positions
-  const sourcePos = source
+  const sourcePos = useStablePoint(source
     ? getPortPosition(source, effectivePorts.sourcePort, packRegistry, connection.sourceRatio ?? 0.5)
-    : connection.sourcePos;
-  const targetPos = target
+    : connection.sourcePos);
+  const targetPos = useStablePoint(target
     ? getPortPosition(target, effectivePorts.targetPort, packRegistry, connection.targetRatio ?? 0.5)
-    : connection.targetPos;
+    : connection.targetPos);
+  const waypoints = connection.waypoints || EMPTY_WAYPOINTS;
 
   // Get line style and renderer
   const lineStyle = connection.lineStyle || 'curved';
@@ -499,6 +511,11 @@ export default function Connection({
   // Build obstacles list from all OTHER elements (excluding source, target, and frames)
   // Per CLAUDE.md: Nodes are hard obstacles, connectors MUST route around them
   // Frames are background grouping elements - connections should route through them freely
+  // While elements are being dragged only connections attached to a moving element follow
+  // the drag; every other connection keeps its cached route until the drop.
+  const attachedToDrag = !!dragState?.ids &&
+    (dragState.ids.has(connection.sourceId) || dragState.ids.has(connection.targetId));
+  const activeDrag = attachedToDrag ? dragState : null;
   const obstacles = useMemo(() => {
     if (!source || !target) return [];
 
@@ -518,8 +535,8 @@ export default function Connection({
           return null;
         }
         // Apply drag offset if this element is being dragged
-        const adjustedEl = dragState?.ids?.has(el.id)
-          ? { ...el, x: el.x + dragState.offset.x, y: el.y + dragState.offset.y }
+        const adjustedEl = activeDrag?.ids?.has(el.id)
+          ? { ...el, x: el.x + activeDrag.offset.x, y: el.y + activeDrag.offset.y }
           : el;
 
         const pack = packRegistry?.get?.(adjustedEl.packId);
@@ -534,7 +551,7 @@ export default function Connection({
         };
       })
       .filter(Boolean);
-  }, [elements, source, target, packRegistry, dragState]);
+  }, [elements, source, target, packRegistry, activeDrag]);
 
   // Calculate label position based on actual path points
   const labelPos = useMemo(() => {
@@ -542,7 +559,7 @@ export default function Connection({
     if ((lineStyle === 'step' || lineStyle === 'step-sharp') && sourcePos && targetPos) {
       const pathResult = buildOrthogonalPath(sourcePos, targetPos, effectivePorts.sourcePort, effectivePorts.targetPort, {
         sharp: isSharp,
-        waypoints: connection.waypoints || [],
+        waypoints,
         sourceBounds,
         targetBounds,
       });
@@ -631,7 +648,7 @@ export default function Connection({
         targetPort={effectivePorts.targetPort}
         sourceBounds={sourceBounds}
         targetBounds={targetBounds}
-        waypoints={connection.waypoints || []}
+        waypoints={waypoints}
         obstacles={obstacles}
         curveAmount={connection.curve ?? null}
         sharp={isSharp}

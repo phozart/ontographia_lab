@@ -80,7 +80,7 @@ describe('migrateDiagram', () => {
     it('removes duplicate consecutive waypoints but keeps real corners', () => {
       const input = {
         elements: els(),
-        connections: [{ id: 'c', sourceId: 'a', targetId: 'b', sourcePort: 'right', targetPort: 'right', hasManualWaypoints: true,
+        connections: [{ id: 'c', sourceId: 'a', targetId: 'b', sourcePort: 'right', targetPort: 'right', lineStyle: 'step', hasManualWaypoints: true,
           waypoints: [{ x: 300, y: 130 }, { x: 300, y: 130 }, { x: 300, y: 330 }] }],
       };
       const out = migrateDiagram(input);
@@ -89,7 +89,7 @@ describe('migrateDiagram', () => {
 
     it('works without element sizes (waypoint-only spike detection)', () => {
       const out = migrateDiagram({
-        connections: [{ id: 'c', waypoints: [{ x: 0, y: 0 }, { x: 0, y: -20 }, { x: 0, y: 50 }, { x: 80, y: 50 }] }],
+        connections: [{ id: 'c', lineStyle: 'step', waypoints: [{ x: 0, y: 0 }, { x: 0, y: -20 }, { x: 0, y: 50 }, { x: 80, y: 50 }] }],
       });
       expect(out.connections[0].waypoints.length).toBeLessThan(4);
     });
@@ -103,6 +103,14 @@ describe('migrateDiagram', () => {
       expect(migrateDiagram(clean)).toBe(clean);
       const once = migrateDiagram(stubbed());
       expect(migrateDiagram(once)).toBe(once);
+    });
+
+    it('leaves non-orthogonal line styles untouched (same reference)', () => {
+      for (const lineStyle of ['curved', 'arc', 'straight', 'smart', undefined]) {
+        const input = stubbed();
+        input.connections[0].lineStyle = lineStyle;
+        expect(migrateDiagram(input)).toBe(input);
+      }
     });
 
     it('does not mutate its input', () => {

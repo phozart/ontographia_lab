@@ -205,39 +205,104 @@ function expand(r, pad) {
 }
 
 class MinHeap {
-  constructor() { this.a = []; }
-  push(item) {
-    const a = this.a;
-    a.push(item);
-    let i = a.length - 1;
+  // Parallel arrays (cost, packed state) avoid allocating a tuple per push
+  constructor() { this.c = []; this.v = []; }
+  push(cost, val) {
+    const c = this.c;
+    const v = this.v;
+    let i = c.length;
+    c.push(cost);
+    v.push(val);
     while (i > 0) {
       const p = (i - 1) >> 1;
-      if (a[p][0] <= a[i][0]) break;
-      [a[p], a[i]] = [a[i], a[p]];
+      if (c[p] <= cost) break;
+      c[i] = c[p];
+      v[i] = v[p];
       i = p;
     }
+    c[i] = cost;
+    v[i] = val;
   }
+  // Removes the minimum; read it from `topCost` / `topVal` afterwards
   pop() {
-    const a = this.a;
-    const top = a[0];
-    const last = a.pop();
-    if (a.length > 0) {
-      a[0] = last;
+    const c = this.c;
+    const v = this.v;
+    this.topCost = c[0];
+    this.topVal = v[0];
+    const lc = c.pop();
+    const lv = v.pop();
+    const n = c.length;
+    if (n > 0) {
       let i = 0;
       for (;;) {
         const l = 2 * i + 1;
+        if (l >= n) break;
         const r = l + 1;
-        let m = i;
-        if (l < a.length && a[l][0] < a[m][0]) m = l;
-        if (r < a.length && a[r][0] < a[m][0]) m = r;
-        if (m === i) break;
-        [a[m], a[i]] = [a[i], a[m]];
+        const m = r < n && c[r] < c[l] ? r : l;
+        if (c[m] >= lc) break;
+        c[i] = c[m];
+        v[i] = v[m];
         i = m;
       }
+      c[i] = lc;
+      v[i] = lv;
     }
-    return top;
   }
-  get size() { return this.a.length; }
+  get size() { return this.c.length; }
+}
+
+// First index in sorted `arr` whose value is >= v
+function lowerIndex(arr, v) {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] < v) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+// First index in sorted `arr` whose value is > v
+function upperIndex(arr, v) {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] <= v) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * Precompute which grid edges pass through a blocker's open interior, so the
+ * search does O(1) lookups instead of scanning every blocker per edge.
+ * hBlk[iy * (nx - 1) + ix]: edge (ix,iy)-(ix+1,iy); vBlk[ix * (ny - 1) + iy]: edge (ix,iy)-(ix,iy+1)
+ */
+function blockedEdges(X, Y, blockers) {
+  const nx = X.length;
+  const ny = Y.length;
+  const hBlk = new Uint8Array(Math.max(nx - 1, 0) * ny);
+  const vBlk = new Uint8Array(Math.max(ny - 1, 0) * nx);
+  for (const r of blockers) {
+    const x0 = r.x + EPS;
+    const x1 = r.x + r.width - EPS;
+    const y0 = r.y + EPS;
+    const y1 = r.y + r.height - EPS;
+    if (x1 <= x0 || y1 <= y0) continue;
+    // Horizontal edges: row strictly inside (y0, y1), edge overlapping (x0, x1)
+    const eLo = Math.max(upperIndex(X, x0) - 1, 0);
+    for (let iy = upperIndex(Y, y0); iy < ny && Y[iy] < y1; iy++) {
+      for (let ix = eLo; ix < nx - 1 && X[ix] < x1; ix++) hBlk[iy * (nx - 1) + ix] = 1;
+    }
+    // Vertical edges: column strictly inside (x0, x1), edge overlapping (y0, y1)
+    const fLo = Math.max(upperIndex(Y, y0) - 1, 0);
+    for (let ix = upperIndex(X, x0); ix < nx && X[ix] < x1; ix++) {
+      for (let iy = fLo; iy < ny - 1 && Y[iy] < y1; iy++) vBlk[ix * (ny - 1) + iy] = 1;
+    }
+  }
+  return { hBlk, vBlk };
 }
 
 function search(exit, entry, sd, td, blockers, extraXs, extraYs) {
@@ -254,51 +319,41 @@ function search(exit, entry, sd, td, blockers, extraXs, extraYs) {
   const nx = X.length;
   const ny = Y.length;
   const find = (arr, v) => {
-    for (let i = 0; i < arr.length; i++) if (Math.abs(arr[i] - v) < 1e-6) return i;
-    return -1;
+    const i = lowerIndex(arr, v - 1e-6);
+    return i < arr.length && Math.abs(arr[i] - v) < 1e-6 ? i : -1;
   };
   const sx = find(X, exit.x);
   const sy = find(Y, exit.y);
   const ex = find(X, entry.x);
   const ey = find(Y, entry.y);
 
-  // Blocked-edge tests (open interior overlap)
-  const hBlocked = (y, x1, x2) => {
-    const lo = Math.min(x1, x2);
-    const hi = Math.max(x1, x2);
-    for (const r of blockers) {
-      if (y > r.y + EPS && y < r.y + r.height - EPS && hi > r.x + EPS && lo < r.x + r.width - EPS) return true;
-    }
-    return false;
-  };
-  const vBlocked = (x, y1, y2) => {
-    const lo = Math.min(y1, y2);
-    const hi = Math.max(y1, y2);
-    for (const r of blockers) {
-      if (x > r.x + EPS && x < r.x + r.width - EPS && hi > r.y + EPS && lo < r.y + r.height - EPS) return true;
-    }
-    return false;
-  };
   for (const r of blockers) {
     if (strictInside(exit.x, exit.y, r) || strictInside(entry.x, entry.y, r)) return null;
   }
+  const { hBlk, vBlk } = blockedEdges(X, Y, blockers);
 
   const sdI = dirIndex(sd);
   const tdI = dirIndex(td);
+  const total = nx * ny * 5;
   const key = (ix, iy, d) => (iy * nx + ix) * 5 + d; // d === 4: finished at the entry point
   const finalDir = (tdI + 2) % 4; // direction of the last segment (entry -> target)
-  const dist = new Map();
-  const prev = new Map();
+  const dist = new Float64Array(total).fill(Infinity);
+  const prev = new Int32Array(total).fill(-1);
   const heap = new MinHeap();
   const startKey = key(sx, sy, sdI);
-  dist.set(startKey, 0);
-  heap.push([0, sx, sy, sdI]);
-  let endKey = null;
+  dist[startKey] = 0;
+  heap.push(0, startKey);
+  let endKey = -1;
 
   while (heap.size) {
-    const [cost, ix, iy, d] = heap.pop();
-    const k = key(ix, iy, d);
-    if (cost > (dist.get(k) ?? Infinity) + 1e-9) continue;
+    heap.pop();
+    const cost = heap.topCost;
+    const k = heap.topVal;
+    if (cost > dist[k] + 1e-9) continue;
+    const d = k % 5;
+    const cell = (k - d) / 5;
+    const ix = cell % nx;
+    const iy = (cell - ix) / nx;
     if (d === 4) {
       endKey = k;
       break;
@@ -307,10 +362,10 @@ function search(exit, entry, sd, td, blockers, extraXs, extraYs) {
       // Turning into the final entry -> target segment counts as a bend
       const c = cost + (d !== finalDir ? BEND_COST : 0);
       const fk = key(ix, iy, 4);
-      if (c < (dist.get(fk) ?? Infinity) - 1e-9) {
-        dist.set(fk, c);
-        prev.set(fk, k);
-        heap.push([c, ix, iy, 4]);
+      if (c < dist[fk] - 1e-9) {
+        dist[fk] = c;
+        prev[fk] = k;
+        heap.push(c, fk);
       }
     }
     for (let nd = 0; nd < 4; nd++) {
@@ -319,36 +374,115 @@ function search(exit, entry, sd, td, blockers, extraXs, extraYs) {
       const jx = ix + v.x;
       const jy = iy + v.y;
       if (jx < 0 || jx >= nx || jy < 0 || jy >= ny) continue;
-      const x1 = X[ix];
-      const y1 = Y[iy];
-      const x2 = X[jx];
-      const y2 = Y[jy];
       const horizontal = v.y === 0;
-      if (horizontal ? hBlocked(y1, x1, x2) : vBlocked(x1, y1, y2)) continue;
-      const len = Math.abs(x2 - x1) + Math.abs(y2 - y1);
-      const dev = horizontal ? Math.abs(y1 - midY) : Math.abs(x1 - midX);
+      if (horizontal) {
+        if (hBlk[iy * (nx - 1) + Math.min(ix, jx)]) continue;
+      } else if (vBlk[ix * (ny - 1) + Math.min(iy, jy)]) continue;
+      const len = Math.abs(X[jx] - X[ix]) + Math.abs(Y[jy] - Y[iy]);
+      const dev = horizontal ? Math.abs(Y[iy] - midY) : Math.abs(X[ix] - midX);
       const c = cost + len * (1 + MID_BIAS * dev) + (nd !== d ? BEND_COST : 0);
       const nk = key(jx, jy, nd);
-      if (c < (dist.get(nk) ?? Infinity) - 1e-9) {
-        dist.set(nk, c);
-        prev.set(nk, k);
-        heap.push([c, jx, jy, nd]);
+      if (c < dist[nk] - 1e-9) {
+        dist[nk] = c;
+        prev[nk] = k;
+        heap.push(c, nk);
       }
     }
   }
-  if (endKey === null) return null;
+  if (endKey < 0) return null;
 
   const pts = [];
   let k = endKey;
-  while (k !== undefined) {
+  while (k >= 0) {
     const cell = Math.floor(k / 5);
     const ix = cell % nx;
     const iy = Math.floor(cell / nx);
     if (k % 5 !== 4) pts.push({ x: X[ix], y: Y[iy] });
-    k = prev.get(k);
+    k = prev[k];
   }
   pts.reverse();
   return pts;
+}
+
+function rectsHitBox(list, box) {
+  return list.filter(o => o && o.x < box.maxX && o.x + o.width > box.minX && o.y < box.maxY && o.y + o.height > box.minY);
+}
+
+function pathClearOf(points, rects, pad) {
+  for (const r of rects) {
+    const e = expand(r, pad);
+    for (let i = 0; i < points.length - 1; i++) {
+      if (segmentHitsInterior(points[i], points[i + 1], e, EPS)) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Cheap candidates before the grid search: straight, single-elbow and
+ * two-elbow (Z / U) routes between the stub end points. Costs mirror the
+ * search's, so the cheapest valid candidate is what the search would return.
+ * Returns the full point list (source ... target) or null when all are blocked.
+ */
+function trivialRoute(sourcePos, targetPos, exit, entry, sd, td, sourcePort, targetPort, sourceBounds, targetBounds, blockers) {
+  const sdI = dirIndex(sd);
+  const tdI = dirIndex(td);
+  const finalDir = (tdI + 2) % 4;
+  const midX = (exit.x + entry.x) / 2;
+  const midY = (exit.y + entry.y) / 2;
+  const mids = [
+    [],
+    [{ x: exit.x, y: entry.y }],
+    [{ x: entry.x, y: exit.y }],
+    [{ x: midX, y: exit.y }, { x: midX, y: entry.y }],
+    [{ x: exit.x, y: midY }, { x: entry.x, y: midY }],
+  ];
+  let best = null;
+  let bestCost = Infinity;
+  for (const mid of mids) {
+    const raw = [exit, ...mid, entry];
+    let cost = 0;
+    let d = sdI;
+    let ok = true;
+    for (let i = 0; i < raw.length - 1 && ok; i++) {
+      const a = raw[i];
+      const b = raw[i + 1];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) { ok = false; break; } // degenerate: leave to the search
+      if (Math.abs(dx) > 1e-6 && Math.abs(dy) > 1e-6) { ok = false; break; } // not axis-aligned
+      const nd = dirIndex({ x: Math.sign(dx), y: Math.sign(dy) });
+      if (nd === ((d + 2) % 4)) { ok = false; break; } // reversal
+      const horizontal = dy === 0 || Math.abs(dy) < 1e-6;
+      const dev = horizontal ? Math.abs(a.y - midY) : Math.abs(a.x - midX);
+      cost += (Math.abs(dx) + Math.abs(dy)) * (1 + MID_BIAS * dev) + (nd !== d ? BEND_COST : 0);
+      for (const r of blockers) {
+        if (segmentHitsInterior(a, b, r, EPS)) { ok = false; break; }
+      }
+      d = nd;
+    }
+    if (!ok || d === tdI) continue;
+    if (d !== finalDir) cost += BEND_COST;
+    if (cost >= bestCost - 1e-9) continue;
+    const pts = normalizePoints([sourcePos, ...raw, targetPos]);
+    // More than two bends: a detour along an obstacle edge may be cheaper, so let the search decide
+    if (pts.length - 2 > MAX_TRIVIAL_BENDS) continue;
+    if (!validateRoute(pts, sourceBounds, targetBounds, sourcePort, targetPort).valid) continue;
+    best = pts;
+    bestCost = cost;
+  }
+  return best;
+}
+
+const MAX_TRIVIAL_BENDS = 2;
+const ROUTE_CACHE_MAX = 4000;
+const routeCache = new Map();
+
+const rectKey = r => (r ? `${+r.x.toFixed(2)},${+r.y.toFixed(2)},${+r.width.toFixed(2)},${+r.height.toFixed(2)}` : '-');
+
+/** Drop all cached routes (tests / memory pressure). */
+export function clearRouteCache() {
+  routeCache.clear();
 }
 
 /**
@@ -359,7 +493,7 @@ function search(exit, entry, sd, td, blockers, extraXs, extraYs) {
  * @param {string} targetPort
  * @param {{x,y,width,height}|null} sourceBounds
  * @param {{x,y,width,height}|null} targetBounds
- * @param {{ obstacles?: Array, stub?: number }} [options]
+ * @param {{ obstacles?: Array, stub?: number, skipTrivial?: boolean, noCache?: boolean }} [options]
  * @returns {{x:number,y:number}[]|null} points including source and target, or null
  */
 export function routeOrthogonal(sourcePos, targetPos, sourcePort, targetPort, sourceBounds, targetBounds, options = {}) {
@@ -369,6 +503,38 @@ export function routeOrthogonal(sourcePos, targetPos, sourcePort, targetPort, so
   const stub = options.stub ?? DEFAULT_STUB;
   const obstacles = options.obstacles || [];
 
+  // Only consider obstacles near the corridor to keep the grid small
+  const nearby = rectsHitBox(obstacles, {
+    minX: Math.min(sourcePos.x, targetPos.x) - 150,
+    maxX: Math.max(sourcePos.x, targetPos.x) + 150,
+    minY: Math.min(sourcePos.y, targetPos.y) - 150,
+    maxY: Math.max(sourcePos.y, targetPos.y) + 150,
+  });
+
+  // Routes depend only on these inputs, so identical re-renders are free
+  let cacheKey = null;
+  if (!options.noCache) {
+    cacheKey = [
+      +sourcePos.x.toFixed(2), +sourcePos.y.toFixed(2), +targetPos.x.toFixed(2), +targetPos.y.toFixed(2),
+      sourcePort, targetPort, stub, options.skipTrivial ? 1 : 0, rectKey(sourceBounds), rectKey(targetBounds),
+      nearby.map(rectKey).join(';'),
+    ].join('|');
+    const hit = routeCache.get(cacheKey);
+    if (hit !== undefined) {
+      routeCache.delete(cacheKey); // refresh LRU position
+      routeCache.set(cacheKey, hit);
+      return hit && hit.map(pt => ({ x: pt.x, y: pt.y }));
+    }
+  }
+  const result = computeRoute(sourcePos, targetPos, sourcePort, targetPort, sd, td, sourceBounds, targetBounds, nearby, stub, options);
+  if (cacheKey !== null) {
+    routeCache.set(cacheKey, result);
+    if (routeCache.size > ROUTE_CACHE_MAX) routeCache.delete(routeCache.keys().next().value);
+  }
+  return result && result.map(pt => ({ x: pt.x, y: pt.y }));
+}
+
+function computeRoute(sourcePos, targetPos, sourcePort, targetPort, sd, td, sourceBounds, targetBounds, nearby, stub, options) {
   let sLen = stubLength(sourcePos, sd, targetBounds, stub);
   let tLen = stubLength(targetPos, td, sourceBounds, stub);
   // Facing ports with the target ahead: split the available gap so the stubs
@@ -383,14 +549,6 @@ export function routeOrthogonal(sourcePos, targetPos, sourcePort, targetPort, so
   const exit = { x: sourcePos.x + sd.x * sLen, y: sourcePos.y + sd.y * sLen };
   const entry = { x: targetPos.x + td.x * tLen, y: targetPos.y + td.y * tLen };
 
-  // Only consider obstacles near the corridor to keep the grid small
-  const minX = Math.min(sourcePos.x, targetPos.x) - 150;
-  const maxX = Math.max(sourcePos.x, targetPos.x) + 150;
-  const minY = Math.min(sourcePos.y, targetPos.y) - 150;
-  const maxY = Math.max(sourcePos.y, targetPos.y) + 150;
-  const nearby = obstacles.filter(o =>
-    o && o.x < maxX && o.x + o.width > minX && o.y < maxY && o.y + o.height > minY);
-
   const attempts = [];
   if (nearby.length) {
     attempts.push({ pad: 15, obs: nearby, obsPad: 8 });
@@ -399,16 +557,58 @@ export function routeOrthogonal(sourcePos, targetPos, sourcePort, targetPort, so
   attempts.push({ pad: 5, obs: [], obsPad: 0 });
   attempts.push({ pad: 0, obs: [], obsPad: 0 });
 
-  for (const att of attempts) {
+  const buildBlockers = (att, obs) => {
     const blockers = [];
     if (sourceBounds) blockers.push(expand(sourceBounds, att.pad));
     if (targetBounds) blockers.push(expand(targetBounds, att.pad));
-    for (const o of att.obs) blockers.push(expand(o, att.obsPad));
-    const grid = search(exit, entry, sd, td, blockers, [sourcePos.x, targetPos.x], [sourcePos.y, targetPos.y]);
-    if (!grid) continue;
-    const pts = normalizePoints([sourcePos, ...grid, targetPos]);
-    const check = validateRoute(pts, sourceBounds, targetBounds, sourcePort, targetPort);
-    if (check.valid) return pts;
+    for (const o of obs) blockers.push(expand(o, att.obsPad));
+    return blockers;
+  };
+  const inOwn = (blockers) => blockers.some(r => strictInside(exit.x, exit.y, r) || strictInside(entry.x, entry.y, r));
+
+  // Corridor between the stub end points: any trivial route stays inside it, so
+  // only obstacles touching the corridor can block one.
+  const corridor = {
+    minX: Math.min(exit.x, entry.x), maxX: Math.max(exit.x, entry.x),
+    minY: Math.min(exit.y, entry.y), maxY: Math.max(exit.y, entry.y),
+  };
+  // Search area: everything the route could reasonably wrap around
+  const area = { ...corridor };
+  for (const b of [sourceBounds, targetBounds]) {
+    if (!b) continue;
+    area.minX = Math.min(area.minX, b.x); area.maxX = Math.max(area.maxX, b.x + b.width);
+    area.minY = Math.min(area.minY, b.y); area.maxY = Math.max(area.maxY, b.y + b.height);
+  }
+  const AREA_MARGIN = 60;
+  const areaBox = { minX: area.minX - AREA_MARGIN, maxX: area.maxX + AREA_MARGIN, minY: area.minY - AREA_MARGIN, maxY: area.maxY + AREA_MARGIN };
+
+  for (const att of attempts) {
+    const allBlockers = buildBlockers(att, att.obs);
+    if (!options.skipTrivial && !inOwn(allBlockers)) {
+      const local = buildBlockers(att, rectsHitBox(att.obs, corridor));
+      const triv = trivialRoute(sourcePos, targetPos, exit, entry, sd, td, sourcePort, targetPort, sourceBounds, targetBounds, local);
+      if (triv) return triv;
+    }
+    const attempt = (obs, verifyAgainst) => {
+      const blockers = buildBlockers(att, obs);
+      const grid = search(exit, entry, sd, td, blockers, [sourcePos.x, targetPos.x], [sourcePos.y, targetPos.y]);
+      if (!grid) return null;
+      const pts = normalizePoints([sourcePos, ...grid, targetPos]);
+      if (!validateRoute(pts, sourceBounds, targetBounds, sourcePort, targetPort).valid) return null;
+      // A route found among pruned obstacles must still clear the ones left out
+      if (verifyAgainst && !pathClearOf(pts.slice(1, -1), verifyAgainst, att.obsPad)) return null;
+      return pts;
+    };
+    if (att.obs.length > 4) {
+      const pruned = rectsHitBox(att.obs, areaBox);
+      if (pruned.length < att.obs.length) {
+        const rest = att.obs.filter(o => !pruned.includes(o));
+        const pts = attempt(pruned, rest);
+        if (pts) return pts;
+      }
+    }
+    const pts = attempt(att.obs, null);
+    if (pts) return pts;
   }
   return null;
 }

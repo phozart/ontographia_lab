@@ -1068,6 +1068,14 @@ export function buildOrthogonalPath(sourcePos, targetPos, sourcePort, targetPort
 
   // Nearly horizontal - snap to straight (if ports align, no waypoints, and path doesn't cross stencils)
   if (!hasManualWaypoints && dy <= SNAP_TO_STRAIGHT_THRESHOLD && dx > dy && horizontalPorts) {
+    // Straight line on the shared mid line when both shapes span it (no jog)
+    const midYLine = (sourcePos.y + targetPos.y) / 2;
+    const straightH = [{ x: sourcePos.x, y: midYLine }, { x: targetPos.x, y: midYLine }];
+    if (spansLine(sourceBounds, midYLine, true) && spansLine(targetBounds, midYLine, true) &&
+        validateRoute(straightH, sourceBounds, targetBounds, sourcePort, targetPort).valid &&
+        !pathHitsObstacles(straightH, obstacles)) {
+      return { path: buildRoundedPath(straightH, cornerRadius), points: straightH, segments: calculateSegments(straightH) };
+    }
     // Create path with perpendicular stubs at both ends
     const exitPoint = { x: sourcePos.x + sourceDir.x * MIN_STUB, y: sourcePos.y };
     const entryPoint = { x: targetPos.x + targetDir.x * MIN_STUB, y: targetPos.y };
@@ -1098,6 +1106,13 @@ export function buildOrthogonalPath(sourcePos, targetPos, sourcePort, targetPort
 
   // Nearly vertical - snap to straight (if ports align, no waypoints, and path doesn't cross stencils)
   if (!hasManualWaypoints && dx <= SNAP_TO_STRAIGHT_THRESHOLD && dy > dx && verticalPorts) {
+    const midXLine = (sourcePos.x + targetPos.x) / 2;
+    const straightV = [{ x: midXLine, y: sourcePos.y }, { x: midXLine, y: targetPos.y }];
+    if (spansLine(sourceBounds, midXLine, false) && spansLine(targetBounds, midXLine, false) &&
+        validateRoute(straightV, sourceBounds, targetBounds, sourcePort, targetPort).valid &&
+        !pathHitsObstacles(straightV, obstacles)) {
+      return { path: buildRoundedPath(straightV, cornerRadius), points: straightV, segments: calculateSegments(straightV) };
+    }
     // Create path with perpendicular stubs at both ends
     const exitPoint = { x: sourcePos.x, y: sourcePos.y + sourceDir.y * MIN_STUB };
     const entryPoint = { x: targetPos.x, y: targetPos.y + targetDir.y * MIN_STUB };
@@ -1177,6 +1192,14 @@ export function buildOrthogonalPath(sourcePos, targetPos, sourcePort, targetPort
   const segments = calculateSegments(allPoints);
 
   return { path, points: allPoints, segments };
+}
+
+/** Does the shape's border span `line` (a y for horizontal, an x for vertical) with a 4px margin? */
+function spansLine(bounds, line, horizontal) {
+  if (!bounds) return false;
+  const lo = horizontal ? bounds.y : bounds.x;
+  const size = horizontal ? bounds.height : bounds.width;
+  return line >= lo + 4 && line <= lo + size - 4;
 }
 
 /**

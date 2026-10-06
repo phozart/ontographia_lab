@@ -36,7 +36,7 @@ import CrossingIndicators from './connections/CrossingIndicators';
 import { calculateMidLabelPosition } from './connections/geometry/labelPositioning';
 import { calculateOrthogonalWaypoints, buildOrthogonalThroughWaypoints, buildOrthogonalPath } from './connections/geometry/orthogonalRouting';
 import { buildStraightPath } from './connections/geometry/pathBuilders';
-import { resolveConnectionPorts, selectAutoPorts } from './connections/geometry/autoPorts';
+import { resolveConnectionPorts, selectAutoPorts, manualWaypointUpdate } from './connections/geometry/autoPorts';
 
 // Extracted hooks (refactored 2025-12-29)
 import { useClipboard, useQuickCreate, useAlignmentGuides } from './hooks';
@@ -1924,7 +1924,7 @@ export default function DiagramCanvas({
             updateConnection(connectionId, { waypoints: [], hasManualWaypoints: false }, { coalesceKey: `conn-drag:${connectionId}` });
           } else {
             // Mark as manually adjusted so we track user edits
-            updateConnection(connectionId, { waypoints, hasManualWaypoints: true }, { coalesceKey: `conn-drag:${connectionId}` });
+            updateConnection(connectionId, manualWaypointUpdate(connection, waypoints), { coalesceKey: `conn-drag:${connectionId}` });
           }
         }
         return;
@@ -2767,7 +2767,7 @@ export default function DiagramCanvas({
         const newWaypoints = [...(connection.waypoints || [])];
         newWaypoints[waypointIndex] = { x: snapToGrid(x), y: snapToGrid(y) };
         // Mark as manually adjusted so we track user edits
-        updateConnection(connectionId, { waypoints: newWaypoints, hasManualWaypoints: true }, { coalesceKey: `conn-drag:${connectionId}` });
+        updateConnection(connectionId, manualWaypointUpdate(connection, newWaypoints), { coalesceKey: `conn-drag:${connectionId}` });
       }
       return;
     }
@@ -2857,7 +2857,7 @@ export default function DiagramCanvas({
           updateConnection(connectionId, { waypoints: [], hasManualWaypoints: false }, { coalesceKey: `conn-drag:${connectionId}` });
         } else {
           // Mark as manually adjusted so we track user edits
-          updateConnection(connectionId, { waypoints, hasManualWaypoints: true }, { coalesceKey: `conn-drag:${connectionId}` });
+          updateConnection(connectionId, manualWaypointUpdate(connection, waypoints), { coalesceKey: `conn-drag:${connectionId}` });
         }
       }
       return;
@@ -4827,7 +4827,7 @@ export default function DiagramCanvas({
 
     const newWaypoints = [...(connection.waypoints || []), position];
     // Mark as manually adjusted when user adds a waypoint
-    updateConnection(connectionId, { waypoints: newWaypoints, hasManualWaypoints: true });
+    updateConnection(connectionId, manualWaypointUpdate(connection, newWaypoints));
   }, [connections, updateConnection]);
 
   const handleClearWaypoints = useCallback((connectionId) => {

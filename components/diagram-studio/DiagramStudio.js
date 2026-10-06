@@ -406,6 +406,8 @@ function DiagramStudioInner({
           targetId,
           sourcePort: conn.sourcePort || 'right',
           targetPort: conn.targetPort || 'left',
+          // No explicit side in the template: follow the facing sides of the shapes
+          autoPorts: !conn.sourcePort && !conn.targetPort,
           label: conn.label,
           lineStyle: 'step', // Use step for process flows
           parentFrameId: frameId, // Reference to containing frame for clipping

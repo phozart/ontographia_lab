@@ -61,6 +61,9 @@ function hasStub(points) {
   return false;
 }
 
+// Stub cleanup assumes orthogonal geometry; curved/arc/straight/smart paths use waypoints differently.
+const ORTHOGONAL_STYLES = new Set(['step', 'step-sharp', 'orthogonal']);
+
 function migrateConnections(list, elements) {
   if (!Array.isArray(list)) return list;
   const byId = new Map();
@@ -69,6 +72,7 @@ function migrateConnections(list, elements) {
   const next = list.map((conn) => {
     const wps = conn && conn.waypoints;
     if (!Array.isArray(wps) || wps.length === 0) return conn;
+    if (!ORTHOGONAL_STYLES.has(conn.lineStyle)) return conn;
     if (!wps.every((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y))) return conn;
 
     // Include the port positions when computable so a stub at the very start
