@@ -1,7 +1,7 @@
 // pages/api/mcp.js
 // Read-only MCP server (stateless Streamable HTTP). Bearer API tokens only; see lib/mcp/http.js.
 
-import { createMcpHandler, MAX_BODY_BYTES } from '../../lib/mcp/http';
+import { createMcpHandler } from '../../lib/mcp/http';
 import { createMcpServer } from '../../lib/mcp/server';
 import { verifyToken } from '../../lib/apiTokens';
 import { rateLimit } from '../../lib/rateLimit';
@@ -13,7 +13,7 @@ const authFailLimiter = rateLimit({ interval: 60 * 1000, limit: 30, prefix: 'mcp
 
 export const config = {
   api: {
-    bodyParser: { sizeLimit: MAX_BODY_BYTES },
+    bodyParser: { sizeLimit: '256kb' }, // keep equal to MAX_BODY_BYTES (Next requires a literal here)
     externalResolver: true,
   },
 };

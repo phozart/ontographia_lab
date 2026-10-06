@@ -15,6 +15,7 @@ A professional visual diagramming workspace for creating diagrams, flowcharts, m
 - **Comments & Annotations**: Add feedback directly on the canvas
 - **Keyboard Shortcuts**: Professional workflow with extensive shortcuts
 - **Export Options**: SVG, PNG, and JSON export
+- **MCP (read-only)**: let Claude Code, Cursor and other MCP clients read your diagrams with a personal API token (see [docs/architecture/investigations/mcp-connect-howto.md](docs/architecture/investigations/mcp-connect-howto.md))
 - **Dark/Light Themes**: Comfortable viewing in any environment
 
 ## Quick Start
@@ -327,6 +328,7 @@ npm run test:e2e       # End-to-end tests
 | `GOOGLE_CLIENT_SECRET` | Google OAuth secret              | No       |
 | `GITHUB_CLIENT_ID`     | GitHub OAuth client ID           | No       |
 | `GITHUB_CLIENT_SECRET` | GitHub OAuth secret              | No       |
+| `MCP_ALLOWED_ORIGINS`  | Extra browser origins allowed to call `/api/mcp` (comma separated; none needed for CLI clients) | No       |
 
 **Note:** You can also set `DATABASE_URL` directly instead of individual `DB_*` variables. If both are set, `DATABASE_URL` takes precedence.
 

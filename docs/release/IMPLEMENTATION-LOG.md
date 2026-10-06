@@ -36,3 +36,23 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Deviations from the docs:** (1) oversized content answers 413 (api-contracts) rather than 400. (2) Unsafe URLs are stripped with `warnings`, not rejected (a rejected autosave would lose work). (3) `[id].js` stays a single file instead of moving to `[id]/index.js` (Next serves `[id].js` next to `[id]/duplicate.js`). (4) `If-Match` only; the `baseRevision` body alternative from ADR-0003 is not implemented. (5) `owner_id IS NULL` (only possible when no admin exists at migration time) means nobody can open the diagram.
 - **Tests:** policy matrix (every role x every action), `authorize`, wrapper, every endpoint row (owner / non-owner / admin / unauthenticated / 405 / malformed id), content validation per rule, thumbnail-between-saves, conflict dialog, migration 0002 on throwaway databases (including backfill, admin fallback, no-admin, idempotence).
 - **Follow-ups (review):** duplicate now validates and sanitizes source content (400 / 413, `warnings`); `tags` / `description` / `isTemplate` validated on create and update (`lib/diagramMetadata.js`); URL stripping broadened to blocked schemes (`javascript:`, `vbscript:`, non-image `data:`) under any key, prose like "javascript: the good parts" untouched. **Operator:** diagrams with `owner_id IS NULL` after `0002` (UNASSIGNED in its output) are inaccessible; fix with `UPDATE diagrams SET owner_id = '<user-uuid>' WHERE owner_id IS NULL;` after verifying the list.
+
+---
+
+## Slice M1 — Read-only MCP server + personal API tokens
+
+- **PR title:** `feat(mcp): read-only MCP server with personal API tokens`
+- **Refs:** docs/architecture/investigations/mcp-and-embedding.md sections 4, 6 (M1), 7 (accepted defaults); ADR-0003 (agent principal).
+- **Branch:** `feat/m1-mcp-readonly`
+- **What changed**
+  - **Migration `0004_api_tokens`** (additive, idempotent): `api_tokens` (SHA-256 hash of an `ogl_` secret, role cap viewer|commenter, optional diagram allowlist, expiry, revoke, last used).
+  - **`lib/apiTokens.js`**: generate/hash/verify (revoked, expired, inactive user, malformed cap all refuse), create (max 20 active), list, revoke. Secret shown once.
+  - **`lib/authz`**: agent principals honor `diagramScope` (allowlist; outside it is 404) and `authorizeMeta()` re-checks list rows without a query per row.
+  - **`/api/mcp`** (`lib/mcp/http.js`): stateless Streamable HTTP via `@modelcontextprotocol/sdk` 1.32.1, bearer only (cookie ignored), Origin check, 405 for non-POST, 401 with `WWW-Authenticate`, per-token (120/min) and failed-auth (30/min per address) limits, 256 KB body limit, batch cap, optional `Mcp-Method`/`Mcp-Name` consistency check.
+  - **Tools** (`lib/mcp/server.js`): `diagram_list`, `diagram_search`, `diagram_get` (compact / Mermaid / outline), `diagram_thumbnail`, `stencil_catalog`; resources `ontographia://diagrams/{id}`, `.../{id}/mermaid`, `ontographia://catalog/{packId}`. All annotated read-only; descriptions static; every diagram access goes through `authorize`/`authorizeMeta`.
+  - **Projections** (`lib/mcp/projections.js`): compact JSON with stable ids, Mermaid with generated aliases and entity-escaped labels (also `%`, `{`, `}`), outline.
+  - **Pure catalog**: stencil and connection-type data moved verbatim into `components/diagram-studio/packs/catalog/*.js` (no React); packs import it, rendering unchanged; a test asserts catalog equals the registered packs.
+  - **UI/API**: Account page "API tokens" (create, list, two-step revoke, allowlist picker); `/api/user/tokens` and `/api/user/tokens/[id]` (session auth, own tokens only, JSON content type required).
+  - `lib/rateLimit.js` `check(req, res, key?)` accepts an explicit bucket key. `jest.setup.js` guards the `window` mock so server suites can use the node environment.
+- **Deviations from the doc:** one `stencil_catalog` tool (optional `packId`) instead of `catalog_list_packs`/`catalog_get_pack`; Mermaid resource URI is `/{id}/mermaid` (a `{id}.mmd` template is ambiguous with `{id}`); `diagram_list` has no `scope` input until sharing exists; SDK 1.32.1 negotiates up to 2025-11-25 (2026-07-28 not yet in the SDK); compact JSON measured about 2.8x smaller than raw on a synthetic 100-element flow (design target 3x; re-measure on real data).
+- **Tests:** unit suites for tokens, authz scope, projections, server tools (through the MCP protocol), HTTP pipeline (real HTTP + SDK client), token API, account section, catalog parity. Live check against a throwaway database: token create via API, SDK client initialize/tools/resources, allowlist, revoke (401 immediately), expiry, Origin, 405, 413.
