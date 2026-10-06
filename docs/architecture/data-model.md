@@ -57,7 +57,7 @@ CREATE INDEX IF NOT EXISTS idx_diagrams_owner_updated ON diagrams(owner_id, upda
 ```
 `version_seq` is seeded from existing data: `UPDATE diagrams d SET version_seq = COALESCE((SELECT MAX(version_number) FROM diagram_versions v WHERE v.diagram_id = d.id), 0);`
 
-### 0003_versions (slices 2–3)
+### 0003_versions (slices 2–3) *(shipped, slice 2; file `0003_versions.sql`)*
 Extends the existing, unused `diagram_versions` (keeps its name and columns).
 ```sql
 ALTER TABLE diagram_versions
@@ -80,6 +80,8 @@ ALTER TABLE diagram_versions
 CREATE INDEX IF NOT EXISTS idx_versions_diagram_created ON diagram_versions(diagram_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_versions_diagram_kind    ON diagram_versions(diagram_id, kind, created_at DESC);
 ```
+**As built (slice 2):** the file is additive and idempotent. Columns are added one `ADD COLUMN IF NOT EXISTS` per statement (constant defaults or nullable: no table rewrite) and the three CHECK constraints (`diagram_versions_kind_check`, `diagram_versions_created_via_check`, `diagram_versions_named_has_label`) are added by name inside a `DO` block that skips existing ones, so re-running the file is harmless (the proposal's bare `ADD CONSTRAINT` was not re-runnable). Existing rows read as `kind 'auto'`, `created_via 'web'`; `content_hash` stays NULL for them (the application treats NULL as "differs"); `created_by_user_id` is backfilled from `created_by` (email, case-insensitive) when an account matches. `version_number` is allocated as `GREATEST(version_seq, MAX(version_number)) + 1` under the diagram row lock (`SELECT ... FOR UPDATE`), so a lagging `version_seq` can never collide. The hash is SHA-256 of key-sorted canonical JSON without `viewport` (`lib/versions/contentHash.js`).
+
 Note: the `UNIQUE(diagram_id, version_number)` constraint already exists. The legacy `created_by VARCHAR` remains populated with the email for display; new code reads `created_by_user_id`.
 
 ### 0004_comments (slice 4)

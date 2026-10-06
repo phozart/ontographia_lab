@@ -36,3 +36,21 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Deviations from the docs:** (1) oversized content answers 413 (api-contracts) rather than 400. (2) Unsafe URLs are stripped with `warnings`, not rejected (a rejected autosave would lose work). (3) `[id].js` stays a single file instead of moving to `[id]/index.js` (Next serves `[id].js` next to `[id]/duplicate.js`). (4) `If-Match` only; the `baseRevision` body alternative from ADR-0003 is not implemented. (5) `owner_id IS NULL` (only possible when no admin exists at migration time) means nobody can open the diagram.
 - **Tests:** policy matrix (every role x every action), `authorize`, wrapper, every endpoint row (owner / non-owner / admin / unauthenticated / 405 / malformed id), content validation per rule, thumbnail-between-saves, conflict dialog, migration 0002 on throwaway databases (including backfill, admin fallback, no-admin, idempotence).
 - **Follow-ups (review):** duplicate now validates and sanitizes source content (400 / 413, `warnings`); `tags` / `description` / `isTemplate` validated on create and update (`lib/diagramMetadata.js`); URL stripping broadened to blocked schemes (`javascript:`, `vbscript:`, non-image `data:`) under any key, prose like "javascript: the good parts" untouched. **Operator:** diagrams with `owner_id IS NULL` after `0002` (UNASSIGNED in its output) are inaccessible; fix with `UPDATE diagrams SET owner_id = '<user-uuid>' WHERE owner_id IS NULL;` after verifying the list.
+
+---
+
+## Slice 2 — Named versions + restore
+
+- **PR title:** `feat: slice 2 named versions + restore (History panel)`
+- **Refs:** delivery-plan slice 2; ADR-0001 decisions 1, 3-5, 7 (as-built note appended); api-contracts section 3; data-model `0003`; open-questions Q-V1 (retention -> slice 3) and Q-V3 (owner-only delete -> later) at their accepted defaults.
+- **Branch:** `feat/slice-2-versions`
+- **What changed**
+  - **Migration `0003_versions.sql`:** extends `diagram_versions` (kind, label, description, content_hash, size/counts, diagram_revision, restored_from_version_id, created_by_user_id, created_via) + indexes; additive, idempotent (guarded CHECK constraints), constant defaults only; legacy rows read as `auto`/`web`.
+  - **`lib/versions/contentHash.js`**, **`lib/versionRepository.js`** (list/get/createNamed/update/restore; transactions under `SELECT ... FOR UPDATE`; race-free numbering), **`lib/audit.js`** (log-line seam until slice 5), **`lib/versions/http.js`**.
+  - **API** (all wrapped with `withDiagramAuth`; actions `version.read` / `version.create` / `version.restore`): `GET/POST /api/diagrams/{id}/versions`, `GET/PATCH /versions/{v}`, `POST /versions/{v}/restore` (restore path per api-contracts, not a top-level `/restore`).
+  - **Restore** creates `pre_restore` (only when the head is not already the latest version) then `restore`; nothing is deleted; `If-Match` honoured; no-op when the version equals the head.
+  - **Editor:** History panel (`VersionHistoryPanel`: list, "Name current version", rename, static SVG preview, Restore with confirm dialog), opened from the title-bar menu; `DiagramContext.restoreFromVersion` (autosave lock, flush-first, reload head + revision).
+- **Deviations from the docs:** (1) restore endpoint path follows api-contracts (`/versions/{v}/restore`). (2) `POST /versions` rejects `kind:'auto'` until slice 3. (3) Extra `unchanged` no-op response and `422 VERSION_CONTENT_INVALID`. (4) Preview is a static simplified SVG, not a live read-only canvas (rationale in ADR-0001 as-built). All recorded in api-contracts / data-model / ADR-0001.
+- **Tests:** migration 0003 on throwaway DBs (existing data, constraints, idempotency, FK); repository on a throwaway DB (22: naming, dedupe, pagination, restore semantics incl. concurrency and lagging `version_seq`); API role matrix (owner/editor/commenter/viewer/no-access/unauthenticated per endpoint) + validation; editor restore (flush-first, no stale autosave, 409, failure paths); History panel; e2e `version-history.test.js` (name -> change -> preview -> restore -> server state; stale `If-Match` -> 409).
+- **Operator note:** migration `0003` runs automatically before the app starts (`prestart` / container `CMD`); take a `pg_dump` first as for any migration; it only adds columns/indexes/constraints.
+

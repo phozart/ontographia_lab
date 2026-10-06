@@ -92,6 +92,14 @@ type VersionDiff = { from: { id, number }; to: { id, number } | 'head'; changes:
 ```
 No `DELETE` on versions (immutable; pruning is system-only — Q-V3).
 
+**As built (slice 2):**
+- Shipped: `GET/POST /versions`, `GET/PATCH /versions/{v}`, `POST /versions/{v}/restore` (the restore path is the one above, not a top-level `/restore`). `GET .../diff` is slice 8. `{v}` is the integer `version_number`; malformed -> 400.
+- `POST /versions` accepts only `kind: 'named'` (or no `kind`); `kind: 'auto'` (session-end checkpoint) is slice 3 and answers 400 until then. Label is trimmed, 1-120 chars; description <= 2000 chars (blank -> null). Identical content to the latest version -> `200 { deduplicated: true, version }`: an `auto`/`named` latest version is promoted to `named` with the new label (an existing name is replaced); a `restore`/`pre_restore` latest keeps its kind and only gains the label.
+- `PATCH` accepts only `label` / `description` (anything else, including `content` or `kind`, is 400). A named version cannot lose its label; naming an `auto` version needs a label. Action: `version.create` (editor).
+- `POST .../restore`: `If-Match` optional; stale -> `409 REVISION_CONFLICT` with `current`. Restoring a version whose content already equals the head is a no-op: `200 { unchanged: true, diagram, version }` (no versions written, no audit event). A source whose content no longer passes content validation -> `422 VERSION_CONTENT_INVALID`. Success sets the `ETag` to the new revision and writes an audit log line (`AUDIT {...}`, `lib/audit.js`) until `audit_events` exists (slice 5).
+- `createdBy` is `null` for system-created versions, otherwise `{ id, name }` where `id` may be `null` for legacy rows without a user id (name falls back to `created_by`).
+- Lists send `Cache-Control: no-store`; `nextCursor` is opaque (base64url of the last number returned).
+
 ## 4. Comments (B)
 
 | Method & path | Role | Request | Response |
