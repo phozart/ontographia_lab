@@ -15,6 +15,7 @@ export const LINE_STYLES = [
   { id: 'step-sharp', label: 'Elbow Sharp' },
   { id: 'curved', label: 'Curved' },
   { id: 'arc', label: 'Arc' },
+  { id: 'smart', label: 'Smart' },
 ];
 
 export const DASH_PATTERNS = [

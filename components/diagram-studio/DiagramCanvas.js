@@ -35,6 +35,7 @@ import CrossingIndicators from './connections/CrossingIndicators';
 import { calculateMidLabelPosition } from './connections/geometry/labelPositioning';
 import { calculateOrthogonalWaypoints, buildOrthogonalThroughWaypoints, buildOrthogonalPath } from './connections/geometry/orthogonalRouting';
 import { buildStraightPath } from './connections/geometry/pathBuilders';
+import { resolveConnectionPorts, selectAutoPorts } from './connections/geometry/autoPorts';
 
 // Extracted hooks (refactored 2025-12-29)
 import { useClipboard, useQuickCreate, useAlignmentGuides } from './hooks';
@@ -545,7 +546,8 @@ function Node({
         ratio = localY / rect.height;
       }
 
-      onConnectStart?.(element, e, edge, ratio);
+      // Interior press: the nearest border is only a start hint, the side is not pinned
+      onConnectStart?.(element, e, edge, ratio, true);
       return;
     }
 
@@ -1237,7 +1239,7 @@ export default function DiagramCanvas({
   const {
     diagram,
     elements,
-    connections,
+    connections: storedConnections,
     showGrid,
     gridStyle,
     activeTool,
@@ -1263,6 +1265,24 @@ export default function DiagramCanvas({
     setIsDragging,
     setIsRotating,
   } = useDiagram();
+
+  // Connections flagged `autoPorts` follow the facing sides of their shapes; resolve
+  // them once here so every consumer below sees the effective ports.
+  const connections = useMemo(() => {
+    if (!storedConnections.some(c => c.autoPorts)) return storedConnections;
+    const boundsOf = (id) => {
+      const el = elements.find(e => e.id === id);
+      if (!el || typeof el.x !== 'number') return null;
+      const stencil = packRegistry?.get?.(el.packId)?.stencils?.find(st => st.id === el.type);
+      const size = el.size || stencil?.defaultSize || { width: 120, height: 60 };
+      return { x: el.x, y: el.y, width: size.width, height: size.height };
+    };
+    return storedConnections.map(c => {
+      if (!c.autoPorts) return c;
+      const ports = resolveConnectionPorts(c, boundsOf(c.sourceId), boundsOf(c.targetId));
+      return ports.sourcePort === c.sourcePort && ports.targetPort === c.targetPort ? c : { ...c, ...ports };
+    });
+  }, [storedConnections, elements, packRegistry]);
 
   // Get layout settings from diagram
   const layoutSettings = diagram?.settings || {};
@@ -3294,14 +3314,19 @@ export default function DiagramCanvas({
           const hasValidSource = sourceId || (connectSource.x !== undefined && connectSource.y !== undefined);
           const hasValidTarget = targetId || (endX !== undefined && endY !== undefined);
 
-          if ((sourceId !== targetId) && hasValidSource && hasValidTarget) {
+          // Dragging from an edge handle (Select mode) and releasing over empty canvas
+          // cancels: quick-create is the click gesture, and a dangling connection
+          // would leave an endpoint floating. Freehand ends stay available in Connect mode.
+          const isHandleDragToNowhere = activeTool !== 'connect' && !!connectSource.elementId && !nearbyEndNode;
+
+          if (!isHandleDragToNowhere && (sourceId !== targetId) && hasValidSource && hasValidTarget) {
             // Use last line style if user changed it, otherwise get from source element's pack
             const sourcePack = sourceElement ? packRegistry?.get?.(sourceElement.packId) : null;
             const packDefaultLineStyle = sourcePack?.defaultLineStyle || 'curved';
             let effectiveLineStyle = lastLineStyle || packDefaultLineStyle;
 
             // Calculate source port
-            const sourcePort = sourceElement ? (connectSource.portId || determineBestPort(connectSource.x, connectSource.y, sourceElement)) : null;
+            let sourcePort = sourceElement ? (connectSource.portId || determineBestPort(connectSource.x, connectSource.y, sourceElement)) : null;
 
             // Calculate target port and ratio from exact drop position
             let targetPort = null;
@@ -3312,7 +3337,8 @@ export default function DiagramCanvas({
               const targetStencil = targetPack?.stencils?.find(s => s.id === nearbyEndNode.type);
               const targetSize = nearbyEndNode.size || targetStencil?.defaultSize || { width: 120, height: 60 };
               const borderInfo = detectBorderClick(endX, endY, nearbyEndNode, targetSize, 25);
-              if (borderInfo.edge) {
+              // Only a drop within the border band pins the side; an interior drop stays auto
+              if (borderInfo.edge && Math.hypot(endX - borderInfo.position.x, endY - borderInfo.position.y) <= 25) {
                 targetPort = borderInfo.edge;
                 targetRatio = borderInfo.ratio;
                 targetIsManual = true; // User dropped on specific border
@@ -3320,6 +3346,25 @@ export default function DiagramCanvas({
                 targetPort = determineBestPort(endX, endY, nearbyEndNode);
                 targetRatio = 0.5;
               }
+            }
+
+            // Nothing pinned by the user (no edge handle / border press or drop): use the
+            // sides that face each other and keep re-evaluating them on move/resize.
+            const sourceIsPinned = !connectSource.autoSide && ['top', 'right', 'bottom', 'left'].includes(connectSource.portId);
+            let autoPorts = false;
+            let sourceRatioOut = connectSource.ratio ?? 0.5;
+            if (sourceElement && nearbyEndNode && !sourceIsPinned && !targetIsManual) {
+              const boundsOf = (el) => {
+                const st = packRegistry?.get?.(el.packId)?.stencils?.find(x => x.id === el.type);
+                const sz = el.size || st?.defaultSize || { width: 120, height: 60 };
+                return { x: el.x, y: el.y, width: sz.width, height: sz.height };
+              };
+              const facing = selectAutoPorts(boundsOf(sourceElement), boundsOf(nearbyEndNode));
+              sourcePort = facing.sourcePort;
+              targetPort = facing.targetPort;
+              targetRatio = 0.5;
+              sourceRatioOut = 0.5;
+              autoPorts = true;
             }
 
             // Miro-like behavior: Use curved line when ports are on the same side
@@ -3336,8 +3381,9 @@ export default function DiagramCanvas({
               targetId,
               sourcePort,
               targetPort,
-              sourceRatio: connectSource.ratio ?? 0.5,
+              sourceRatio: sourceRatioOut,
               targetRatio,
+              ...(autoPorts && { autoPorts: true }),
               sourcePos: sourceElement ? null : { x: connectSource.x, y: connectSource.y },
               targetPos: nearbyEndNode ? null : { x: endX, y: endY },
               lineStyle: effectiveLineStyle,
@@ -3386,7 +3432,7 @@ export default function DiagramCanvas({
     setRotationIndicator(null);
     setIsRotating?.(false); // Notify context to show toolbar again
     setIsDragging?.(false); // Notify context that dragging ended
-  }, [draggingElement, draggingWaypoint, draggingSegment, draggingEndpoint, draggingCurve, resizing, rotating, marquee, drawing, selectedStencil, stickyNoteColor, elements, packRegistry, selectElements, selectElement, addElement, recordHistory, isConnecting, connectSource, viewport, addConnection, updateConnection, updateElement, lastLineStyle, setIsDragging, setIsRotating, setActiveTool, setSelectedStencil]);
+  }, [draggingElement, draggingWaypoint, draggingSegment, draggingEndpoint, draggingCurve, resizing, rotating, marquee, drawing, selectedStencil, stickyNoteColor, elements, packRegistry, selectElements, selectElement, addElement, recordHistory, isConnecting, connectSource, activeTool, viewport, addConnection, updateConnection, updateElement, lastLineStyle, setIsDragging, setIsRotating, setActiveTool, setSelectedStencil]);
 
   // ============ PAN HANDLING ============
 
@@ -4405,7 +4451,7 @@ export default function DiagramCanvas({
 
   // ============ START CONNECTION FROM NODE ============
 
-  const handleNodeConnectionStart = useCallback((element, e, portId = null, ratio = 0.5) => {
+  const handleNodeConnectionStart = useCallback((element, e, portId = null, ratio = 0.5, autoSide = false) => {
     // Check both profile and layout settings for connection permissions
     if (!canConnect || readOnly) {
       return;
@@ -4461,6 +4507,7 @@ export default function DiagramCanvas({
       elementId: element.id,
       portId: effectivePort,
       ratio: clampedRatio,
+      autoSide, // start side was only a hint (interior press), not pinned by the user
       x: startX,
       y: startY,
     });
@@ -4526,11 +4573,15 @@ export default function DiagramCanvas({
     }
 
     // Use source port/ratio from connection start if specified, otherwise auto-determine
-    const autoPorts = determineBestPorts(sourceEl, targetElement);
-    const sourcePort = connectSource.portId && connectSource.portId !== 'center'
-      ? connectSource.portId
-      : autoPorts.sourcePort;
-    const sourceRatio = connectSource.ratio ?? 0.5;
+    const boundsOfEl = (el) => {
+      const st = packRegistry?.get?.(el.packId)?.stencils?.find(x => x.id === el.type);
+      const sz = el.size || st?.defaultSize || { width: 120, height: 60 };
+      return { x: el.x, y: el.y, width: sz.width, height: sz.height };
+    };
+    const autoPorts = selectAutoPorts(boundsOfEl(sourceEl), boundsOfEl(targetElement));
+    const startPinned = !connectSource.autoSide && connectSource.portId && connectSource.portId !== 'center';
+    const sourcePort = startPinned ? connectSource.portId : autoPorts.sourcePort;
+    const sourceRatio = startPinned ? (connectSource.ratio ?? 0.5) : 0.5;
 
     // Calculate target port and ratio from exact drop position
     let targetPort = autoPorts.targetPort;
@@ -4546,7 +4597,8 @@ export default function DiagramCanvas({
       const targetStencil = targetPack?.stencils?.find(s => s.id === targetElement.type);
       const targetSize = targetElement.size || targetStencil?.defaultSize || { width: 120, height: 60 };
       const borderInfo = detectBorderClick(endX, endY, targetElement, targetSize, 25);
-      if (borderInfo.edge) {
+      // Only a drop within the border band pins the side; an interior drop stays auto
+      if (borderInfo.edge && Math.hypot(endX - borderInfo.position.x, endY - borderInfo.position.y) <= 25) {
         targetPort = borderInfo.edge;
         targetRatio = borderInfo.ratio;
         targetIsManual = true; // User dropped on specific border
@@ -4555,7 +4607,7 @@ export default function DiagramCanvas({
 
     // Check if source has manual port (from edge handle or specific border)
     const validEdgePorts = ['top', 'right', 'bottom', 'left'];
-    const sourceIsManual = validEdgePorts.includes(connectSource.portId);
+    const sourceIsManual = !!startPinned && validEdgePorts.includes(connectSource.portId);
 
     // Ports auto-update based on element positions (no manual lock)
 
@@ -4576,6 +4628,8 @@ export default function DiagramCanvas({
       targetPort,
       sourceRatio,
       targetRatio,
+      // Facing sides are re-evaluated on move/resize unless the user pinned a side
+      autoPorts: !sourceIsManual && !targetIsManual,
       lineStyle: defaultLineStyle,
       parentFrameId, // For clipping connection to frame bounds
       ...(isMindMapConnection && { sourceMarker: 'none', targetMarker: 'none' }),

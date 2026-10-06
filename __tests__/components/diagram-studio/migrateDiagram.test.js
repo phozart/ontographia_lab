@@ -55,4 +55,61 @@ describe('migrateDiagram', () => {
     const out = migrateDiagram({ elements: [{ id: 's', type: 'sticky-yellow', label: 'To Do', x: 5 }] });
     expect(out.elements[0]).toMatchObject({ id: 's', type: 'sticky-medium', packId: 'sticky-notes', label: 'To Do', x: 5 });
   });
+
+  describe('connection stub cleanup (QA #6)', () => {
+    const els = () => ([
+      { id: 'a', type: 'rectangle', packId: 'core', x: 100, y: 100, size: { width: 120, height: 60 } },
+      { id: 'b', type: 'rectangle', packId: 'core', x: 100, y: 300, size: { width: 120, height: 60 } },
+    ]);
+    // a.top = (160,100); stub goes up 18px then straight back down past a
+    const stubbed = () => ({
+      elements: els(),
+      connections: [{
+        id: 'c', sourceId: 'a', targetId: 'b', sourcePort: 'top', targetPort: 'top',
+        lineStyle: 'step', hasManualWaypoints: true,
+        waypoints: [{ x: 160, y: 82 }, { x: 160, y: 348 }],
+      }],
+    });
+
+    it('removes backtracking waypoints and clears the manual flag when none remain', () => {
+      const out = migrateDiagram(stubbed());
+      expect(out.connections[0].waypoints).toEqual([]);
+      expect(out.connections[0].hasManualWaypoints).toBe(false);
+    });
+
+    it('removes duplicate consecutive waypoints but keeps real corners', () => {
+      const input = {
+        elements: els(),
+        connections: [{ id: 'c', sourceId: 'a', targetId: 'b', sourcePort: 'right', targetPort: 'right', hasManualWaypoints: true,
+          waypoints: [{ x: 300, y: 130 }, { x: 300, y: 130 }, { x: 300, y: 330 }] }],
+      };
+      const out = migrateDiagram(input);
+      expect(out.connections[0].waypoints).toEqual([{ x: 300, y: 130 }, { x: 300, y: 330 }]);
+    });
+
+    it('works without element sizes (waypoint-only spike detection)', () => {
+      const out = migrateDiagram({
+        connections: [{ id: 'c', waypoints: [{ x: 0, y: 0 }, { x: 0, y: -20 }, { x: 0, y: 50 }, { x: 80, y: 50 }] }],
+      });
+      expect(out.connections[0].waypoints.length).toBeLessThan(4);
+    });
+
+    it('leaves clean connections untouched (same reference) and is idempotent', () => {
+      const clean = {
+        elements: els(),
+        connections: [{ id: 'c', sourceId: 'a', targetId: 'b', sourcePort: 'right', targetPort: 'right',
+          waypoints: [{ x: 300, y: 130 }, { x: 300, y: 330 }] }],
+      };
+      expect(migrateDiagram(clean)).toBe(clean);
+      const once = migrateDiagram(stubbed());
+      expect(migrateDiagram(once)).toBe(once);
+    });
+
+    it('does not mutate its input', () => {
+      const input = stubbed();
+      const snap = JSON.parse(JSON.stringify(input));
+      migrateDiagram(input);
+      expect(input).toEqual(snap);
+    });
+  });
 });

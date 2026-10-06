@@ -24,6 +24,7 @@ import EndpointLabel from './labels/EndpointLabel';
 // Geometry
 import { calculateMidLabelPosition } from './geometry/labelPositioning';
 import { buildOrthogonalPath } from './geometry/orthogonalRouting';
+import { resolveConnectionPorts } from './geometry/autoPorts';
 
 /**
  * Map of line styles to renderer components
@@ -436,38 +437,6 @@ export default function Connection({
     ? { ...targetRaw, x: targetRaw.x + dragState.offset.x, y: targetRaw.y + dragState.offset.y }
     : targetRaw;
 
-  // Ports are always sticky - they only change when user explicitly changes them
-  // This matches professional tools like Visio and draw.io where connections stay put
-  const effectivePorts = useMemo(() => {
-    return {
-      sourcePort: connection.sourcePort || 'right',
-      targetPort: connection.targetPort || 'left',
-    };
-  }, [connection.sourcePort, connection.targetPort]);
-
-  // Calculate positions
-  const sourcePos = source
-    ? getPortPosition(source, effectivePorts.sourcePort, packRegistry, connection.sourceRatio ?? 0.5)
-    : connection.sourcePos;
-  const targetPos = target
-    ? getPortPosition(target, effectivePorts.targetPort, packRegistry, connection.targetRatio ?? 0.5)
-    : connection.targetPos;
-
-  // Get line style and renderer
-  const lineStyle = connection.lineStyle || 'curved';
-  const Renderer = RENDERERS[lineStyle] || RENDERERS.curved;
-  const isSharp = lineStyle === 'step-sharp';
-
-  // Build style object
-  const style = useMemo(() => ({
-    stroke: connection.stroke || connection.color || 'var(--text-muted)',
-    strokeWidth: connection.strokeWidth || 2,
-    dashPattern: connection.dashPattern || (connection.dashed ? 'dashed' : 'solid'),
-    sourceMarker: connection.sourceMarker || 'none',
-    targetMarker: connection.targetMarker || 'arrow',
-    opacity: connection.strokeOpacity ?? 1,
-  }), [connection]);
-
   // Calculate source and target stencil bounds
   // These are used to ensure the connection routes around its own endpoints
   const sourceBounds = useMemo(() => {
@@ -495,6 +464,37 @@ export default function Connection({
       height: size.height,
     };
   }, [target, packRegistry]);
+
+  // Ports are sticky (pinned) unless the connection was created with auto ports,
+  // in which case they follow the facing sides of the shapes as they move/resize.
+  const effectivePorts = useMemo(
+    () => resolveConnectionPorts(connection, sourceBounds, targetBounds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [connection.sourcePort, connection.targetPort, connection.autoPorts, connection.waypoints, sourceBounds, targetBounds]
+  );
+
+  // Calculate positions
+  const sourcePos = source
+    ? getPortPosition(source, effectivePorts.sourcePort, packRegistry, connection.sourceRatio ?? 0.5)
+    : connection.sourcePos;
+  const targetPos = target
+    ? getPortPosition(target, effectivePorts.targetPort, packRegistry, connection.targetRatio ?? 0.5)
+    : connection.targetPos;
+
+  // Get line style and renderer
+  const lineStyle = connection.lineStyle || 'curved';
+  const Renderer = RENDERERS[lineStyle] || RENDERERS.curved;
+  const isSharp = lineStyle === 'step-sharp';
+
+  // Build style object
+  const style = useMemo(() => ({
+    stroke: connection.stroke || connection.color || 'var(--text-muted)',
+    strokeWidth: connection.strokeWidth || 2,
+    dashPattern: connection.dashPattern || (connection.dashed ? 'dashed' : 'solid'),
+    sourceMarker: connection.sourceMarker || 'none',
+    targetMarker: connection.targetMarker || 'arrow',
+    opacity: connection.strokeOpacity ?? 1,
+  }), [connection]);
 
   // Build obstacles list from all OTHER elements (excluding source, target, and frames)
   // Per CLAUDE.md: Nodes are hard obstacles, connectors MUST route around them
