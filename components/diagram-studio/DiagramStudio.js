@@ -242,14 +242,15 @@ function DiagramStudioInner({
   // Preview mode: hide selection outlines, handles and toolbars while previewing; restore after
   useEffect(() => {
     if (isPreviewMode) {
-      previewSelectionRef.current = selection?.nodeIds ? [...selection.nodeIds] : [];
+      previewSelectionRef.current = { ids: selection?.nodeIds ? [...selection.nodeIds] : [], props: showPropertiesPanel };
       closeContextMenu();
       setShowPropertiesPanel(false);
       clearSelection?.();
     } else if (previewSelectionRef.current) {
-      const ids = previewSelectionRef.current;
+      const { ids, props } = previewSelectionRef.current;
       previewSelectionRef.current = null;
       if (ids.length > 0) selectElements?.(ids);
+      if (props && ids.length > 0) setShowPropertiesPanel(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPreviewMode]);

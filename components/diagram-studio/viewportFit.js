@@ -27,6 +27,23 @@ export function visibleArea(container, obstacles = []) {
   return { left, top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
 }
 
+/**
+ * Shrink `area` so it no longer overlaps a floating box (e.g. the minimap), cutting from the
+ * side that loses the least area. Rects use container-relative {left, top, right, bottom}.
+ */
+export function avoidRect(area, rect) {
+  const aRight = area.left + area.width;
+  const aBottom = area.top + area.height;
+  if (rect.right <= area.left || rect.left >= aRight || rect.bottom <= area.top || rect.top >= aBottom) return area;
+  const cuts = [];
+  if (rect.top > area.top) cuts.push({ ...area, height: rect.top - area.top });            // keep above
+  if (rect.bottom < aBottom) cuts.push({ ...area, top: rect.bottom, height: aBottom - rect.bottom }); // keep below
+  if (rect.left > area.left) cuts.push({ ...area, width: rect.left - area.left });          // keep left
+  if (rect.right < aRight) cuts.push({ ...area, left: rect.right, width: aRight - rect.right });       // keep right
+  if (cuts.length === 0) return area;
+  return cuts.reduce((best, c) => (c.width * c.height > best.width * best.height ? c : best));
+}
+
 export function getElementsBounds(elements) {
   if (!elements || elements.length === 0) return null;
   let minX = Infinity;
@@ -64,7 +81,7 @@ export function computeFit(bounds, area, { padding = FIT_PADDING, maxScale = FIT
  * Fit `elements` into the live canvas: container rect minus title bar / sidebars / open panels.
  * Returns null when the DOM is unavailable or there is nothing to fit.
  */
-export function computeFitForCanvas(elements, { container, obstacles, padding = FIT_PADDING, fallback } = {}) {
+export function computeFitForCanvas(elements, { container, obstacles, avoid, padding = FIT_PADDING, fallback } = {}) {
   const bounds = getElementsBounds(elements);
   if (!bounds) return null;
   let rect = null;
@@ -82,6 +99,11 @@ export function computeFitForCanvas(elements, { container, obstacles, padding = 
     right: o.right - rect.left,
     bottom: o.bottom - rect.top,
   }));
-  const area = visibleArea({ left: 0, top: 0, width: rect.width, height: rect.height }, rel);
+  let area = visibleArea({ left: 0, top: 0, width: rect.width, height: rect.height }, rel);
+  (avoid || []).forEach((o) => {
+    area = avoidRect(area, {
+      left: o.left - rect.left, top: o.top - rect.top, right: o.right - rect.left, bottom: o.bottom - rect.top,
+    });
+  });
   return computeFit(bounds, area, { padding });
 }

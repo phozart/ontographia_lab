@@ -108,3 +108,36 @@ describe('unionRects', () => {
     ])).toEqual({ left: 10, top: 5, width: 50, height: 15 });
   });
 });
+
+describe('watchObstacles', () => {
+  const { watchObstacles } = require('../../../components/diagram-studio/ui/positioning');
+  it('fires when an obstacle element appears after the watcher started', async () => {
+    document.body.innerHTML = '';
+    const rectSpy = jest.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      return this.classList.contains('ds-panel-right')
+        ? { left: 1000, top: 56, right: 1300, bottom: 900, width: 300, height: 844 }
+        : { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 };
+    });
+    const cb = jest.fn();
+    const stop = watchObstacles(cb);
+    const panel = document.createElement('div');
+    panel.className = 'ds-panel-right';
+    document.body.appendChild(panel);
+    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 20)));
+    expect(cb).toHaveBeenCalled();
+    stop();
+    rectSpy.mockRestore();
+  });
+});
+
+describe('placement above a toolbar', () => {
+  it('a popover flipped above clears the whole toolbar by the gap', () => {
+    const bar = { left: 100, top: 880, width: 600, height: 40 };
+    const r = computePlacement({
+      anchor: { left: 300, top: bar.top, width: 28, height: bar.height },
+      size: { width: 360, height: 250 }, viewport: VP, obstacles: [], preferred: 'bottom',
+    });
+    expect(r.placement).toBe('top');
+    expect(r.top + 250).toBeLessThanOrEqual(880 - 8);
+  });
+});

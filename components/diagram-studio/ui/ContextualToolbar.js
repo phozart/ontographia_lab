@@ -927,7 +927,9 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
       ref={toolbarRef}
       className="ds-contextual-toolbar"
       data-placement={placement.placement}
+      data-floating-bar
       style={{
+        animation: 'none',
         left: placement.left,
         top: placement.top,
         visibility: placement.ready ? 'visible' : 'hidden',

@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { computeFitForCanvas, FIT_PADDING } from './viewportFit';
-import { getObstacleRects } from './ui/positioning';
+import { getObstacleRects, getAvoidRects } from './ui/positioning';
 import { useSession } from 'next-auth/react';
 import { generateId } from './utils/ids';
 import { normalizeDiagramContent } from './migrations/normalizeContent';
@@ -1461,6 +1461,7 @@ export function useDiagramViewport() {
     const fit = computeFitForCanvas(elements, {
       container,
       obstacles: getObstacleRects(),
+      avoid: getAvoidRects(['.ds-minimap']),
       padding,
       fallback: { width: containerWidth, height: containerHeight },
     });

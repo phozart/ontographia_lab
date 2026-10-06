@@ -181,6 +181,44 @@ export function rectToAnchor(r) {
  * announces a layout change (so stacked elements settle in order).
  * Returns { left, top, placement, maxHeight, maxWidth, ready }.
  */
+function obstacleSignature() {
+  return getObstacleRects().map((r) => `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)}`).join('|');
+}
+
+/**
+ * Call `onChange` when the persistent chrome (sidebar, title bar, properties panel) appears,
+ * disappears, collapses or finishes moving. Cheap: rAF-throttled signature comparison.
+ */
+export function watchObstacles(onChange) {
+  if (typeof document === 'undefined') return () => {};
+  let last = obstacleSignature();
+  let raf = 0;
+  const check = () => {
+    raf = 0;
+    const sig = obstacleSignature();
+    if (sig !== last) {
+      last = sig;
+      onChange();
+    }
+  };
+  const schedule = () => {
+    if (!raf) raf = requestAnimationFrame(check);
+  };
+  const mo = new MutationObserver(schedule);
+  mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
+  document.addEventListener('transitionend', schedule, true);
+  document.addEventListener('animationend', schedule, true);
+  const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
+  if (ro) OBSTACLE_SELECTORS.forEach((sel) => document.querySelectorAll(sel).forEach((el) => ro.observe(el)));
+  return () => {
+    mo.disconnect();
+    ro?.disconnect();
+    document.removeEventListener('transitionend', schedule, true);
+    document.removeEventListener('animationend', schedule, true);
+    if (raf) cancelAnimationFrame(raf);
+  };
+}
+
 export function useFloatingPlacement(ref, getAnchor, options = {}, deps = []) {
   const [state, setState] = useState({ left: 0, top: 0, placement: options.preferred || 'top', ready: false });
   const [tick, setTick] = useState(0);
@@ -189,7 +227,9 @@ export function useFloatingPlacement(ref, getAnchor, options = {}, deps = []) {
     const onChange = () => setTick((t) => t + 1);
     window.addEventListener('resize', onChange);
     window.addEventListener(FLOATING_LAYOUT_EVENT, onChange);
+    const stopWatching = watchObstacles(onChange);
     return () => {
+      stopWatching();
       window.removeEventListener('resize', onChange);
       window.removeEventListener(FLOATING_LAYOUT_EVENT, onChange);
     };
@@ -241,30 +281,45 @@ export function useFloatingPlacement(ref, getAnchor, options = {}, deps = []) {
  * Imperatively place a popover element (child of a trigger wrapper) with position: fixed.
  * Used for the many popovers in the contextual toolbar.
  */
-export function placePopoverElement(el, { preferred = 'bottom', align = 'center' } = {}) {
+export function placePopoverElement(el, { preferred = 'bottom', align = 'center', gap = DEFAULT_GAP, maxHeight = 420 } = {}) {
   const trigger = el.parentElement;
   if (!trigger) return;
-  const anchor = rectToAnchor(trigger.getBoundingClientRect());
-  // Cap the size first so measurement reflects what will actually be shown.
-  const cap = usableBounds(getViewportSize(), getObstacleRects());
-  el.style.maxWidth = `${cap.right - cap.left}px`;
-  el.style.maxHeight = `${Math.max(120, cap.bottom - cap.top - 48)}px`;
-  el.style.overflowY = 'auto';
-  const r = computePlacement({
-    anchor,
-    size: { width: el.offsetWidth, height: el.offsetHeight },
-    viewport: getViewportSize(),
-    obstacles: getObstacleRects(),
-    preferred,
-    align,
-  });
+  // Horizontal anchor is the trigger; vertical anchor is the whole toolbar so a flipped
+  // popover clears the toolbar (and the trigger) instead of covering them.
+  const t = trigger.getBoundingClientRect();
+  const bar = trigger.closest('[data-floating-bar]')?.getBoundingClientRect() || t;
+  const anchor = { left: t.left, width: t.width, top: bar.top, height: bar.height };
+  const viewport = getViewportSize();
+  const obstacles = getObstacleRects();
+  const bounds = usableBounds(viewport, obstacles);
   el.style.position = 'fixed';
-  el.style.left = `${r.left}px`;
-  el.style.top = `${r.top}px`;
   el.style.right = 'auto';
   el.style.bottom = 'auto';
   el.style.transform = 'none';
   el.style.margin = '0';
+  el.style.overflowY = 'auto';
+  el.style.maxWidth = `${bounds.right - bounds.left}px`;
+  el.style.maxHeight = `${Math.min(maxHeight, bounds.bottom - bounds.top)}px`;
+  const place = () => computePlacement({
+    anchor,
+    size: { width: el.offsetWidth, height: el.offsetHeight },
+    viewport,
+    obstacles,
+    preferred,
+    align,
+    gap,
+  });
+  let r = place();
+  // Not enough room on either side: cap the height to the space on the chosen side and re-place.
+  const avail = r.placement === 'top'
+    ? anchor.top - gap - bounds.top
+    : bounds.bottom - (anchor.top + anchor.height) - gap;
+  if (el.offsetHeight > avail && avail >= 120) {
+    el.style.maxHeight = `${avail}px`;
+    r = place();
+  }
+  el.style.left = `${r.left}px`;
+  el.style.top = `${r.top}px`;
   el.dataset.placement = r.placement;
   // An ancestor with transform/backdrop-filter becomes the containing block for fixed
   // descendants; correct by whatever offset that introduces.

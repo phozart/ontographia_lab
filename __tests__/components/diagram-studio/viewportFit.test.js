@@ -1,4 +1,4 @@
-import { computeFit, visibleArea } from '../../../components/diagram-studio/viewportFit';
+import { computeFit, visibleArea, avoidRect, computeFitForCanvas } from '../../../components/diagram-studio/viewportFit';
 
 const toScreen = (vp, area, p) => ({
   x: (p.x + vp.x) * vp.scale,
@@ -59,5 +59,27 @@ describe('visibleArea', () => {
       { left: 1079, top: 56, right: 1379, bottom: 985 },
     ];
     expect(visibleArea(container, obstacles)).toEqual({ left: 72, top: 56, width: 1007, height: 929 });
+  });
+});
+
+describe('avoidRect (minimap)', () => {
+  const area = { left: 56, top: 48, width: 1323, height: 937 };
+  it('cuts the area so it no longer overlaps a bottom-right box', () => {
+    const mini = { left: 1180, top: 850, right: 1370, bottom: 975 };
+    const a = avoidRect(area, mini);
+    const noOverlap = a.left + a.width <= mini.left || a.top + a.height <= mini.top;
+    expect(noOverlap).toBe(true);
+    expect(a.width * a.height).toBeGreaterThan(1000 * 800);
+  });
+  it('leaves the area alone when there is no overlap', () => {
+    expect(avoidRect(area, { left: 0, top: 0, right: 10, bottom: 10 })).toEqual(area);
+  });
+  it('computeFitForCanvas keeps content out of an avoided corner box', () => {
+    const container = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 800 }) };
+    const mini = { left: 800, top: 650, right: 990, bottom: 790 };
+    const els = [{ x: 0, y: 0, size: { width: 2000, height: 1000 } }];
+    const vp = computeFitForCanvas(els, { container, obstacles: [], avoid: [mini], padding: 40 });
+    const br = { x: (2000 + vp.x) * vp.scale, y: (1000 + vp.y) * vp.scale };
+    expect(br.x <= mini.left || br.y <= mini.top).toBe(true);
   });
 });
