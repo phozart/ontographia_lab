@@ -1159,7 +1159,11 @@ export function buildOrthogonalPath(sourcePos, targetPos, sourcePort, targetPort
     // Stale waypoints (e.g. saved before a resize) fall through to a fresh route.
     if (waypoints.length > 0) {
       const manual = legacyRoute();
-      if (isValid(manual)) allPoints = manual;
+      // Bends sitting on (or inside) an endpoint's border are leftovers of a stub: reject them too
+      const clearOfOwnShapes = manual.slice(1, -1).every(pt =>
+        [sourceBounds, targetBounds].every(r => !r ||
+          pt.x < r.x - 1 || pt.x > r.x + r.width + 1 || pt.y < r.y - 1 || pt.y > r.y + r.height + 1));
+      if (isValid(manual) && clearOfOwnShapes) allPoints = manual;
     }
     if (!allPoints) {
       allPoints = routeOrthogonal(sourcePos, targetPos, sourcePort, targetPort, sourceBounds, targetBounds, { obstacles });

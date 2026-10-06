@@ -234,3 +234,15 @@ describe('orthogonal router property tests', () => {
     expect(routeOrthogonal({ x: 0, y: 0 }, { x: 5, y: 5 }, 'x', 'y', null, null)).toBeNull();
   });
 });
+
+describe('stale manual waypoints on the shape border (QA #6)', () => {
+  it('falls back to a clean route when a saved bend sits on the source border', () => {
+    const a = { x: 200, y: 200, width: 300, height: 60 };
+    const b = { x: 640, y: 200, width: 120, height: 60 };
+    const r = buildOrthogonalPath({ x: 500, y: 230 }, { x: 640, y: 230 }, 'right', 'left', {
+      sourceBounds: a, targetBounds: b,
+      waypoints: [{ x: 500, y: 214 }, { x: 610, y: 214 }, { x: 610, y: 230 }],
+    });
+    expect(r.points.length).toBe(2);
+  });
+});
