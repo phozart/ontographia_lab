@@ -112,6 +112,8 @@ const LEDGER_DDL = `
 async function migrate({ connectionString = getConnectionString(), dir = DEFAULT_DIR, logger = console, dryRun = false, retries, retryDelayMs, lockTimeout = '15s', statementTimeout = '5min' } = {}) {
   const files = listMigrationFiles(dir);
   const client = await connectWithRetry(connectionString, { logger, attempts: retries || 10, delayMs: retryDelayMs === undefined ? 2000 : retryDelayMs });
+  // Surface RAISE NOTICE output from migrations (e.g. which rows a backfill touched)
+  client.on('notice', (n) => logger.log(`[migrate] ${n.message}`));
   const applied = [];
   const skipped = [];
   const pending = [];
@@ -152,6 +154,8 @@ async function migrate({ connectionString = getConnectionString(), dir = DEFAULT
           // and, in turn, blocking application traffic behind our DDL lock request.
           await client.query(`SET LOCAL lock_timeout = '${lockTimeout}'`);
           await client.query(`SET LOCAL statement_timeout = '${statementTimeout}'`);
+          // Lets migrations read the configured admin account (0002 owner_id backfill, Q-M1); transaction-local.
+          await client.query("SELECT set_config('app.admin_email', $1, true)", [process.env.ADMIN_EMAIL || '']);
           await client.query(f.sql);
           await client.query('INSERT INTO schema_migrations (version, checksum) VALUES ($1, $2)', [f.version, f.checksum]);
           await client.query('COMMIT');

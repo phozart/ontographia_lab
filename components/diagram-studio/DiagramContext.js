@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react';
 import { generateId } from './utils/ids';
 import { normalizeDiagramContent } from './migrations/normalizeContent';
 import { migrateDiagram } from './migrations/migrateDiagram';
+import SaveConflictDialog from './ui/SaveConflictDialog';
 import { assignFrameOnCreate, remapDuplicateParent } from './utils/frameMembership';
 
 // ============ CONTEXT ============
@@ -693,6 +694,12 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     }
   }, [user, setDiagram]);
 
+  // Set when the server answers 409 REVISION_CONFLICT; pauses autosave until the user chooses.
+  const [conflict, setConflict] = useState(null);
+  const [conflictBusy, setConflictBusy] = useState(false);
+  const [conflictError, setConflictError] = useState(null);
+  const skipUnloadSaveRef = useRef(false);
+
   const saveDiagram = useCallback(async (forceOrOptions = false) => {
     // Support both saveDiagram(true) and saveDiagram({ force: true, name: 'new name' })
     const options = typeof forceOrOptions === 'boolean'
@@ -700,7 +707,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       : forceOrOptions || {};
     const { force = false, name: nameOverride, description: descOverride } = options;
 
-    if (!diagram?.id || (!saveStatus.dirty && !force)) return;
+    if (!diagram?.id || (!saveStatus.dirty && !force) || conflict) return;
 
     setSaveStatus(prev => ({ ...prev, saving: true }));
 
@@ -722,6 +729,10 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          // Optimistic concurrency: the server rejects (409) if someone else saved since we loaded
+          ...(Number.isFinite(Number(diagram.revision)) && diagram.revision !== undefined && diagram.revision !== null
+            ? { 'If-Match': `"${diagram.revision}"` }
+            : {}),
         },
         body: JSON.stringify({
           name: saveName,
@@ -729,6 +740,14 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
           content,
         }),
       });
+
+      if (res.status === 409) {
+        let info = null;
+        try { info = await res.json(); } catch (_) { /* ignore */ }
+        setConflict(info?.current || {});
+        setSaveStatus(prev => ({ ...prev, saving: false }));
+        return null;
+      }
 
       if (!res.ok) {
         throw new Error('Failed to save diagram');
@@ -750,7 +769,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       setSaveStatus(prev => ({ ...prev, saving: false }));
       return null;
     }
-  }, [diagram, elements, connections, layers, groups, saveStatus.dirty, onSaveCallback]);
+  }, [diagram, elements, connections, layers, groups, saveStatus.dirty, onSaveCallback, conflict]);
 
   // ============ AUTO-SAVE ============
 
@@ -763,7 +782,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     }
 
     // Set up debounced save when dirty
-    if (diagram?.id && saveStatus.dirty && !saveStatus.saving) {
+    if (diagram?.id && saveStatus.dirty && !saveStatus.saving && !conflict) {
       autoSaveTimerRef.current = setTimeout(() => {
         saveDiagram();
       }, autoSaveDelayMs);
@@ -774,12 +793,12 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [diagram?.id, saveStatus.dirty, saveStatus.saving, saveDiagram, elements, connections]);
+  }, [diagram?.id, saveStatus.dirty, saveStatus.saving, saveDiagram, elements, connections, conflict]);
 
   // Save before unload
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (saveStatus.dirty && diagram?.id) {
+      if (saveStatus.dirty && diagram?.id && !conflict && !skipUnloadSaveRef.current) {
         saveDiagram(true);
         e.preventDefault();
         e.returnValue = '';
@@ -788,7 +807,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [saveStatus.dirty, diagram?.id, saveDiagram]);
+  }, [saveStatus.dirty, diagram?.id, saveDiagram, conflict]);
 
   // Auto-load diagram when initialDiagramId is provided
   useEffect(() => {
@@ -796,6 +815,54 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       loadDiagram(initialDiagramId);
     }
   }, [initialDiagramId, user, diagram, loadDiagram]);
+
+  // ============ SAVE CONFLICT (409) ============
+
+  const resolveConflictReload = useCallback(async () => {
+    setConflictBusy(true);
+    setConflictError(null);
+    try {
+      const res = await fetch(`/api/diagrams/${diagram.id}`);
+      if (!res.ok) throw new Error('Could not load the latest version');
+      const latest = await res.json();
+      setDiagram(latest);
+      setConflict(null);
+    } catch (e) {
+      setConflictError(e.message);
+    } finally {
+      setConflictBusy(false);
+    }
+  }, [diagram?.id, setDiagram]);
+
+  const resolveConflictSaveCopy = useCallback(async () => {
+    setConflictBusy(true);
+    setConflictError(null);
+    try {
+      const res = await fetch('/api/diagrams', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${diagram.name || 'Untitled'} (my version)`.slice(0, 255),
+          type: diagram.type,
+          description: diagram.description || '',
+          content: {
+            elements,
+            connections,
+            layers,
+            groups,
+            viewport: normalizeDiagramContent(diagram.content).viewport,
+          },
+        }),
+      });
+      if (!res.ok) throw new Error('Could not save your version as a copy');
+      const copy = await res.json();
+      skipUnloadSaveRef.current = true;
+      window.location.assign(`/diagram/${copy.short_id || copy.id}`);
+    } catch (e) {
+      setConflictError(e.message);
+      setConflictBusy(false);
+    }
+  }, [diagram, elements, connections, layers, groups]);
 
   // ============ CONTEXT VALUE ============
 
@@ -856,6 +923,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     // Element operations
     addElement,
     updateElement,
+    endGesture,
     removeElement,
     discardElement,
 
@@ -907,6 +975,13 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   return (
     <DiagramContext.Provider value={value}>
       {children}
+      <SaveConflictDialog
+        open={!!conflict}
+        busy={conflictBusy}
+        error={conflictError}
+        onReload={resolveConflictReload}
+        onSaveCopy={resolveConflictSaveCopy}
+      />
     </DiagramContext.Provider>
   );
 }

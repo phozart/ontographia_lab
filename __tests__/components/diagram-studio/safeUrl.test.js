@@ -39,3 +39,12 @@ describe('import sanitizer url fields', () => {
     expect(r.warnings.join(' ')).toMatch(/url/i);
   });
 });
+
+describe('import sanitizer: blocked schemes under any key', () => {
+  it('strips javascript: under non-URL keys but keeps label text', () => {
+    const text = JSON.stringify({ elements: [{ id: 'a', x: 0, y: 0, icon: 'javascript:alert(1)', label: 'javascript: the good parts' }] });
+    const r = JSON.stringify(parseImportText(text));
+    expect(r).not.toMatch(/alert\(1\)/);
+    expect(r).toMatch(/javascript: the good parts/);
+  });
+});

@@ -3,6 +3,7 @@
 
 import React from 'react';
 import SvgNodeFrame from './SvgNodeFrame';
+import { SvgBelowLabel } from './NodeLabels';
 
 // ============ LOOP LABEL FIT ============
 
@@ -162,6 +163,7 @@ const stencils = [
     group: 'Loop Markers',
     shape: 'circle',
     icon: 'R',
+    defaultLabel: 'R',
     color: '#ef4444',
     defaultSize: { width: 50, height: 50 },
     ports: [],
@@ -178,6 +180,7 @@ const stencils = [
     group: 'Loop Markers',
     shape: 'circle',
     icon: 'B',
+    defaultLabel: 'B',
     color: '#3b82f6',
     defaultSize: { width: 50, height: 50 },
     ports: [],
@@ -666,6 +669,7 @@ function CloudNode({ element, stencil, isSelected }) {
       {/* Cloud bumps */}
       <circle cx={cx - width * 0.2} cy={cy - height * 0.1} r={width * 0.12} fill="#f1f5f9" stroke="none" />
       <circle cx={cx + width * 0.15} cy={cy - height * 0.12} r={width * 0.1} fill="#f1f5f9" stroke="none" />
+      <SvgBelowLabel element={element} width={width} height={height} />
     </g>
   );
 }

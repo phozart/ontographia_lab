@@ -1,6 +1,8 @@
 // components/diagram-studio/packs/ProductDesignPack.js
 // Product Design canvas pack with structured canvas templates
 
+import { withBelowLabel } from './NodeLabels';
+
 // ============ STENCILS ============
 
 const stencils = [
@@ -1569,7 +1571,7 @@ function renderNode(element, stencil, isSelected) {
     case 'touchpoint':
       return <TouchpointNode element={element} stencil={stencil} />;
     case 'emotion-point':
-      return <EmotionPointNode element={element} stencil={stencil} />;
+      return withBelowLabel(<EmotionPointNode element={element} stencil={stencil} />, element);
 
     // Colored cards
     case 'yellow-card':

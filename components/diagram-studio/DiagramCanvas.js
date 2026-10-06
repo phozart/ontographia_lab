@@ -25,6 +25,7 @@ import {
   isValidHierarchyConnection,
 } from './LayoutEngine';
 import Minimap from './Minimap';
+import { resolveLabelColor } from './packs/colorUtils';
 import { SmartRouter } from './routing/SmartRouter';
 import ConnectionToolbar from './ui/toolbar/ConnectionToolbar';
 import EmptyCanvasWelcome from './ui/EmptyCanvasWelcome';
@@ -636,43 +637,6 @@ function Node({
     checkAndAutoResize(currentLabel);
   };
 
-  // Helper to calculate relative luminance and determine if color is light or dark
-  const getContrastTextColor = (hexColor) => {
-    if (!hexColor || typeof hexColor !== 'string') return '#1f2937'; // Default dark text
-
-    // Handle hex colors (with or without #)
-    let hex = hexColor.replace('#', '');
-
-    // Handle shorthand hex (e.g., #fff -> #ffffff)
-    if (hex.length === 3) {
-      hex = hex.split('').map(c => c + c).join('');
-    }
-
-    // Handle rgba/rgb - extract just the RGB values
-    if (hexColor.startsWith('rgb')) {
-      const match = hexColor.match(/\d+/g);
-      if (match && match.length >= 3) {
-        const [r, g, b] = match.map(Number);
-        // Calculate relative luminance using sRGB formula
-        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-        return luminance > 0.5 ? '#1f2937' : '#ffffff';
-      }
-      return '#1f2937';
-    }
-
-    if (hex.length !== 6) return '#1f2937'; // Invalid, default to dark
-
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-
-    // Calculate relative luminance using sRGB formula
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-    // Return dark text for light backgrounds, light text for dark backgrounds
-    return luminance > 0.5 ? '#1f2937' : '#ffffff';
-  };
-
   // Default node rendering
   const shape = stencil?.shape || 'rect';
   const color = element.color || stencil?.color || '#3b82f6';
@@ -683,8 +647,9 @@ function Node({
   const fontFamily = element.fontFamily || null; // null means system default
 
   // Auto-calculate text color based on background if not explicitly set
-  const backgroundColor = element.backgroundColor || element.color || stencil?.color || '#ffffff';
-  const textColor = element.textColor || getContrastTextColor(backgroundColor);
+  // The fill painted below is `backgroundColor || color || var(--panel)`, so the label
+  // contrast must be computed against that same fill (not the stencil colour).
+  const textColor = resolveLabelColor(element, stencil);
 
   // Border and shape properties
   const borderStyle = element.borderStyle || 'solid';
@@ -3784,7 +3749,7 @@ export default function DiagramCanvas({
             type: stencil.id,
             packId: data.packId || activePack,
             name: stencil.name,
-            label: stencil.name,
+            label: stencil.defaultLabel ?? stencil.name,
             x: snappedX, // Allow any coordinate on infinite canvas
             y: snappedY,
             size: stencil.defaultSize || { width: 120, height: 60 },

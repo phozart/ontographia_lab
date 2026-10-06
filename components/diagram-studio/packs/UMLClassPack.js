@@ -1,6 +1,10 @@
 // components/diagram-studio/packs/UMLClassPack.js
 // UML Comprehensive Pack - Class, Use Case, Activity, State Machine, Sequence diagrams
 
+import { pickLabelColor } from './colorUtils';
+
+import { withBelowLabel } from './NodeLabels';
+
 // ============ STENCILS ============
 
 const stencils = [
@@ -1482,11 +1486,26 @@ function LifelineRenderer({ element, stencil }) {
   );
 }
 
+// Activation Renderer (narrow bar on a lifeline)
+function ActivationRenderer({ element, stencil }) {
+  const color = element.color || stencil?.color || '#22c55e';
+  return (
+    <div style={{
+      width: '100%',
+      height: '100%',
+      background: element.backgroundColor || color,
+      border: `1px solid ${element.borderColor || color}`,
+      borderRadius: 2,
+      opacity: 0.9,
+    }} />
+  );
+}
+
 // Combined Fragment Renderer
 function CombinedFragmentRenderer({ element, stencil }) {
   const color = element.color || stencil?.color || '#64748b';
   const fragmentType = element.data?.fragmentType || 'alt';
-  const guard = element.data?.guard || '';
+  const guard = element.data?.guard || element.label || element.name || '';
 
   return (
     <div style={{
@@ -1501,7 +1520,7 @@ function CombinedFragmentRenderer({ element, stencil }) {
         top: 0,
         left: 0,
         background: color,
-        color: 'white',
+        color: pickLabelColor(color),
         padding: '2px 8px',
         fontSize: 10,
         fontWeight: 600,
@@ -1548,32 +1567,34 @@ function renderNode(element, stencil, isSelected) {
 
     // Activity Diagram
     case 'initial-node':
-      return <InitialNodeRenderer element={element} stencil={stencil} />;
+      return withBelowLabel(<InitialNodeRenderer element={element} stencil={stencil} />, element);
     case 'final-node':
     case 'final-state':
-      return <FinalNodeRenderer element={element} stencil={stencil} />;
+      return withBelowLabel(<FinalNodeRenderer element={element} stencil={stencil} />, element);
     case 'flow-final':
-      return <FlowFinalRenderer element={element} stencil={stencil} />;
+      return withBelowLabel(<FlowFinalRenderer element={element} stencil={stencil} />, element);
     case 'action':
       return <ActionRenderer element={element} stencil={stencil} />;
     case 'decision':
     case 'choice':
-      return <DecisionRenderer element={element} stencil={stencil} />;
+      return withBelowLabel(<DecisionRenderer element={element} stencil={stencil} />, element);
     case 'fork-join':
-      return <ForkJoinRenderer element={element} stencil={stencil} />;
+      return withBelowLabel(<ForkJoinRenderer element={element} stencil={stencil} />, element);
     case 'swimlane':
       return <SwimlaneRenderer element={element} stencil={stencil} />;
 
     // State Machine
     case 'initial-state':
-      return <InitialNodeRenderer element={element} stencil={stencil} />;
+      return withBelowLabel(<InitialNodeRenderer element={element} stencil={stencil} />, element);
     case 'state':
     case 'composite-state':
       return <StateRenderer element={element} stencil={stencil} />;
     case 'history':
-      return <HistoryRenderer element={element} stencil={stencil} />;
+      return withBelowLabel(<HistoryRenderer element={element} stencil={stencil} />, element);
 
     // Sequence Diagram
+    case 'activation':
+      return withBelowLabel(<ActivationRenderer element={element} stencil={stencil} />, element);
     case 'lifeline':
       return <LifelineRenderer element={element} stencil={stencil} />;
     case 'combined-fragment':
