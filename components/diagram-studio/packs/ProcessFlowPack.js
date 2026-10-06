@@ -120,7 +120,7 @@ const stencils = [
     description: 'Exclusive gateway - only one path can be taken (XOR)',
     group: 'Flow Control',
     shape: 'diamond',
-    icon: '✕',
+    icon: '◇',
     color: '#f59e0b',
     defaultSize: { width: 110, height: 70 },
     ports: [
@@ -794,7 +794,19 @@ function SubprocessNode({ element, stencil }) {
 }
 
 // Gateway (modern diamond shape with internal marker)
-function GatewayNode({ element, stencil, gatewayType }) {
+// Rough fit test: does the label fit inside the diamond's inscribed text box?
+export function decisionLabelFits(element, stencil) {
+  const { width, height } = element.size || stencil?.defaultSize || { width: 110, height: 70 };
+  const text = labelOf(element);
+  const fs = element.fontSize || 12;
+  const innerW = width * 0.56;
+  const innerH = height * 0.56;
+  const lines = Math.ceil((text.length * fs * 0.55) / Math.max(1, innerW));
+  const longestWord = Math.max(0, ...text.split(/\s+/).map((w) => w.length));
+  return lines * fs * 1.15 <= innerH && longestWord * fs * 0.55 <= innerW;
+}
+
+function GatewayNode({ element, stencil, gatewayType, labelInside = true }) {
   const { width, height } = element.size || stencil?.defaultSize || { width: 50, height: 50 };
   const cx = width / 2;
   const cy = height / 2;
@@ -809,7 +821,7 @@ function GatewayNode({ element, stencil, gatewayType }) {
   const fill = element.backgroundColor || 'white';
   // The generic Decision (exclusive gateway) carries its label inside the diamond;
   // marker-only variants keep their BPMN marker and show the label below the shape.
-  const label = gatewayType === 'exclusive' ? labelOf(element) : '';
+  const label = gatewayType === 'exclusive' && labelInside ? labelOf(element) : '';
 
   const getMarker = () => {
     switch (gatewayType) {
@@ -1083,8 +1095,13 @@ function renderNode(element, stencil, isSelected) {
       return <TaskNode element={element} stencil={stencil} isSelected={isSelected} />;
     case 'subprocess':
       return <SubprocessNode element={element} stencil={stencil} />;
-    case 'exclusive-gateway':
-      return <GatewayNode element={element} stencil={stencil} gatewayType="exclusive" />;
+    case 'exclusive-gateway': {
+      // Small stored Decisions (e.g. legacy 50x50) show the label (and marker) below instead of clipping it
+      if (decisionLabelFits(element, stencil)) {
+        return <GatewayNode element={element} stencil={stencil} gatewayType="exclusive" />;
+      }
+      return withBelowLabel(<GatewayNode element={element} stencil={stencil} gatewayType="exclusive" labelInside={false} />, element);
+    }
     case 'parallel-gateway':
       return withBelowLabel(<GatewayNode element={element} stencil={stencil} gatewayType="parallel" />, element);
     case 'inclusive-gateway':

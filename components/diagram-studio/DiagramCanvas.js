@@ -3703,7 +3703,7 @@ export default function DiagramCanvas({
             type: stencil.id,
             packId: data.packId || activePack,
             name: stencil.name,
-            label: stencil.name,
+            label: stencil.defaultLabel ?? stencil.name,
             x: snappedX, // Allow any coordinate on infinite canvas
             y: snappedY,
             size: stencil.defaultSize || { width: 120, height: 60 },

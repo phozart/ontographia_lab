@@ -58,9 +58,9 @@ describe('PropertiesPanel position', () => {
   test('editing X writes the internal coordinate back', () => {
     renderPanel(el);
     fireEvent.change(screen.getByLabelText('X'), { target: { value: '600' } });
-    expect(mockUpdateElement).toHaveBeenCalledWith('a', { x: 50600 }, undefined);
+    expect(mockUpdateElement).toHaveBeenCalledWith('a', { x: 50600 }, expect.objectContaining({ coalesceKey: expect.any(String) }));
     fireEvent.change(screen.getByLabelText('Y'), { target: { value: '-20' } });
-    expect(mockUpdateElement).toHaveBeenLastCalledWith('a', { y: 49980 }, undefined);
+    expect(mockUpdateElement).toHaveBeenLastCalledWith('a', { y: 49980 }, expect.objectContaining({ coalesceKey: expect.any(String) }));
   });
 });
 
@@ -84,7 +84,7 @@ describe('PropertiesPanel style section', () => {
     fireEvent.change(screen.getByLabelText('Stroke width'), { target: { value: '3' } });
     expect(mockUpdateElement).toHaveBeenLastCalledWith('a', { borderWidth: 3 }, undefined);
     fireEvent.change(screen.getByLabelText('Font size'), { target: { value: '18' } });
-    expect(mockUpdateElement).toHaveBeenLastCalledWith('a', { fontSize: 18 }, undefined);
+    expect(mockUpdateElement).toHaveBeenLastCalledWith('a', { fontSize: 18 }, expect.objectContaining({ coalesceKey: expect.any(String) }));
     fireEvent.change(screen.getByLabelText('Font weight'), { target: { value: 'bold' } });
     expect(mockUpdateElement).toHaveBeenLastCalledWith('a', { fontWeight: 'bold' }, undefined);
     fireEvent.change(screen.getByLabelText('Text color'), { target: { value: '#111111' } });
@@ -94,7 +94,7 @@ describe('PropertiesPanel style section', () => {
   test('font size is clamped to the toolbar range 8-72', () => {
     renderPanel(el);
     fireEvent.change(screen.getByLabelText('Font size'), { target: { value: '500' } });
-    expect(mockUpdateElement).toHaveBeenLastCalledWith('a', { fontSize: 72 }, undefined);
+    expect(mockUpdateElement).toHaveBeenLastCalledWith('a', { fontSize: 72 }, expect.objectContaining({ coalesceKey: expect.any(String) }));
   });
 
   test('read-only profile disables style controls', () => {

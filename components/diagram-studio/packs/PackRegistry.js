@@ -84,7 +84,7 @@ export class PackRegistry {
       id: generateId(),
       type: stencil.id,
       packId: packId,
-      label: stencil.name,
+      label: stencil.defaultLabel ?? stencil.name,
       x: position.x,
       y: position.y,
       size: stencil.defaultSize || { width: 120, height: 60 },

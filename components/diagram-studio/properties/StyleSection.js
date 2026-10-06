@@ -59,7 +59,7 @@ function ColorRow({ label, value, fallback, field, onChange, readOnly, auto }) {
   );
 }
 
-export default function StyleSection({ item, stencil, onChange, readOnly }) {
+export default function StyleSection({ item, stencil, onChange, onEnd, readOnly }) {
   const fill = item.color || stencil?.color || '#3b82f6';
   return (
     <>
@@ -94,10 +94,11 @@ export default function StyleSection({ item, stencil, onChange, readOnly }) {
             className="ds-property-input"
             value={item.fontSize || 13}
             disabled={readOnly}
+            onBlur={onEnd}
             onChange={(e) => {
               const n = parseInt(e.target.value, 10);
               if (Number.isNaN(n)) return;
-              onChange('fontSize', Math.min(FONT_MAX, Math.max(FONT_MIN, n)));
+              onChange('fontSize', Math.min(FONT_MAX, Math.max(FONT_MIN, n)), { coalesce: true });
             }}
           />
         </div>

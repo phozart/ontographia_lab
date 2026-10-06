@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { DiamondNode } from './CorePack';
-import { normalizeFields } from './erdFields';
+import { normalizeFields, visibleRows } from './erdFields';
 
 // ============ STENCILS ============
 
@@ -568,6 +568,8 @@ function ERDEntityRenderer({ element, stencil, isSelected }) {
   // data.fields may be structured rows, legacy strings, or a free-text block
   const fields = normalizeFields(data?.fields);
   const indexes = Array.isArray(data?.indexes) ? data.indexes : [];
+  const height = element.size?.height || stencil?.defaultSize?.height || 160;
+  const { shown, hidden } = visibleRows(height, fields.length, indexes.length);
   const isWeakEntity = element.type === 'weak-entity';
   const isJunction = element.type === 'junction';
   const isView = element.type === 'view';
@@ -587,27 +589,34 @@ function ERDEntityRenderer({ element, stencil, isSelected }) {
       {/* Fields section */}
       <div className="erd-entity-fields">
         {fields.length > 0 ? (
-          fields.map((field, idx) => (
+          fields.slice(0, shown).map((field, idx) => (
             <div key={idx} className={`erd-field ${field.isPrimaryKey ? 'pk' : ''} ${field.isForeignKey ? 'fk' : ''}`}>
               <span className="erd-field-icons">
                 {field.isPrimaryKey && <span className="erd-pk-icon" title="Primary Key">🔑</span>}
                 {field.isForeignKey && <span className="erd-fk-icon" title="Foreign Key">🔗</span>}
                 {!field.isPrimaryKey && !field.isForeignKey && <span className="erd-field-spacer">•</span>}
               </span>
-              <span className="erd-field-name">{field.name}</span>
+              <span className="erd-field-name" style={{ minWidth: 48 }}>{field.name}</span>
               {(field.isPrimaryKey || field.isForeignKey) && (
                 <span className="erd-field-keys" style={{ display: 'inline-flex', gap: 2 }}>
                   {field.isPrimaryKey && <span className="erd-key-badge" style={KEY_BADGE}>PK</span>}
                   {field.isForeignKey && <span className="erd-key-badge" style={KEY_BADGE}>FK</span>}
                 </span>
               )}
-              <span className="erd-field-type">{field.dataType}</span>
+              <span
+                className="erd-field-type"
+                title={field.dataType || undefined}
+                style={{ maxWidth: '45%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {field.dataType}
+              </span>
               {field.isNullable === false && <span className="erd-field-notnull" title="NOT NULL">*</span>}
             </div>
           ))
         ) : (
           <div className="erd-field empty">No fields defined</div>
         )}
+        {hidden > 0 && <div className="erd-field more" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>+{hidden} more</div>}
       </div>
 
       {/* Indexes section (if present) */}

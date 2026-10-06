@@ -13,6 +13,7 @@ import FieldListEditor from './properties/FieldListEditor';
 import StyleSection from './properties/StyleSection';
 import { toDisplayCoord, fromDisplayCoord } from './properties/coordinates';
 import { cacheStencilStyle } from './styling/StencilStyleManager';
+import { normalizeFields, entityMinHeight } from './packs/erdFields';
 
 // Element fields shared with the contextual style toolbar (cached per stencil like the toolbar does)
 const STYLE_FIELDS = new Set(['color', 'borderColor', 'borderWidth', 'fontSize', 'fontWeight', 'textColor']);
@@ -48,7 +49,7 @@ export default function PropertiesPanel({
   className = '',
   onClose,
 }) {
-  const { updateElement, updateConnection, removeElement, removeConnection } = useDiagram();
+  const { updateElement, updateConnection, removeElement, removeConnection, endGesture } = useDiagram();
   const { selectedElements, selectedConnections, clearSelection } = useDiagramSelection();
 
   // Get the selected item (element or connection)
@@ -90,6 +91,11 @@ export default function PropertiesPanel({
       updateConnection(selectedItem.item.id, { [field]: value });
     }
   }, [selectedItem, updateElement, updateConnection]);
+
+  // Several fields in one update (one undo step)
+  const handlePatch = useCallback((patch) => {
+    if (selectedItem?.type === 'element') updateElement(selectedItem.item.id, patch);
+  }, [selectedItem, updateElement]);
 
   // Handle delete
   const handleDelete = useCallback(() => {
@@ -218,6 +224,7 @@ export default function PropertiesPanel({
             <PositionSection
               item={item}
               onChange={handleChange}
+              onEnd={endGesture}
               readOnly={readOnly || !canEditProperties}
             />
           </AccordionSection>
@@ -230,6 +237,7 @@ export default function PropertiesPanel({
               item={item}
               stencil={stencil}
               onChange={handleChange}
+              onEnd={endGesture}
               readOnly={readOnly || !canEditProperties}
             />
           </AccordionSection>
@@ -266,6 +274,7 @@ export default function PropertiesPanel({
               pack={pack}
               stencil={stencil}
               onChange={handleChange}
+              onPatch={handlePatch}
               readOnly={readOnly || !canEditProperties}
             />
           </AccordionSection>
@@ -317,7 +326,8 @@ function GeneralSection({ item, isElement, onChange, readOnly }) {
 // ============ POSITION SECTION ============
 
 // X/Y are canvas coordinates relative to the canvas origin (same as the status bar).
-function PositionSection({ item, onChange, readOnly }) {
+function PositionSection({ item, onChange, onEnd, readOnly }) {
+  const C = { coalesce: true };
   return (
     <>
       <div style={{ display: 'flex', gap: 8 }}>
@@ -328,7 +338,8 @@ function PositionSection({ item, onChange, readOnly }) {
             type="number"
             className="ds-property-input"
             value={toDisplayCoord(item.x)}
-            onChange={(e) => onChange('x', fromDisplayCoord(parseInt(e.target.value, 10) || 0))}
+            onChange={(e) => onChange('x', fromDisplayCoord(parseInt(e.target.value, 10) || 0), C)}
+            onBlur={onEnd}
             disabled={readOnly}
           />
         </div>
@@ -339,7 +350,8 @@ function PositionSection({ item, onChange, readOnly }) {
             type="number"
             className="ds-property-input"
             value={toDisplayCoord(item.y)}
-            onChange={(e) => onChange('y', fromDisplayCoord(parseInt(e.target.value, 10) || 0))}
+            onChange={(e) => onChange('y', fromDisplayCoord(parseInt(e.target.value, 10) || 0), C)}
+            onBlur={onEnd}
             disabled={readOnly}
           />
         </div>
@@ -351,8 +363,11 @@ function PositionSection({ item, onChange, readOnly }) {
           <input
             type="number"
             className="ds-property-input"
+            id="ds-pos-w"
+            aria-label="Width"
             value={item.size?.width || 120}
-            onChange={(e) => onChange('size', { ...item.size, width: parseInt(e.target.value) || 120 })}
+            onChange={(e) => onChange('size', { ...item.size, width: parseInt(e.target.value) || 120 }, C)}
+            onBlur={onEnd}
             disabled={readOnly}
           />
         </div>
@@ -361,8 +376,11 @@ function PositionSection({ item, onChange, readOnly }) {
           <input
             type="number"
             className="ds-property-input"
+            id="ds-pos-h"
+            aria-label="Height"
             value={item.size?.height || 60}
-            onChange={(e) => onChange('size', { ...item.size, height: parseInt(e.target.value) || 60 })}
+            onChange={(e) => onChange('size', { ...item.size, height: parseInt(e.target.value) || 60 }, C)}
+            onBlur={onEnd}
             disabled={readOnly}
           />
         </div>
@@ -616,7 +634,7 @@ function LineStyleSection({ item, onChange, readOnly }) {
 
 // ============ DATA SECTION ============
 
-function DataSection({ item, pack, stencil, onChange, readOnly }) {
+function DataSection({ item, pack, stencil, onChange, onPatch, readOnly }) {
   // Get custom properties from pack/stencil
   const customProperties = useMemo(() => {
     return stencil?.properties || pack?.nodeProperties || [];
@@ -640,6 +658,15 @@ function DataSection({ item, pack, stencil, onChange, readOnly }) {
             value={item.data?.[prop.id] || item[prop.id]}
             onChange={(value) => {
               const data = { ...item.data, [prop.id]: value };
+              if (prop.type === 'fieldList' && prop.id === 'fields' && onPatch) {
+                // Grow the entity to fit its rows (never shrink a user-set larger height)
+                const need = entityMinHeight(normalizeFields(value).length, Array.isArray(data.indexes) ? data.indexes.length : 0);
+                const current = item.size?.height || stencil?.defaultSize?.height || 0;
+                const patch = { data };
+                if (need > current) patch.size = { ...(item.size || stencil?.defaultSize), height: need };
+                onPatch(patch);
+                return;
+              }
               onChange('data', data);
             }}
             readOnly={readOnly}
