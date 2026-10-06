@@ -699,15 +699,19 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   const [conflictBusy, setConflictBusy] = useState(false);
   const [conflictError, setConflictError] = useState(null);
   const skipUnloadSaveRef = useRef(false);
+  // True while a version restore is in flight: autosave / unload saves must not run, or a stale save could
+  // overwrite (or 409 against) the restored head.
+  const restoringRef = useRef(false);
 
   const saveDiagram = useCallback(async (forceOrOptions = false) => {
     // Support both saveDiagram(true) and saveDiagram({ force: true, name: 'new name' })
     const options = typeof forceOrOptions === 'boolean'
       ? { force: forceOrOptions }
       : forceOrOptions || {};
-    const { force = false, name: nameOverride, description: descOverride } = options;
+    const { force = false, name: nameOverride, description: descOverride, ignoreRestoreLock = false } = options;
 
     if (!diagram?.id || (!saveStatus.dirty && !force) || conflict) return;
+    if (restoringRef.current && !ignoreRestoreLock) return;
 
     setSaveStatus(prev => ({ ...prev, saving: true }));
 
@@ -864,6 +868,58 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     }
   }, [diagram, elements, connections, layers, groups]);
 
+  // ============ VERSION RESTORE (ADR-0001, slice 2) ============
+
+  /**
+   * Restore version `versionNumber` as the new head. Order matters:
+   *  1. lock autosave; 2. flush unsaved local edits (they become the server's pre_restore snapshot instead of
+   *  being silently discarded); 3. POST restore with If-Match; 4. reload the new head + revision (resets local
+   *  undo history and selection). Any failure leaves local state exactly as it was.
+   * @returns {Promise<{ok: true, unchanged?: boolean, version?: object, preRestoreVersion?: object}
+   *                  | {ok: false, conflict?: boolean, error?: string}>}
+   */
+  const restoreFromVersion = useCallback(async (versionNumber) => {
+    if (!diagram?.id) return { ok: false, error: 'No diagram is open' };
+    if (restoringRef.current) return { ok: false, error: 'A restore is already in progress' };
+    restoringRef.current = true;
+    try {
+      let revision = diagram.revision;
+      if (saveStatus.saving) return { ok: false, error: 'Saving is in progress, try again in a moment' };
+      if (saveStatus.dirty) {
+        const saved = await saveDiagram({ force: true, ignoreRestoreLock: true });
+        if (!saved) return { ok: false, error: 'Your latest edits could not be saved, so nothing was restored' };
+        revision = saved.revision;
+      }
+
+      const res = await fetch(`/api/diagrams/${diagram.id}/versions/${versionNumber}/restore`, {
+        method: 'POST',
+        headers: Number.isFinite(Number(revision)) && revision !== undefined && revision !== null
+          ? { 'If-Match': `"${revision}"` }
+          : {},
+      });
+      let body = null;
+      try { body = await res.json(); } catch (_) { /* no body */ }
+      if (res.status === 409) {
+        setConflict(body?.current || {});
+        return { ok: false, conflict: true, error: body?.error };
+      }
+      if (!res.ok) return { ok: false, error: body?.error || 'Could not restore this version' };
+      if (body?.unchanged) return { ok: true, unchanged: true, version: body.version };
+
+      const latestRes = await fetch(`/api/diagrams/${diagram.id}`);
+      if (!latestRes.ok) throw new Error('Restored, but the latest version could not be loaded; reload the page');
+      const latest = await latestRes.json();
+      setDiagram(latest);
+      setSelection({ nodeIds: [], connectionIds: [] });
+      return { ok: true, version: body?.version, preRestoreVersion: body?.preRestoreVersion };
+    } catch (e) {
+      console.error('Restore version error:', e);
+      return { ok: false, error: e.message || 'Could not restore this version' };
+    } finally {
+      restoringRef.current = false;
+    }
+  }, [diagram, saveStatus.dirty, saveStatus.saving, saveDiagram, setDiagram]);
+
   // ============ CONTEXT VALUE ============
 
   const value = useMemo(() => ({
@@ -957,6 +1013,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     saveDiagram,
     loadDiagram,
     createDiagram,
+    restoreFromVersion,
   }), [
     diagram, elements, connections, layers, groups,
     viewport, selection, activePack, activeTool, showGrid, gridStyle, selectedStencil, stickyNoteColor, drawingTool, drawingColor, drawingStrokeWidth,
@@ -969,7 +1026,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     addLayer, updateLayer, removeLayer, reorderLayers,
     groupElements, ungroupElements,
     undo, redo, recordHistory,
-    saveDiagram, loadDiagram, createDiagram,
+    saveDiagram, loadDiagram, createDiagram, restoreFromVersion,
   ]);
 
   return (

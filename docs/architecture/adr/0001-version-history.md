@@ -92,3 +92,11 @@ sequenceDiagram
 ## Not decided here
 
 Retention numbers and whether version count is a pricing lever (Q-V1, Q-P1); version-level comments ("comment on Rev C") — not in scope; branches/forks ("duplicate from version" is cheap to add later as *create diagram from version content*).
+
+## As built — slice 2 (named versions + restore)
+
+- Shipped: migration `0003_versions`, `lib/versions/contentHash.js` (canonical hash, viewport excluded), `lib/versionRepository.js` (every write under the diagram row lock), the versions API (see api-contracts section 3 "As built"), a History panel (title-bar menu -> "Version history...").
+- Restore follows decision 5 exactly. Additions: restoring a version equal to the head is a no-op; the source content is re-validated with the normal content rules (a version that no longer validates answers 422 instead of poisoning the head).
+- **Editor integration.** `DiagramContext.restoreFromVersion`: lock autosave -> flush unsaved local edits (they become the `pre_restore` snapshot instead of being lost; if the flush fails nothing is restored) -> `POST restore` with `If-Match` -> reload the head via `GET` (new content, new revision, undo history and selection reset). The server's `If-Match` check is the second line of defense: a stale autosave after a restore gets 409, never overwrites.
+- **Preview.** A static SVG image generated from the version content by the export module's data-driven renderer (`ExportManager.exportSVG`), shown in an `<img>` (data URL). A live read-only canvas was rejected for now: `DiagramCanvas` and its hooks all read the single `DiagramContext`, and there is no "render other content read-only" mode until the sharing slice adds `readOnly`. Trade-off: simplified shapes (generic rect/ellipse/diamond + labels + straight connections), not pack-accurate. Content is allow-listed before it reaches the SVG markup. The compare slice (8) can replace this with an on-canvas overlay.
+- Not in this slice: automatic checkpoints, dedupe on the save path, pruning, `kind:'auto'` creation (slice 3); diff (slice 8); owner-only version deletion (Q-V3, later); audit table (slice 5, until then `lib/audit.js` logs one `AUDIT {json}` line).
