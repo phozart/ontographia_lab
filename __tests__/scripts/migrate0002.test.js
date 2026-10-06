@@ -100,7 +100,7 @@ dbDescribe('0002 against throwaway databases', () => {
     });
     const logs = [];
     const res = await withEnv('boss@x.co', () => migrate({ connectionString: url, dir: REAL_DIR, logger: { log: (m) => logs.push(m), warn: () => {} } }));
-    expect(res.applied).toEqual(['0002_diagram_identity_and_revision']);
+    expect(res.applied[0]).toBe('0002_diagram_identity_and_revision'); // later migrations apply after it
     await withClient(url, async (c) => {
       const rows = (await c.query('select id, owner_id, revision, version_seq, updated_by from diagrams')).rows;
       const by = Object.fromEntries(rows.map((r) => [r.id, r]));

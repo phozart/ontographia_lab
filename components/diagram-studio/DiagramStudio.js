@@ -29,6 +29,7 @@ import StarterPackModal from './StarterPackModal';
 import { LogoIcon } from '../ui/Logo';
 import { ExportManager, downloadExport } from './export/ExportManager';
 import ExportDialog, { useExportDialog } from './ui/ExportDialog';
+import { VersionHistory } from './ui/VersionHistoryPanel';
 import { initializeStencilStyles } from './styling/StencilStyleManager';
 import LoadingScreen from '../ui/LoadingScreen';
 
@@ -753,6 +754,9 @@ function DiagramStudioInner({
           viewport={viewport}
           diagramName={diagram?.name || 'diagram'}
         />
+
+        {/* Version history panel (opened from the title-bar menu) */}
+        <VersionHistory />
 
         {/* Context Menu */}
         {contextMenu && (

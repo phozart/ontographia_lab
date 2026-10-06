@@ -29,6 +29,7 @@ import SettingsBackupRestoreIcon from '@mui/icons-material/SettingsBackupRestore
 import TuneIcon from '@mui/icons-material/Tune';
 
 import { ResponsiveSidebar, MobileNavBar, useResponsiveNav } from '../components/ui/ResponsiveNav';
+import ApiTokensSection from '../components/account/ApiTokensSection';
 import { RoleBadge, StatusBadge } from '../components/ui/StatusBadge';
 
 // Password requirements
@@ -454,6 +455,8 @@ export default function AccountPage() {
           </Paper>
 
           {/* Logout Section */}
+          <ApiTokensSection />
+
           <Paper
             elevation={0}
             sx={{
