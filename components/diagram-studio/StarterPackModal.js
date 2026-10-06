@@ -1,7 +1,8 @@
 // components/diagram-studio/StarterPackModal.js
-// Modal for selecting and applying starter pack templates
+// Modal for selecting and applying templates
 
 import { useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import CloseIcon from '@mui/icons-material/Close';
 
 // ============ STARTER PACK DEFINITIONS ============
@@ -15,12 +16,12 @@ const STARTER_PACKS = [
     packId: 'process-flow',
     thumbnail: '🔄',
     elements: [
-      { type: 'start-event', label: 'Start', x: 100, y: 200, size: { width: 50, height: 50 } },
+      { type: 'start-event', label: 'Start', x: 100, y: 195, size: { width: 50, height: 50 } },
       { type: 'task', label: 'Step 1', x: 200, y: 185, size: { width: 140, height: 70 } },
-      { type: 'exclusive-gateway', label: 'Decision?', x: 400, y: 195, size: { width: 60, height: 60 } },
+      { type: 'exclusive-gateway', label: 'Decision?', x: 400, y: 190, size: { width: 60, height: 60 } },
       { type: 'task', label: 'Option A', x: 520, y: 100, size: { width: 140, height: 70 } },
       { type: 'task', label: 'Option B', x: 520, y: 270, size: { width: 140, height: 70 } },
-      { type: 'end-event', label: 'End', x: 720, y: 200, size: { width: 50, height: 50 } },
+      { type: 'end-event', label: 'End', x: 720, y: 195, size: { width: 50, height: 50 } },
     ],
     connections: [
       { sourceIdx: 0, targetIdx: 1, sourcePort: 'right', targetPort: 'left' },
@@ -65,7 +66,7 @@ const STARTER_PACKS = [
       { type: 'pool', label: 'Business Process', x: 50, y: 50, size: { width: 700, height: 350 } },
       { type: 'lane', label: 'Department A', x: 80, y: 80, size: { width: 640, height: 110 } },
       { type: 'lane', label: 'Department B', x: 80, y: 200, size: { width: 640, height: 110 } },
-      { type: 'start-event', label: 'Start', x: 130, y: 110, size: { width: 50, height: 50 } },
+      { type: 'start-event', label: 'Start', x: 130, y: 105, size: { width: 50, height: 50 } },
       { type: 'task', label: 'Initial Task', x: 220, y: 100, size: { width: 120, height: 60 } },
       { type: 'task', label: 'Review', x: 220, y: 225, size: { width: 120, height: 60 } },
       { type: 'task', label: 'Finalize', x: 420, y: 100, size: { width: 120, height: 60 } },
@@ -156,6 +157,9 @@ const STARTER_PACKS = [
 // Group packs by category
 const CATEGORIES = [...new Set(STARTER_PACKS.map(p => p.category))];
 
+// Above the canvas's floating rotation handle (portal, z-index 10000) and other overlays
+const MODAL_Z_INDEX = 10100;
+
 // ============ COMPONENT ============
 
 export default function StarterPackModal({ isOpen, onClose, onApply }) {
@@ -178,10 +182,11 @@ export default function StarterPackModal({ isOpen, onClose, onApply }) {
     ? STARTER_PACKS
     : STARTER_PACKS.filter(p => p.category === activeCategory);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
-    <div style={{
+  // Rendered in a portal above every canvas overlay (floating rotation handle, toolbars)
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="Templates" data-testid="templates-modal" style={{
       position: 'fixed',
       top: 0,
       left: 0,
@@ -192,7 +197,7 @@ export default function StarterPackModal({ isOpen, onClose, onApply }) {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 10000,
+      zIndex: MODAL_Z_INDEX,
     }} onClick={handleClose}>
       <div
         onClick={(e) => e.stopPropagation()}
@@ -218,7 +223,7 @@ export default function StarterPackModal({ isOpen, onClose, onApply }) {
         }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>
-              Starter Packs
+              Templates
             </h2>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
               Choose a template to get started quickly
@@ -382,7 +387,7 @@ export default function StarterPackModal({ isOpen, onClose, onApply }) {
                 {' '}({selectedPack.elements.length} elements)
               </>
             ) : (
-              'Select a starter pack to add to your canvas'
+              'Select a template to add to your canvas'
             )}
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -423,7 +428,8 @@ export default function StarterPackModal({ isOpen, onClose, onApply }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

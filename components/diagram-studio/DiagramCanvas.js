@@ -43,6 +43,7 @@ import { useCanvasInteractions } from './hooks/composite/useCanvasInteractions';
 import { getZIndexForOrder, compareByZOrder } from './hooks/interaction/zOrder';
 import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOptions';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
+import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
 
 // Extracted utilities (refactored 2025-12-29)
 import {
@@ -87,36 +88,12 @@ import {
 // ============ HELPER FUNCTIONS ============
 // (Pure geometry utilities moved to ./utils/)
 
-// Find all elements that are inside a frame (based on bounding box containment)
-function getElementsInsideFrame(frame, elements, packRegistry) {
+// Elements that belong to a frame (nested frames travel with it, with their own members). Membership is explicit (parentFrameId): set when a
+// shape is dropped into / created inside the frame or inserted with a template, and
+// cleared when the shape is dragged out. It is never recomputed from geometry here.
+function getElementsInsideFrame(frame, elements) {
   if (!frame || frame.type !== 'frame') return [];
-
-  const pack = packRegistry?.get?.(frame.packId);
-  const stencil = pack?.stencils?.find(s => s.id === frame.type);
-  const frameSize = frame.size || stencil?.defaultSize || { width: 600, height: 400 };
-
-  const frameLeft = frame.x;
-  const frameTop = frame.y;
-  const frameRight = frame.x + frameSize.width;
-  const frameBottom = frame.y + frameSize.height;
-
-  return elements.filter(el => {
-    if (el.id === frame.id) return false; // Exclude the frame itself
-    if (el.type === 'frame') return false; // Don't nest frames
-
-    const elPack = packRegistry?.get?.(el.packId);
-    const elStencil = elPack?.stencils?.find(s => s.id === el.type);
-    const elSize = el.size || elStencil?.defaultSize || { width: 120, height: 60 };
-
-    const elLeft = el.x;
-    const elTop = el.y;
-    const elRight = el.x + elSize.width;
-    const elBottom = el.y + elSize.height;
-
-    // Element is inside if its bounds are within the frame bounds
-    return elLeft >= frameLeft && elTop >= frameTop &&
-           elRight <= frameRight && elBottom <= frameBottom;
-  });
+  return getFrameDescendants(frame.id, elements);
 }
 
 // Get connections where both source and target are in the given element list
@@ -127,21 +104,11 @@ function getConnectionsInsideFrame(elementIds, connections) {
   );
 }
 
-// Find a frame that contains both elements (for clipping connections to frame bounds)
-function findCommonParentFrame(sourceEl, targetEl, elements, packRegistry) {
-  // Find all frames
-  const frames = elements.filter(el => el.type === 'frame');
-
-  for (const frame of frames) {
-    const elementsInFrame = getElementsInsideFrame(frame, elements, packRegistry);
-    const elementIds = new Set(elementsInFrame.map(el => el.id));
-
-    // Check if both source and target are in this frame
-    if (elementIds.has(sourceEl.id) && elementIds.has(targetEl.id)) {
-      return frame.id;
-    }
+// Frame that both elements explicitly belong to (for clipping connections to frame bounds)
+function findCommonParentFrame(sourceEl, targetEl) {
+  if (sourceEl?.parentFrameId && sourceEl.parentFrameId === targetEl?.parentFrameId) {
+    return sourceEl.parentFrameId;
   }
-
   return null;
 }
 
@@ -2071,19 +2038,26 @@ export default function DiagramCanvas({
         // Commit final positions (clamped to valid canvas bounds)
         if (Object.keys(startPositions).length > 0) {
           // Multi-element drag
+          const finals = {};
           Object.keys(startPositions).forEach(id => {
             const startPos = startPositions[id];
-            updateElement(id, {
+            finals[id] = {
               x: clampToCanvas(wasAlignedX ? (startPos.x + offsetX) : snapToGrid(startPos.x + offsetX)),
               y: clampToCanvas(wasAlignedY ? (startPos.y + offsetY) : snapToGrid(startPos.y + offsetY)),
-            });
+            };
+          });
+          const membership = computeFrameMembershipChanges(elements, finals);
+          Object.keys(finals).forEach(id => {
+            updateElement(id, { ...finals[id], ...(id in membership ? { parentFrameId: membership[id] } : {}) });
           });
         } else {
           // Single element drag
-          updateElement(currentDraggingId, {
+          const final = {
             x: clampToCanvas(wasAlignedX ? current.x : snapToGrid(current.x)),
             y: clampToCanvas(wasAlignedY ? current.y : snapToGrid(current.y)),
-          });
+          };
+          const membership = computeFrameMembershipChanges(elements, { [currentDraggingId]: final });
+          updateElement(currentDraggingId, { ...final, ...(currentDraggingId in membership ? { parentFrameId: membership[currentDraggingId] } : {}) });
         }
 
         // When elements move, reset connections to auto-routing
@@ -2323,7 +2297,7 @@ export default function DiagramCanvas({
     }
     // For frame drag, set zIndex on all child elements
     if (element.type === 'frame') {
-      const childElements = getElementsInsideFrame(element, elements, packRegistry);
+      const childElements = getElementsInsideFrame(element, elements);
       childElements.forEach(child => {
         const childEl = canvasRef.current?.querySelector(`[data-node-id="${child.id}"]`);
         if (childEl) {
@@ -2505,14 +2479,21 @@ export default function DiagramCanvas({
 
       if (Object.keys(positions).length > 0) {
         // Multi-element drag
+        const finals = {};
         Object.keys(positions).forEach(id => {
           const pos = positions[id];
-          const nx = clampToCanvas(wasAlignedX ? (pos.x + offsetX) : snapToGrid(pos.x + offsetX));
-          const ny = clampToCanvas(wasAlignedY ? (pos.y + offsetY) : snapToGrid(pos.y + offsetY));
+          finals[id] = {
+            x: clampToCanvas(wasAlignedX ? (pos.x + offsetX) : snapToGrid(pos.x + offsetX)),
+            y: clampToCanvas(wasAlignedY ? (pos.y + offsetY) : snapToGrid(pos.y + offsetY)),
+          };
+        });
+        const membership = computeFrameMembershipChanges(elements, finals);
+        Object.keys(positions).forEach(id => {
+          const { x: nx, y: ny } = finals[id];
           const cur = elements.find(e => e.id === id);
           // A plain click (no movement) must not write or create an undo entry
           if (cur && cur.x === nx && cur.y === ny) return;
-          updateElement(id, { x: nx, y: ny });
+          updateElement(id, { x: nx, y: ny, ...(id in membership ? { parentFrameId: membership[id] } : {}) });
         });
       } else {
         // Single element drag
@@ -2520,7 +2501,8 @@ export default function DiagramCanvas({
         const ny = clampToCanvas(wasAlignedY ? current.y : snapToGrid(current.y));
         // A plain click (no movement) must not write or create an undo entry
         if (!(element.x === nx && element.y === ny)) {
-          updateElement(element.id, { x: nx, y: ny });
+          const membership = computeFrameMembershipChanges(elements, { [element.id]: { x: nx, y: ny } });
+          updateElement(element.id, { x: nx, y: ny, ...(element.id in membership ? { parentFrameId: membership[element.id] } : {}) });
         }
       }
 
@@ -2605,20 +2587,28 @@ export default function DiagramCanvas({
 
       if (Object.keys(positions).length > 0) {
         // Multi-element drag
+        const finals = {};
         Object.keys(positions).forEach(id => {
           const pos = positions[id];
-          const nx = clampToCanvas(wasAlignedX ? (pos.x + offsetX) : snapToGrid(pos.x + offsetX));
-          const ny = clampToCanvas(wasAlignedY ? (pos.y + offsetY) : snapToGrid(pos.y + offsetY));
+          finals[id] = {
+            x: clampToCanvas(wasAlignedX ? (pos.x + offsetX) : snapToGrid(pos.x + offsetX)),
+            y: clampToCanvas(wasAlignedY ? (pos.y + offsetY) : snapToGrid(pos.y + offsetY)),
+          };
+        });
+        const membership = computeFrameMembershipChanges(elements, finals);
+        Object.keys(positions).forEach(id => {
+          const { x: nx, y: ny } = finals[id];
           const cur = elements.find(e => e.id === id);
           if (cur && cur.x === nx && cur.y === ny) return; // plain click: no write, no undo entry
-          updateElement(id, { x: nx, y: ny });
+          updateElement(id, { x: nx, y: ny, ...(id in membership ? { parentFrameId: membership[id] } : {}) });
         });
       } else {
         // Single element drag
         const nx = clampToCanvas(wasAlignedX ? current.x : snapToGrid(current.x));
         const ny = clampToCanvas(wasAlignedY ? current.y : snapToGrid(current.y));
         if (!(element.x === nx && element.y === ny)) { // plain click: no write, no undo entry
-          updateElement(element.id, { x: nx, y: ny });
+          const membership = computeFrameMembershipChanges(elements, { [element.id]: { x: nx, y: ny } });
+          updateElement(element.id, { x: nx, y: ny, ...(element.id in membership ? { parentFrameId: membership[element.id] } : {}) });
         }
       }
 
@@ -2644,7 +2634,9 @@ export default function DiagramCanvas({
     if (selection.nodeIds.length > 1 && selection.nodeIds.includes(element.id)) {
       const positions = {};
       elements.forEach(el => {
-        if (selection.nodeIds.includes(el.id)) {
+        // A selected frame carries its explicit members along
+        if (selection.nodeIds.includes(el.id) ||
+            (el.parentFrameId && selection.nodeIds.includes(el.parentFrameId))) {
           positions[el.id] = { x: el.x, y: el.y };
         }
       });
@@ -2653,7 +2645,7 @@ export default function DiagramCanvas({
     }
     // If dragging a frame, also store positions of all child elements
     else if (element.type === 'frame') {
-      const childElements = getElementsInsideFrame(element, elements, packRegistry);
+      const childElements = getElementsInsideFrame(element, elements);
       const positions = { [element.id]: { x: element.x, y: element.y } };
       childElements.forEach(child => {
         positions[child.id] = { x: child.x, y: child.y };
@@ -3124,18 +3116,25 @@ export default function DiagramCanvas({
 
           if (Object.keys(positions).length > 0) {
             // Multi-element drag - clear translate transforms and restore rotation/scale + commit positions
+            const finals = {};
             Object.keys(positions).forEach(id => {
               const el = canvasRef.current?.querySelector(`[data-node-id="${id}"]`);
               if (el) {
                 restoreElementStyle(el, id);
               }
               const pos = positions[id];
-              const nx = clampToCanvas(snapToGrid(pos.x + offsetX));
-              const ny = clampToCanvas(snapToGrid(pos.y + offsetY));
+              finals[id] = {
+                x: clampToCanvas(snapToGrid(pos.x + offsetX)),
+                y: clampToCanvas(snapToGrid(pos.y + offsetY)),
+              };
+            });
+            const membership = computeFrameMembershipChanges(elements, finals);
+            Object.keys(positions).forEach(id => {
+              const { x: nx, y: ny } = finals[id];
               const cur = elements.find(e => e.id === id);
               if (cur && cur.x === nx && cur.y === ny) return; // plain click: no write, no undo entry
               movedAny = true;
-              updateElement(id, { x: nx, y: ny });
+              updateElement(id, { x: nx, y: ny, ...(id in membership ? { parentFrameId: membership[id] } : {}) });
             });
           } else {
             // Single element drag
@@ -3144,7 +3143,8 @@ export default function DiagramCanvas({
             const cur = elements.find(e => e.id === currentDragId);
             if (!(cur && cur.x === nx && cur.y === ny)) { // plain click: no write, no undo entry
               movedAny = true;
-              updateElement(currentDragId, { x: nx, y: ny });
+              const membership = computeFrameMembershipChanges(elements, { [currentDragId]: { x: nx, y: ny } });
+              updateElement(currentDragId, { x: nx, y: ny, ...(currentDragId in membership ? { parentFrameId: membership[currentDragId] } : {}) });
             }
           }
         }
@@ -3784,7 +3784,7 @@ export default function DiagramCanvas({
 
         // Check if both elements are inside a frame (for clipping)
         const parentFrameId = sourceEl && targetEl
-          ? findCommonParentFrame(sourceEl, targetEl, elements, packRegistry)
+          ? findCommonParentFrame(sourceEl, targetEl)
           : null;
 
         // Mind map connections should never have arrows
@@ -4529,7 +4529,7 @@ export default function DiagramCanvas({
     const defaultLineStyle = sourcePack?.defaultLineStyle || 'curved';
 
     // Check if both elements are inside a frame (for clipping)
-    const parentFrameId = findCommonParentFrame(sourceEl, targetElement, elements, packRegistry);
+    const parentFrameId = findCommonParentFrame(sourceEl, targetElement);
 
     // Check if either element is a mind map stencil - mind map connections have no arrows
     const isMindMapConnection = isMindMapElement(sourceEl) || isMindMapElement(targetElement);
