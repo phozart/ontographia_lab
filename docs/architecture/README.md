@@ -83,7 +83,7 @@ erDiagram
 ```
 
 - **Content blob**: `diagrams.content` is one JSONB document `{ elements[], connections[], layers[], groups[], viewport }`. Legacy rows may use `nodes`/`edges` or the pre-slice-0 "double write" shape (a nested `diagram` copy, no `viewport`); `normalizeDiagramContent` (`components/diagram-studio/migrations/normalizeContent.js`) maps all of them to the canonical shape on read, and the next save rewrites the row canonically *(slice 0)*. New ids are `<prefix>-<uuid v4>` from `crypto.randomUUID()` via `components/diagram-studio/utils/ids.js` (`el-`, `conn-`, `layer-`, `group-`, `frame-`, `sticky-`, `drawing-`); existing ids (`el-<ms>-<rand>`, `el_<ms>_<idx>`, `frame_<ms>`) remain valid and are never rewritten *(slice 0)*.
-- **Ownership** is effectively `diagrams.created_by = users.email`. `owner_id` exists but `createDiagram` never sets it.
+- **Ownership** *(slice 1)* is `diagrams.owner_id` (user id), set on create/duplicate and backfilled by migration 0002; `created_by` (email) stays for display. Platform admins have no implicit access to other users' diagrams (Q-S1).
 - **Schema evolution** *(slice 0)*: `init.sql` is frozen and only bootstraps a fresh Docker volume. Every change is a forward-only file in `db/migrations/` applied by `scripts/migrate.js` (`npm run db:migrate`; also before `npm start` and in the container `CMD`), recorded in `schema_migrations` with a checksum. `0001_baseline` is idempotent and replaces the former `lib/db.js#runMigrations`; the app no longer migrates lazily.
 
 ## 3. Request flow (save)
@@ -103,7 +103,7 @@ sequenceDiagram
 ```
 Before slice 0 the page's `onSave` handler issued a second PUT with `{elements,…,diagram}`, nesting a full copy of the row at `content.diagram.content` and dropping `viewport`.
 
-Authorization today: `requireActiveUser` (session + `status==='active'`) then `diagramRepository.checkAccess` → access iff `role==='admin'` or `created_by===email`. List (`GET /api/diagrams`) filters by `created_by` for non-admins and returns full rows including `content`.
+Authorization *(slice 1)*: every handler under `pages/api/diagrams/**` is wrapped by `withDiagramAuth` / `withUserAuth` (`lib/authz/next.js`), which calls the framework-free `authorize()` (`lib/authz/index.js`) against the policy table in `lib/authz/policy.js`. No role -> 404, insufficient role -> 403. Only the owner source exists until slice 5 (members). List (`GET /api/diagrams`) returns the caller's own diagrams (admins included) and still includes `content`. `PUT` is guarded by an optional `If-Match` revision and by server-side content validation (`lib/diagramContent.js`).
 
 ## 4. Baseline observations that affect Groups B–D
 
