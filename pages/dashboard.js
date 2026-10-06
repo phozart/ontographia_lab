@@ -414,8 +414,8 @@ export default function DashboardPage() {
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                   <QuickAction
                     icon={ExtensionIcon}
-                    label="Stencil Packs"
-                    description="Explore shapes"
+                    label="Shapes"
+                    description="Browse the shape library"
                     href="/guide/stencils"
                     color={SKY.warmPeach}
                   />
@@ -687,7 +687,7 @@ export default function DashboardPage() {
                     />
                     <ResourceLink
                       icon={ExtensionIcon}
-                      label="Stencil Packs"
+                      label="Shapes"
                       href="/guide/stencils"
                       color={SKY.deepLavender}
                     />

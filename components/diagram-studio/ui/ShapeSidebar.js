@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { useDiagram } from '../DiagramContext';
+import { quickShapeAction, isStencilArmed } from './shapeSidebarLogic';
 
 // Icons
 import SquareOutlinedIcon from '@mui/icons-material/SquareOutlined';
@@ -147,9 +148,9 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
   onAddPack,
   onTogglePack,
   readOnly,
+  hidden = false,
 }, ref) {
-  const { setActiveTool, setSelectedStencil } = useDiagram();
-  const [activeShape, setActiveShape] = useState(null);
+  const { activeTool, setActiveTool, setSelectedStencil } = useDiagram();
   const [showFlyout, setShowFlyout] = useState(false);
   const [flyoutPack, setFlyoutPack] = useState(null);
   const [lastUsedStencil, setLastUsedStencil] = useState(null);
@@ -193,36 +194,51 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
     openFirstPack,
   }), [openFirstPack]);
 
-  // Close flyout on click outside
+  // The pack panel stays pinned while the user drops several shapes. It closes on:
+  //  - Escape
+  //  - a click elsewhere on the sidebar (outside the panel; pack buttons toggle it themselves)
+  //  - choosing another tool (connect, pan, sticky, comment, ...). Select and draw
+  //    keep it open because placing a shape returns the tool to select.
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (showFlyout && sidebarRef.current && !sidebarRef.current.contains(e.target)) {
-        setShowFlyout(false);
-      }
+    if (!showFlyout) return undefined;
+    const handleMouseDown = (e) => {
+      const sidebar = sidebarRef.current;
+      if (!sidebar || !sidebar.contains(e.target)) return;
+      if (e.target.closest?.('.ds-stencil-flyout') || e.target.closest?.('.ds-packs-section')) return;
+      setShowFlyout(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setShowFlyout(false);
+    };
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [showFlyout]);
+
+  useEffect(() => {
+    if (showFlyout && activeTool && activeTool !== 'select' && activeTool !== 'draw') {
+      setShowFlyout(false);
+    }
+  }, [activeTool, showFlyout]);
 
   // Handle quick shape selection - uses stencil data directly for reliability
   const handleQuickShapeClick = (shape) => {
-    if (activeShape?.id === shape.id) {
-      // Toggle off - deselect
-      setActiveShape(null);
+    // Armed state is derived from the context's selectedStencil only, so a placement that
+    // clears it can never leave a stale "active" shape behind (triage n1).
+    if (quickShapeAction(selectedStencil, shape) === 'disarm') {
       setSelectedStencil?.(null);
       setActiveTool('select');
-    } else {
-      // Select shape - use embedded stencil data for direct selection
-      setActiveShape(shape);
-      // Set the stencil directly with full data (doesn't rely on pack lookup)
-      const stencilWithPack = { ...shape.stencilData, packId: shape.packId };
-      setSelectedStencil(stencilWithPack);
-      setActiveTool('draw');
-      // Save as last used stencil
-      saveLastUsedStencil(stencilWithPack);
-      // Also call onStencilSelect for any parent tracking
-      onStencilSelect?.(shape.packId, shape.stencilId);
+      return;
     }
+    setShowFlyout(false);
+    const stencilWithPack = { ...shape.stencilData, packId: shape.packId };
+    setSelectedStencil(stencilWithPack);
+    setActiveTool('draw');
+    saveLastUsedStencil(stencilWithPack);
+    onStencilSelect?.(shape.packId, shape.stencilId);
   };
 
   // Handle last used stencil click
@@ -233,11 +249,9 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
     if (selectedStencil?.id === lastUsedStencil.id && selectedStencil?.packId === lastUsedStencil.packId) {
       setSelectedStencil(null);
       setActiveTool('select');
-      setActiveShape(null);
     } else {
       setSelectedStencil(lastUsedStencil);
       setActiveTool('draw');
-      setActiveShape(null); // Clear quick shape selection
     }
   };
 
@@ -285,7 +299,7 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
       saveLastUsedStencil(stencilWithPack);
     }
     onStencilSelect?.(packId, stencilId);
-    setShowFlyout(false);
+    // Panel stays open (pinned) so several shapes can be dropped in a row
     setActiveTool('draw');
   };
 
@@ -298,7 +312,7 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
     // Don't close flyout here - it aborts the drag operation
   };
 
-  // Handle stencil drag end from flyout - close flyout and save as last used
+  // Handle stencil drag end from flyout - save as last used (the panel stays pinned open)
   const handleFlyoutDragEnd = (packId, stencilId) => {
     // Look up full stencil data to save as last used
     if (packId && stencilId) {
@@ -309,47 +323,15 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
         saveLastUsedStencil(stencilWithPack);
       }
     }
-    setShowFlyout(false);
   };
 
   // Check if a shape is selected
-  const isShapeActive = (shape) => {
-    return selectedStencil?.packId === shape.packId && selectedStencil?.id === shape.stencilId;
-  };
+  const isShapeActive = (shape) => isStencilArmed(selectedStencil, shape);
+
+  if (hidden) return null;
 
   return (
     <div className="ds-shape-sidebar" ref={sidebarRef}>
-      {/* Last used stencil - always at top when available */}
-      {lastUsedStencil && (
-        <div className="ds-sidebar-section ds-last-used">
-          <button
-            className={`ds-sidebar-btn ds-last-used-btn ${
-              selectedStencil?.id === lastUsedStencil.id &&
-              selectedStencil?.packId === lastUsedStencil.packId ? 'active' : ''
-            }`}
-            onClick={handleLastUsedClick}
-            draggable="true"
-            onDragStart={(e) => {
-              if (!e.dataTransfer) return;
-              const dragData = JSON.stringify({
-                type: 'stencil',
-                packId: lastUsedStencil.packId,
-                stencilId: lastUsedStencil.id,
-              });
-              e.dataTransfer.setData('application/json', dragData);
-              e.dataTransfer.setData('text/plain', dragData);
-              e.dataTransfer.effectAllowed = 'copy';
-              onStencilDragStart?.(lastUsedStencil.packId, lastUsedStencil.id);
-            }}
-            title={`Last used: ${lastUsedStencil.name}`}
-          >
-            <HistoryIcon />
-          </button>
-        </div>
-      )}
-
-      {lastUsedStencil && <div className="ds-sidebar-divider" />}
-
       {/* Quick shapes - support both click-to-draw and drag-to-drop */}
       <div className="ds-sidebar-section">
         {QUICK_SHAPES.map(shape => (
@@ -375,7 +357,7 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
       <div className="ds-sidebar-divider" />
 
       {/* Pack shortcuts - show all enabled packs except core */}
-      <div className="ds-sidebar-section ds-packs-section">
+      <div className="ds-sidebar-section ds-packs-section" role="group" aria-label="Shapes">
         {enabledPacks?.map(packId => {
           const pack = packRegistry?.get?.(packId);
           if (!pack || packId === 'core') return null;
@@ -395,12 +377,46 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
           <button
             className="ds-sidebar-btn ds-sidebar-add"
             onClick={onAddPack}
-            title="More stencil packs"
+            title="Templates"
+            aria-label="Templates"
           >
             <AddOutlinedIcon />
           </button>
         )}
       </div>
+
+      {/* Last used stencil - bottom slot: appearing here never shifts the icons above it (#29) */}
+      {lastUsedStencil && (
+        <>
+        <div className="ds-sidebar-divider" />
+        <div className="ds-sidebar-section ds-last-used">
+          <button
+            className={`ds-sidebar-btn ds-last-used-btn ${
+              selectedStencil?.id === lastUsedStencil.id &&
+              selectedStencil?.packId === lastUsedStencil.packId ? 'active' : ''
+            }`}
+            onClick={handleLastUsedClick}
+            draggable="true"
+            onDragStart={(e) => {
+              if (!e.dataTransfer) return;
+              const dragData = JSON.stringify({
+                type: 'stencil',
+                packId: lastUsedStencil.packId,
+                stencilId: lastUsedStencil.id,
+              });
+              e.dataTransfer.setData('application/json', dragData);
+              e.dataTransfer.setData('text/plain', dragData);
+              e.dataTransfer.effectAllowed = 'copy';
+              onStencilDragStart?.(lastUsedStencil.packId, lastUsedStencil.id);
+            }}
+            title={`Last used: ${lastUsedStencil.name}`}
+          >
+            <HistoryIcon />
+          </button>
+        </div>
+        </>
+      )}
+
 
       {/* Flyout panel */}
       {showFlyout && flyoutPack && (
