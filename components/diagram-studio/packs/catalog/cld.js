@@ -1,0 +1,273 @@
+// Catalog data for the "cld" pack: plain data, no React. Shared by the pack (rendering) and the MCP server.
+// Do not import UI code here (enforced by __tests__/lib/catalog.test.js).
+
+export const stencils = [
+  // Variables
+  {
+    id: 'variable',
+    name: 'Variable',
+    description: 'A system variable that can change over time',
+    group: 'Variables',
+    shape: 'rect',
+    icon: 'V',
+    color: '#3b82f6',
+    defaultSize: { width: 140, height: 50 },
+    ports: [
+      { id: 'top', position: 'top' },
+      { id: 'right', position: 'right' },
+      { id: 'bottom', position: 'bottom' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+    properties: [
+      { id: 'variableType', label: 'Type', type: 'select', options: [
+        { value: 'state', label: 'State Variable' },
+        { value: 'rate', label: 'Rate Variable' },
+        { value: 'auxiliary', label: 'Auxiliary' },
+        { value: 'exogenous', label: 'Exogenous' },
+      ]},
+      { id: 'units', label: 'Units', type: 'text' },
+    ],
+  },
+
+  // Stocks (accumulators)
+  {
+    id: 'stock',
+    name: 'Stock',
+    description: 'An accumulator that changes over time (level/state)',
+    group: 'Stocks & Flows',
+    shape: 'rect',
+    icon: '▭',
+    color: '#22c55e',
+    defaultSize: { width: 100, height: 60 },
+    ports: [
+      { id: 'top', position: 'top' },
+      { id: 'right', position: 'right' },
+      { id: 'bottom', position: 'bottom' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+    properties: [
+      { id: 'initialValue', label: 'Initial Value', type: 'number' },
+      { id: 'units', label: 'Units', type: 'text' },
+    ],
+  },
+
+  // Flow (rate of change)
+  {
+    id: 'flow',
+    name: 'Flow',
+    description: 'Rate of change into or out of a stock',
+    group: 'Stocks & Flows',
+    shape: 'rect',
+    icon: '⋈',
+    color: '#f59e0b',
+    defaultSize: { width: 80, height: 40 },
+    ports: [
+      { id: 'top', position: 'top' },
+      { id: 'right', position: 'right' },
+      { id: 'bottom', position: 'bottom' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+    properties: [
+      { id: 'flowType', label: 'Flow Type', type: 'select', options: [
+        { value: 'inflow', label: 'Inflow' },
+        { value: 'outflow', label: 'Outflow' },
+        { value: 'biflow', label: 'Biflow' },
+      ]},
+      { id: 'equation', label: 'Equation', type: 'textarea' },
+    ],
+  },
+
+  // Cloud (source/sink)
+  {
+    id: 'cloud',
+    name: 'Source/Sink',
+    description: 'External source or sink (outside system boundary)',
+    group: 'Stocks & Flows',
+    shape: 'ellipse',
+    icon: '☁',
+    color: '#94a3b8',
+    defaultSize: { width: 60, height: 40 },
+    ports: [
+      { id: 'right', position: 'right' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+  },
+
+  // Loop Markers
+  {
+    id: 'reinforcing-loop',
+    name: 'Reinforcing Loop',
+    description: 'Marker for reinforcing (R) feedback loop',
+    group: 'Loop Markers',
+    shape: 'circle',
+    icon: 'R',
+    defaultLabel: 'R',
+    color: '#ef4444',
+    defaultSize: { width: 50, height: 50 },
+    ports: [],
+    isContainer: false,
+    properties: [
+      { id: 'loopName', label: 'Loop Name', type: 'text' },
+      { id: 'loopNumber', label: 'Loop Number', type: 'text' },
+    ],
+  },
+  {
+    id: 'balancing-loop',
+    name: 'Balancing Loop',
+    description: 'Marker for balancing (B) feedback loop',
+    group: 'Loop Markers',
+    shape: 'circle',
+    icon: 'B',
+    defaultLabel: 'B',
+    color: '#3b82f6',
+    defaultSize: { width: 50, height: 50 },
+    ports: [],
+    isContainer: false,
+    properties: [
+      { id: 'loopName', label: 'Loop Name', type: 'text' },
+      { id: 'loopNumber', label: 'Loop Number', type: 'text' },
+    ],
+  },
+
+  // Auxiliary elements
+  {
+    id: 'constant',
+    name: 'Constant',
+    description: 'A fixed value that does not change',
+    group: 'Auxiliary',
+    shape: 'diamond',
+    icon: 'C',
+    color: '#8b5cf6',
+    defaultSize: { width: 50, height: 50 },
+    ports: [
+      { id: 'top', position: 'top' },
+      { id: 'right', position: 'right' },
+      { id: 'bottom', position: 'bottom' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+    properties: [
+      { id: 'value', label: 'Value', type: 'number' },
+      { id: 'units', label: 'Units', type: 'text' },
+    ],
+  },
+  {
+    id: 'table-function',
+    name: 'Table Function',
+    description: 'Lookup table for non-linear relationships',
+    group: 'Auxiliary',
+    shape: 'rect',
+    icon: '📈',
+    color: '#06b6d4',
+    defaultSize: { width: 80, height: 50 },
+    ports: [
+      { id: 'top', position: 'top' },
+      { id: 'right', position: 'right' },
+      { id: 'bottom', position: 'bottom' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+    properties: [
+      { id: 'tableData', label: 'Table Data', type: 'textarea' },
+    ],
+  },
+
+  // Annotations
+  {
+    id: 'system-boundary',
+    name: 'System Boundary',
+    description: 'Boundary defining the system scope',
+    group: 'Annotations',
+    shape: 'rect',
+    icon: '⬜',
+    color: '#e5e7eb',
+    defaultSize: { width: 400, height: 300 },
+    ports: [],
+    isContainer: true,
+    properties: [
+      { id: 'boundaryName', label: 'Boundary Name', type: 'text' },
+    ],
+  },
+  {
+    id: 'annotation',
+    name: 'Annotation',
+    description: 'Text annotation or note',
+    group: 'Annotations',
+    shape: 'rect',
+    icon: '📝',
+    color: '#fef3c7',
+    defaultSize: { width: 150, height: 60 },
+    ports: [],
+    isContainer: false,
+  },
+];
+
+export const connectionTypes = [
+  {
+    id: 'positive-link',
+    name: 'Positive Link (+)',
+    description: 'Same-direction causal link: when A increases, B increases',
+    style: 'solid',
+    arrowStart: 'none',
+    arrowEnd: 'arrow',
+    color: '#22c55e',
+    labelPosition: 'center',
+    defaultLabel: '+',
+  },
+  {
+    id: 'negative-link',
+    name: 'Negative Link (-)',
+    description: 'Opposite-direction causal link: when A increases, B decreases',
+    style: 'solid',
+    arrowStart: 'none',
+    arrowEnd: 'arrow',
+    color: '#ef4444',
+    labelPosition: 'center',
+    defaultLabel: '-',
+  },
+  {
+    id: 'delayed-positive',
+    name: 'Delayed Positive (+//)',
+    description: 'Positive link with time delay',
+    style: 'dashed',
+    arrowStart: 'none',
+    arrowEnd: 'arrow',
+    color: '#22c55e',
+    labelPosition: 'center',
+    defaultLabel: '+//',
+  },
+  {
+    id: 'delayed-negative',
+    name: 'Delayed Negative (-//)',
+    description: 'Negative link with time delay',
+    style: 'dashed',
+    arrowStart: 'none',
+    arrowEnd: 'arrow',
+    color: '#ef4444',
+    labelPosition: 'center',
+    defaultLabel: '-//',
+  },
+  {
+    id: 'flow-pipe',
+    name: 'Flow Pipe',
+    description: 'Physical flow connection',
+    style: 'solid',
+    arrowStart: 'none',
+    arrowEnd: 'arrow',
+    color: '#3b82f6',
+    strokeWidth: 3,
+  },
+  {
+    id: 'information-link',
+    name: 'Information Link',
+    description: 'Information flow (no physical transfer)',
+    style: 'dotted',
+    arrowStart: 'none',
+    arrowEnd: 'arrow',
+    color: '#6b7280',
+  },
+];

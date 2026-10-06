@@ -341,6 +341,13 @@ Each slice follows the repo rules: TDD, append to `docs/release/IMPLEMENTATION-L
 | Q-E3   | Show a footer "Open in Ontographia" link in embeds?                        | Yes, small, opens a new tab; it only helps signed-in viewers who have access                                       |
 | Q-E4   | Should agents (MCP) be able to create embed or share links?                | **No** (consistent with Q-AI1)                                                                                     |
 
+## As-built notes (M1, read-only MCP)
+
+- **Visibility**: `diagram_list`, `diagram_search` and the resource list include only diagrams with `owner_id = userId` (then filtered through `authorize`). Diagrams shared with the user appear once sharing ships (slice 5); the tool descriptions say so.
+- **Output budget**: every tool result and resource body is capped at 256 KB serialized (`MAX_RESPONSE_BYTES` in `lib/mcp/projections.js`). Tool results carry the payload twice (text and `structuredContent`), so each copy gets about half. Elements, then connections between kept elements, are taken in order until the budget is spent; data keys (64 chars), data values (500 chars) and per-element data (4 KB) are capped. When anything is cut, `truncated: true`, `omitted: {elements, connections}` and a hint to use `frameId` / `elementIds` are returned (mermaid and outline end with a notice line).
+- **Request bodies**: `/api/mcp` disables Next's body parser and reads the body itself (256 KB), so invalid JSON is a JSON-RPC `-32700` (HTTP 400) and an oversize body `-32600` (HTTP 413).
+- **Token creation**: the 20-active-token limit is enforced inside one transaction under `pg_advisory_xact_lock(hashtext(user_id))`. Session-authenticated token routes reject a foreign `Origin` on POST/DELETE (`lib/sameOrigin.js`).
+
 ## Sources (accessed 2026-10-06)
 
 - MCP versioning, current revision **2026-07-28**: <https://modelcontextprotocol.io/specification/versioning>
