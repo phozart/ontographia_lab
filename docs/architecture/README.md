@@ -13,6 +13,7 @@ Proposed work is in the ADRs and companion docs below; nothing here is implement
 | [api-contracts.md](api-contracts.md) | REST contracts for B and C, authorization signature, MCP tool sketch |
 | [open-questions.md](open-questions.md) | Decisions that belong to the product owner, each with a recommended default |
 | [delivery-plan.md](delivery-plan.md) | Ordered, independently shippable vertical slices |
+| [investigations/mcp-and-embedding.md](investigations/mcp-and-embedding.md) | Investigation: MCP server for agents, MCP Apps and iframe embedding of diagrams (proposal, not scheduled) |
 
 ## 1. System at a glance
 
