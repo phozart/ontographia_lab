@@ -245,6 +245,11 @@ export function placePopoverElement(el, { preferred = 'bottom', align = 'center'
   const trigger = el.parentElement;
   if (!trigger) return;
   const anchor = rectToAnchor(trigger.getBoundingClientRect());
+  // Cap the size first so measurement reflects what will actually be shown.
+  const cap = usableBounds(getViewportSize(), getObstacleRects());
+  el.style.maxWidth = `${cap.right - cap.left}px`;
+  el.style.maxHeight = `${Math.max(120, cap.bottom - cap.top - 48)}px`;
+  el.style.overflowY = 'auto';
   const r = computePlacement({
     anchor,
     size: { width: el.offsetWidth, height: el.offsetHeight },
@@ -260,8 +265,14 @@ export function placePopoverElement(el, { preferred = 'bottom', align = 'center'
   el.style.bottom = 'auto';
   el.style.transform = 'none';
   el.style.margin = '0';
-  el.style.maxWidth = `${r.bounds.right - r.bounds.left}px`;
-  el.style.maxHeight = `${r.bounds.bottom - r.bounds.top}px`;
-  el.style.overflowY = 'auto';
   el.dataset.placement = r.placement;
+  // An ancestor with transform/backdrop-filter becomes the containing block for fixed
+  // descendants; correct by whatever offset that introduces.
+  const actual = el.getBoundingClientRect();
+  const dx = r.left - actual.left;
+  const dy = r.top - actual.top;
+  if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+    el.style.left = `${r.left + dx}px`;
+    el.style.top = `${r.top + dy}px`;
+  }
 }
