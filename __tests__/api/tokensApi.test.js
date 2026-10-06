@@ -128,3 +128,24 @@ describe('DELETE /api/user/tokens/[id]', () => {
     expect(res.statusCode).toBe(405);
   });
 });
+
+describe('CSRF origin check on state-changing token routes', () => {
+  test('POST with a foreign Origin is 403 and creates nothing', async () => {
+    const res = mockRes();
+    await tokensRoute(req('POST', { name: 'x' }, { headers: { 'content-type': 'application/json', origin: 'https://evil.example', host: 'app.test' } }), res);
+    expect(res.statusCode).toBe(403);
+    expect(createToken).not.toHaveBeenCalled();
+  });
+  test('DELETE with a foreign Origin is 403 and revokes nothing', async () => {
+    const res = mockRes();
+    await tokenRoute(req('DELETE', undefined, { query: { id: T1 }, headers: { origin: 'https://evil.example', host: 'app.test' } }), res);
+    expect(res.statusCode).toBe(403);
+    expect(revokeToken).not.toHaveBeenCalled();
+  });
+  test('DELETE with the app origin proceeds', async () => {
+    revokeToken.mockResolvedValue(true);
+    const res = mockRes();
+    await tokenRoute(req('DELETE', undefined, { query: { id: T1 }, headers: { origin: 'http://app.test', host: 'app.test' } }), res);
+    expect(res.statusCode).toBe(200);
+  });
+});

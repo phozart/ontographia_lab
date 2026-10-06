@@ -13,7 +13,7 @@ const authFailLimiter = rateLimit({ interval: 60 * 1000, limit: 30, prefix: 'mcp
 
 export const config = {
   api: {
-    bodyParser: { sizeLimit: '256kb' }, // keep equal to MAX_BODY_BYTES (Next requires a literal here)
+    bodyParser: false, // lib/mcp/http.js reads the body itself (MAX_BODY_BYTES) so failures are JSON-RPC errors
     externalResolver: true,
   },
 };

@@ -5,6 +5,7 @@
 
 import { withUserAuth } from '../../../../lib/authz/next';
 import { authorize, AuthzError } from '../../../../lib/authz';
+import { requireSameOrigin } from '../../../../lib/sameOrigin';
 import { createToken, listTokens, validateTokenInput, TokenError } from '../../../../lib/apiTokens';
 
 async function handler(req, res, { principal, user }) {
@@ -13,6 +14,8 @@ async function handler(req, res, { principal, user }) {
   if (req.method === 'GET') {
     return res.status(200).json({ tokens: await listTokens(user.id) });
   }
+
+  if (!requireSameOrigin(req, res)) return undefined;
 
   // JSON only: a cross-site HTML form cannot send this content type, which complements SameSite cookies.
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) {

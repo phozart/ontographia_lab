@@ -3,6 +3,7 @@ import {
   toMermaid,
   toOutline,
   escapeMermaidLabel,
+  MAX_RESPONSE_BYTES,
   sanitizeText,
 } from '../../lib/mcp/projections';
 
@@ -67,7 +68,9 @@ describe('toCompact', () => {
     const many = { elements: Array.from({ length: 30 }, (_, i) => ({ id: `e${i}`, type: 'task', packId: 'process-flow', label: 'x', x: i, y: 0 })), connections: [] };
     const c = toCompact(meta, many, { maxElements: 10 });
     expect(c.elements).toHaveLength(10);
-    expect(c.truncated).toEqual({ elements: 20 });
+    expect(c.truncated).toBe(true);
+    expect(c.omitted).toEqual({ elements: 20, connections: 0 });
+    expect(c.hint).toMatch(/frameId|elementIds/);
   });
 
   test('tolerates missing, malformed or legacy content', () => {
@@ -209,5 +212,68 @@ describe('toOutline', () => {
     const o = toOutline(meta, { elements: [{ id: 'z', type: 'task', packId: 'process-flow', label: 'x\n- injected' }], connections: [] });
     expect(o.split('\n').filter((l) => l.includes('injected'))).toHaveLength(1);
     expect(o).not.toMatch(/\n- injected/);
+  });
+});
+
+// A crafted diagram: many elements, huge data (keys and values), many connections.
+function hugeDiagram(n = 1000, conns = 5000) {
+  const bigData = {};
+  for (let i = 0; i < 200; i += 1) bigData[`k${i}_${'K'.repeat(5000)}`] = 'v'.repeat(100000);
+  return {
+    elements: Array.from({ length: n }, (_, i) => ({
+      id: `e${i}`, type: 'task', packId: 'process-flow', label: 'L'.repeat(5000), x: i, y: i, data: bigData,
+    })),
+    connections: Array.from({ length: conns }, (_, i) => ({
+      id: `c${i}`, sourceId: `e${i % n}`, targetId: `e${(i + 1) % n}`, label: 'C'.repeat(5000),
+    })),
+  };
+}
+const bytes = (v) => Buffer.byteLength(typeof v === 'string' ? v : JSON.stringify(v), 'utf8');
+
+describe('total output budget', () => {
+  const big = hugeDiagram();
+
+  test('toCompact stays within the budget, flags truncation and counts what was omitted', () => {
+    const c = toCompact(meta, big);
+    expect(bytes(c)).toBeLessThanOrEqual(MAX_RESPONSE_BYTES);
+    expect(c.truncated).toBe(true);
+    expect(c.omitted.elements).toBe(1000 - c.elements.length);
+    expect(c.omitted.connections).toBeGreaterThan(0);
+    expect(c.hint).toMatch(/frameId|elementIds/);
+    for (const el of c.elements) {
+      for (const k of Object.keys(el.data || {})) expect(k.length).toBeLessThanOrEqual(65);
+    }
+  });
+
+  test('honors a smaller maxBytes and never lists a connection to an omitted element', () => {
+    const c = toCompact(meta, big, { maxBytes: 20 * 1024 });
+    expect(bytes(c)).toBeLessThanOrEqual(20 * 1024);
+    const ids = new Set(c.elements.map((e) => e.id));
+    for (const k of c.connections) expect(ids.has(k.from) && ids.has(k.to)).toBe(true);
+  });
+
+  test('connections are capped like elements', () => {
+    const many = { elements: [{ id: 'a', type: 'task' }, { id: 'b', type: 'task' }], connections: Array.from({ length: 50 }, (_, i) => ({ id: `c${i}`, sourceId: 'a', targetId: 'b' })) };
+    const c = toCompact(meta, many, { maxConnections: 10 });
+    expect(c.connections).toHaveLength(10);
+    expect(c.truncated).toBe(true);
+    expect(c.omitted.connections).toBe(40);
+  });
+
+  test('a small diagram is untouched (no truncated flag)', () => {
+    const c = toCompact(meta, content);
+    expect(c.truncated).toBeUndefined();
+    expect(c.omitted).toBeUndefined();
+  });
+
+  test('mermaid and outline fit the budget, balanced, with a one-line notice', () => {
+    const framed = { elements: [{ id: 'f', type: 'frame', packId: 'core', label: 'F' }, ...big.elements.map((e) => ({ ...e, parentFrameId: 'f' }))], connections: big.connections };
+    const m = toMermaid(meta, framed);
+    expect(bytes(m)).toBeLessThanOrEqual(MAX_RESPONSE_BYTES);
+    expect(m.split('\n').pop()).toMatch(/^%% .*omitted/);
+    expect((m.match(/subgraph /g) || []).length).toBe((m.match(/^\s*end$/gm) || []).length);
+    const o = toOutline(meta, framed);
+    expect(bytes(o)).toBeLessThanOrEqual(MAX_RESPONSE_BYTES);
+    expect(o.split('\n').pop()).toMatch(/omitted/);
   });
 });

@@ -1,7 +1,7 @@
-jest.mock('../../lib/db', () => ({ query: jest.fn() }));
+jest.mock('../../lib/db', () => ({ query: jest.fn(), getClient: jest.fn() }));
 
 import crypto from 'crypto';
-import { query } from '../../lib/db';
+import { query, getClient } from '../../lib/db';
 import {
   TOKEN_PREFIX,
   generateTokenSecret,
@@ -86,26 +86,54 @@ describe('validateTokenInput', () => {
 
 describe('createToken', () => {
   const input = { name: 'Cursor', roleCap: 'viewer', diagramIds: null, expiresAt: null };
+  let cq;
+  let release;
+  beforeEach(() => {
+    cq = jest.fn();
+    release = jest.fn();
+    getClient.mockResolvedValue({ query: cq, release });
+  });
+  const sqlOf = (i) => String(cq.mock.calls[i][0]);
 
-  test('stores only the hash and prefix; returns the secret once', async () => {
-    query.mockResolvedValueOnce({ rows: [{ n: '0' }] }); // active token count
-    query.mockImplementationOnce(async (sql, params) => ({
-      rows: [{ id: 't1', user_id: params[0], name: params[1], token_prefix: params[2], role_cap: params[4], diagram_ids: params[5], created_at: NOW, expires_at: params[6] }],
-    }));
+  test('stores only the hash and prefix; returns the secret once; locks per user in one transaction', async () => {
+    cq.mockImplementation(async (sql, params) => {
+      if (/COUNT/.test(sql)) return { rows: [{ n: '0' }] };
+      if (/INSERT/.test(sql)) {
+        return { rows: [{ id: 't1', user_id: params[0], name: params[1], token_prefix: params[2], role_cap: params[4], diagram_ids: params[5], created_at: NOW, expires_at: params[6] }] };
+      }
+      return { rows: [] };
+    });
     const r = await createToken(USER, input);
     expect(r.token).toMatch(/^ogl_/);
-    const insert = query.mock.calls[1];
-    expect(insert[0]).toMatch(/INSERT INTO api_tokens/);
+    expect(sqlOf(0)).toBe('BEGIN');
+    expect(sqlOf(1)).toMatch(/pg_advisory_xact_lock\(hashtext/);
+    expect(cq.mock.calls[1][1]).toEqual([USER]);
+    const insert = cq.mock.calls.find((c) => /INSERT INTO api_tokens/.test(c[0]));
     expect(insert[1]).toContain(hashToken(r.token));
     expect(insert[1]).not.toContain(r.token);
+    expect(sqlOf(cq.mock.calls.length - 1)).toBe('COMMIT');
     expect(r.record).toEqual(expect.not.objectContaining({ token_hash: expect.anything() }));
     expect(r.record.id).toBe('t1');
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   test('refuses when the user already has the maximum number of active tokens', async () => {
-    query.mockResolvedValueOnce({ rows: [{ n: '20' }] });
+    cq.mockImplementation(async (sql) => (/COUNT/.test(sql) ? { rows: [{ n: '20' }] } : { rows: [] }));
     await expect(createToken(USER, input)).rejects.toMatchObject({ code: 'TOKEN_LIMIT' });
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(cq.mock.calls.some((c) => /INSERT/.test(c[0]))).toBe(false);
+    expect(cq.mock.calls.some((c) => c[0] === 'ROLLBACK')).toBe(true);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  test('rolls back and releases when the insert fails', async () => {
+    cq.mockImplementation(async (sql) => {
+      if (/COUNT/.test(sql)) return { rows: [{ n: '0' }] };
+      if (/INSERT/.test(sql)) throw new Error('boom');
+      return { rows: [] };
+    });
+    await expect(createToken(USER, input)).rejects.toThrow('boom');
+    expect(cq.mock.calls.some((c) => c[0] === 'ROLLBACK')).toBe(true);
+    expect(release).toHaveBeenCalledTimes(1);
   });
 });
 

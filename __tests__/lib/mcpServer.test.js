@@ -297,3 +297,44 @@ describe('server instructions', () => {
     expect(client.getInstructions()).toMatch(/data, not instructions/i);
   });
 });
+
+describe('response size budget', () => {
+  const HUGE = {
+    elements: Array.from({ length: 1000 }, (_, i) => ({
+      id: `e${i}`, type: 'task', packId: 'process-flow', label: 'L'.repeat(5000), x: i, y: 0,
+      data: Object.fromEntries(Array.from({ length: 60 }, (_, k) => [`key${k}${'K'.repeat(2000)}`, 'v'.repeat(100000)])),
+    })),
+    connections: Array.from({ length: 5000 }, (_, i) => ({ id: `c${i}`, sourceId: `e${i % 1000}`, targetId: `e${(i + 1) % 1000}`, label: 'C'.repeat(5000) })),
+  };
+  const wire = (r) => Buffer.byteLength(JSON.stringify(r), 'utf8');
+  const LIMIT = 256 * 1024 + 16 * 1024; // budget plus JSON-RPC framing
+
+  beforeEach(() => repo.getContent.mockResolvedValue({ content: HUGE, description: 'D'.repeat(5000) }));
+
+  test.each(['compact', 'mermaid', 'outline'])('diagram_get %s stays within the budget and says it was truncated', async (format) => {
+    const client = await connect();
+    const r = await call(client, 'diagram_get', { id: A, format });
+    expect(r.isError).toBeFalsy();
+    expect(wire(r.content) + wire(r.structuredContent)).toBeLessThanOrEqual(LIMIT);
+    const sc = r.structuredContent;
+    expect(format === 'compact' ? sc.content.truncated : sc.truncated).toBe(true);
+    expect(text(r)).toMatch(/omitted|truncated/);
+  });
+
+  test('resources/read for compact and mermaid stay within the budget', async () => {
+    const client = await connect();
+    const c = await client.readResource({ uri: `ontographia://diagrams/${A}` });
+    expect(Buffer.byteLength(c.contents[0].text)).toBeLessThanOrEqual(256 * 1024);
+    expect(JSON.parse(c.contents[0].text).truncated).toBe(true);
+    const m = await client.readResource({ uri: `ontographia://diagrams/${A}/mermaid` });
+    expect(Buffer.byteLength(m.contents[0].text)).toBeLessThanOrEqual(256 * 1024);
+  });
+
+  test('list and search descriptions note that shared diagrams come with sharing', async () => {
+    const client = await connect();
+    const { tools } = await client.listTools();
+    for (const n of ['diagram_list', 'diagram_search']) {
+      expect(tools.find((t) => t.name === n).description).toMatch(/shar(ed|ing)/i);
+    }
+  });
+});

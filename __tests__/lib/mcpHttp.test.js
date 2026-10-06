@@ -47,13 +47,8 @@ async function start(handler) {
     // Emulate the bits of the Next.js API runtime the handler relies on.
     res.status = (c) => { res.statusCode = c; return res; };
     res.json = (b) => { res.setHeader('Content-Type', 'application/json'); res.end(JSON.stringify(b)); return res; };
-    const chunks = [];
-    req.on('data', (c) => chunks.push(c));
-    req.on('end', async () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      try { req.body = raw ? JSON.parse(raw) : undefined; } catch { req.body = raw; }
-      await handler(req, res);
-    });
+    // Like the route (bodyParser: false) the handler reads the raw stream itself.
+    Promise.resolve(handler(req, res));
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}/api/mcp`;
@@ -148,6 +143,33 @@ describe('method, origin and body checks', () => {
   test('non-JSON content type: 415; malformed JSON: 400', async () => {
     expect((await post(INIT, { ...bearer(GOOD), 'Content-Type': 'text/plain' })).status).toBe(415);
     expect((await post('{not json', bearer(GOOD))).status).toBe(400);
+  });
+
+  test('body failures are JSON-RPC error objects: invalid JSON -32700, oversize -32600 (also when streamed without a length)', async () => {
+    const bad = await post('{not json', bearer(GOOD));
+    expect(bad.status).toBe(400);
+    expect(bad.headers.get('content-type')).toMatch(/application\/json/);
+    expect(await bad.json()).toMatchObject({ jsonrpc: '2.0', error: { code: -32700 }, id: null });
+
+    const empty = await post('', bearer(GOOD));
+    expect(empty.status).toBe(400);
+    expect((await empty.json()).error.code).toBe(-32700);
+
+    const big = await post(JSON.stringify({ ...INIT, pad: 'x'.repeat(300 * 1024) }), bearer(GOOD));
+    expect(big.status).toBe(413);
+    expect(await big.json()).toMatchObject({ jsonrpc: '2.0', error: { code: -32600 }, id: null });
+
+    // chunked upload: no Content-Length to reject early, the streaming limit applies
+    const chunk = Buffer.from('x'.repeat(64 * 1024));
+    const body = new ReadableStream({
+      start(c) { c.enqueue(Buffer.from('{"a":"')); for (let i = 0; i < 6; i++) c.enqueue(chunk); c.enqueue(Buffer.from('"}')); c.close(); },
+    });
+    const streamed = await fetch(base, {
+      method: 'POST', duplex: 'half', body,
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', ...bearer(GOOD) },
+    });
+    expect(streamed.status).toBe(413);
+    expect((await streamed.json()).error.code).toBe(-32600);
   });
 
   test('large JSON-RPC batches are refused', async () => {
