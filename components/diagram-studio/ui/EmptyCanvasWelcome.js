@@ -37,6 +37,17 @@ export default function EmptyCanvasWelcome({
     }
   }, []);
 
+  // "Add shapes" / "Use template": hide the card for this session (not persisted) and run the
+  // action, so the card never sits on top of the panel/modal it opened (#26).
+  const handleAddShapes = useCallback(() => {
+    setIsDismissed(true);
+    onAddShapes?.();
+  }, [onAddShapes]);
+  const handleUseTemplate = useCallback(() => {
+    setIsDismissed(true);
+    onUseTemplate?.();
+  }, [onUseTemplate]);
+
   // Don't render if not visible or dismissed
   if (!visible || isDismissed) {
     return null;
@@ -61,14 +72,14 @@ export default function EmptyCanvasWelcome({
       <div className="ds-welcome-actions">
         <button
           className="ds-welcome-action-btn primary"
-          onClick={onAddShapes}
+          onClick={handleAddShapes}
         >
           <CategoryOutlined style={{ fontSize: 20 }} />
           <span>Add shapes</span>
         </button>
         <button
           className="ds-welcome-action-btn"
-          onClick={onUseTemplate}
+          onClick={handleUseTemplate}
         >
           <DescriptionOutlined style={{ fontSize: 20 }} />
           <span>Use template</span>
@@ -79,8 +90,8 @@ export default function EmptyCanvasWelcome({
       <div className="ds-welcome-tips">
         <h3 className="ds-tips-heading">Quick tips</h3>
         <ul className="ds-tips-list">
-          <li>Drag stencils from left panel</li>
-          <li>Press <kbd>V</kbd> for select, <kbd>C</kbd> for connect</li>
+          <li>Click or drag shapes from the Shapes panel</li>
+          <li>Press <kbd>V</kbd> for select, <kbd>C</kbd> for connect, <kbd>N</kbd> for a sticky note</li>
           <li>Double-click to edit text</li>
           <li>
             Press <kbd>?</kbd> for{' '}

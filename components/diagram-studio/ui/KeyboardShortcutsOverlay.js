@@ -4,45 +4,11 @@
 import { useEffect, useCallback, useState } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
+import { SHORTCUT_GROUPS, displayKey } from './shortcutKeymap';
+import { isMac } from '../../../lib/platform';
+import { shouldHandleShortcut } from '../hooks/interaction/keyboardFocus';
 
-// Organized shortcut groups matching the user specification
-const SHORTCUT_GROUPS = [
-  {
-    name: 'TOOLS',
-    shortcuts: [
-      { key: 'V', description: 'Select' },
-      { key: 'C', description: 'Connect' },
-      { key: 'H', description: 'Pan' },
-      { key: 'K', description: 'Comment' },
-    ],
-  },
-  {
-    name: 'EDITING',
-    shortcuts: [
-      { key: 'Delete', description: 'Remove' },
-      { key: 'Cmd+Z', description: 'Undo' },
-      { key: 'Cmd+Y', description: 'Redo' },
-      { key: 'Cmd+D', description: 'Duplicate' },
-      { key: 'T', description: 'Connection toolbar' },
-    ],
-  },
-  {
-    name: 'VIEW',
-    shortcuts: [
-      { key: '+', description: 'Zoom in' },
-      { key: '-', description: 'Zoom out' },
-      { key: 'Space+drag', description: 'Pan' },
-    ],
-  },
-  {
-    name: 'CANVAS',
-    shortcuts: [
-      { key: '0', description: 'Fit all to screen' },
-      { key: 'F', description: 'Fit all to screen' },
-      { key: 'G', description: 'Toggle grid' },
-    ],
-  },
-];
+const MAC = isMac();
 
 export default function KeyboardShortcutsOverlay({ isOpen, onClose }) {
   // Close on Escape key
@@ -71,7 +37,7 @@ export default function KeyboardShortcutsOverlay({ isOpen, onClose }) {
 
   return (
     <div className="keyboard-shortcuts-overlay" onClick={handleOverlayClick}>
-      <div className="keyboard-shortcuts-modal">
+      <div className="keyboard-shortcuts-modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
         {/* Header */}
         <div className="keyboard-shortcuts-header">
           <div className="keyboard-shortcuts-title">
@@ -96,7 +62,7 @@ export default function KeyboardShortcutsOverlay({ isOpen, onClose }) {
                 <div className="keyboard-shortcuts-list">
                   {group.shortcuts.map((shortcut, idx) => (
                     <div key={idx} className="keyboard-shortcut-item">
-                      <kbd className="keyboard-shortcut-key">{shortcut.key}</kbd>
+                      <kbd className="keyboard-shortcut-key">{shortcut.keys.map((k) => displayKey(k, MAC)).join(' + ')}</kbd>
                       <span className="keyboard-shortcut-description">
                         {shortcut.description}
                       </span>
@@ -313,9 +279,8 @@ export function useKeyboardShortcutsOverlay() {
   // Listen for '?' key (Shift + /)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Skip if typing in input or textarea
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      if (e.target.isContentEditable) return;
+      // '?' toggles the sheet only when it is not being typed (single focus rule); the open sheet itself may close it
+      if (!shouldHandleShortcut(e, { activeElement: document.activeElement }) ) return;
 
       // Check for '?' key (Shift + / on most keyboards)
       if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {

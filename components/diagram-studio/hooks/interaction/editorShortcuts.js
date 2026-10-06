@@ -1,11 +1,8 @@
 // components/diagram-studio/hooks/interaction/editorShortcuts.js
 // Pure resolver for editor-level shortcuts (undo/redo, tool switching, zoom).
 
-export function isTypingTarget(target) {
-  if (!target) return false;
-  const tag = target.tagName;
-  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!target.isContentEditable;
-}
+import { isTypingTarget } from './keyboardFocus';
+export { isTypingTarget };
 
 /**
  * Map a keyboard event to an editor action name, or null.
