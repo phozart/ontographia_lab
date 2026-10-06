@@ -188,6 +188,27 @@ function DiagramStudioInner({
     updateUserSetting('styleToolbarVisible', true);
   }, [updateUserSetting]);
 
+  // Opening the Properties panel: pan just enough that it does not cover the selection
+  useEffect(() => {
+    if (!showPropertiesPanel || !selectedElements?.length) return undefined;
+    const timer = setTimeout(() => {
+      const panel = document.querySelector('.ds-panel-right');
+      const container = canvasContainerRef.current;
+      if (!panel || !container) return;
+      const p = panel.getBoundingClientRect();
+      const c = container.getBoundingClientRect();
+      const bounds = getContentBounds(selectedElements);
+      if (!bounds) return;
+      const right = c.left + (bounds.x + bounds.width + viewport.x) * viewport.scale;
+      const left = c.left + (bounds.x + viewport.x) * viewport.scale;
+      if (right <= p.left - 16 || left >= p.right) return;
+      const shift = Math.min(right - (p.left - 24), Math.max(0, left - (c.left + 24)));
+      if (shift > 0) setViewport?.(prev => ({ ...prev, x: prev.x - shift / prev.scale }));
+    }, 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPropertiesPanel]);
+
   // Edit label request - triggers editing in DiagramCanvas
   const [editLabelRequest, setEditLabelRequest] = useState(null);
   const handleEditLabel = useCallback((elementId) => {

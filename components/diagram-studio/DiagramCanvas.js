@@ -48,6 +48,7 @@ import { findFreePlacement, placeAtPoint, DEFAULT_STICKY_SIZE, DEFAULT_STENCIL_S
 import { requestJsonImportFromDrop } from './export/useJsonImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
 import FloatingBox from './ui/FloatingBox';
+import { getObstacleRects } from './ui/positioning';
 
 // Extracted utilities (refactored 2025-12-29)
 import {
@@ -5826,7 +5827,9 @@ export default function DiagramCanvas({
       )}
 
       {/* Floating rotation handle - rendered via portal to be above toolbar */}
-      {floatingHandlePos && typeof document !== 'undefined' && createPortal(
+      {floatingHandlePos && typeof document !== 'undefined'
+        && !getObstacleRects().some(o => floatingHandlePos.x >= o.left && floatingHandlePos.x <= o.right && floatingHandlePos.y >= o.top && floatingHandlePos.y <= o.bottom)
+        && createPortal(
         <div
           className="ds-floating-rotation-handle"
           style={{
