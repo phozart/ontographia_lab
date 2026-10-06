@@ -8,7 +8,7 @@
 // and canvas ref needed for coordinate conversion. The hooks in ./interaction/ provide
 // reference implementations that could be used in alternative components or for testing.
 
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useRef } from 'react';
 
 // Renderers
 import StraightLineRenderer from './renderers/StraightLineRenderer';
@@ -24,6 +24,7 @@ import EndpointLabel from './labels/EndpointLabel';
 // Geometry
 import { calculateMidLabelPosition } from './geometry/labelPositioning';
 import { buildOrthogonalPath } from './geometry/orthogonalRouting';
+import { resolveConnectionPorts } from './geometry/autoPorts';
 
 /**
  * Map of line styles to renderer components
@@ -402,6 +403,17 @@ function getOptimalPorts(sourceEl, targetEl, packRegistry, allElements = []) {
  * Renders a connection between two elements (or freehand endpoints)
  * Following the CLAUDE.md spec for text interaction model
  */
+const EMPTY_WAYPOINTS = [];
+
+// Keep the previous point object while its coordinates are unchanged so memoized
+// routing downstream is not invalidated by a fresh-but-equal object every render.
+function useStablePoint(point) {
+  const ref = useRef(point);
+  const prev = ref.current;
+  if (prev !== point && !(prev && point && prev.x === point.x && prev.y === point.y)) ref.current = point;
+  return ref.current;
+}
+
 export default function Connection({
   connection,
   elements = [],
@@ -436,38 +448,6 @@ export default function Connection({
     ? { ...targetRaw, x: targetRaw.x + dragState.offset.x, y: targetRaw.y + dragState.offset.y }
     : targetRaw;
 
-  // Ports are always sticky - they only change when user explicitly changes them
-  // This matches professional tools like Visio and draw.io where connections stay put
-  const effectivePorts = useMemo(() => {
-    return {
-      sourcePort: connection.sourcePort || 'right',
-      targetPort: connection.targetPort || 'left',
-    };
-  }, [connection.sourcePort, connection.targetPort]);
-
-  // Calculate positions
-  const sourcePos = source
-    ? getPortPosition(source, effectivePorts.sourcePort, packRegistry, connection.sourceRatio ?? 0.5)
-    : connection.sourcePos;
-  const targetPos = target
-    ? getPortPosition(target, effectivePorts.targetPort, packRegistry, connection.targetRatio ?? 0.5)
-    : connection.targetPos;
-
-  // Get line style and renderer
-  const lineStyle = connection.lineStyle || 'curved';
-  const Renderer = RENDERERS[lineStyle] || RENDERERS.curved;
-  const isSharp = lineStyle === 'step-sharp';
-
-  // Build style object
-  const style = useMemo(() => ({
-    stroke: connection.stroke || connection.color || 'var(--text-muted)',
-    strokeWidth: connection.strokeWidth || 2,
-    dashPattern: connection.dashPattern || (connection.dashed ? 'dashed' : 'solid'),
-    sourceMarker: connection.sourceMarker || 'none',
-    targetMarker: connection.targetMarker || 'arrow',
-    opacity: connection.strokeOpacity ?? 1,
-  }), [connection]);
-
   // Calculate source and target stencil bounds
   // These are used to ensure the connection routes around its own endpoints
   const sourceBounds = useMemo(() => {
@@ -496,9 +476,46 @@ export default function Connection({
     };
   }, [target, packRegistry]);
 
+  // Ports are sticky (pinned) unless the connection was created with auto ports,
+  // in which case they follow the facing sides of the shapes as they move/resize.
+  const effectivePorts = useMemo(
+    () => resolveConnectionPorts(connection, sourceBounds, targetBounds),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [connection.sourcePort, connection.targetPort, connection.autoPorts, connection.waypoints, sourceBounds, targetBounds]
+  );
+
+  // Calculate positions
+  const sourcePos = useStablePoint(source
+    ? getPortPosition(source, effectivePorts.sourcePort, packRegistry, connection.sourceRatio ?? 0.5)
+    : connection.sourcePos);
+  const targetPos = useStablePoint(target
+    ? getPortPosition(target, effectivePorts.targetPort, packRegistry, connection.targetRatio ?? 0.5)
+    : connection.targetPos);
+  const waypoints = connection.waypoints || EMPTY_WAYPOINTS;
+
+  // Get line style and renderer
+  const lineStyle = connection.lineStyle || 'curved';
+  const Renderer = RENDERERS[lineStyle] || RENDERERS.curved;
+  const isSharp = lineStyle === 'step-sharp';
+
+  // Build style object
+  const style = useMemo(() => ({
+    stroke: connection.stroke || connection.color || 'var(--text-muted)',
+    strokeWidth: connection.strokeWidth || 2,
+    dashPattern: connection.dashPattern || (connection.dashed ? 'dashed' : 'solid'),
+    sourceMarker: connection.sourceMarker || 'none',
+    targetMarker: connection.targetMarker || 'arrow',
+    opacity: connection.strokeOpacity ?? 1,
+  }), [connection]);
+
   // Build obstacles list from all OTHER elements (excluding source, target, and frames)
   // Per CLAUDE.md: Nodes are hard obstacles, connectors MUST route around them
   // Frames are background grouping elements - connections should route through them freely
+  // While elements are being dragged only connections attached to a moving element follow
+  // the drag; every other connection keeps its cached route until the drop.
+  const attachedToDrag = !!dragState?.ids &&
+    (dragState.ids.has(connection.sourceId) || dragState.ids.has(connection.targetId));
+  const activeDrag = attachedToDrag ? dragState : null;
   const obstacles = useMemo(() => {
     if (!source || !target) return [];
 
@@ -518,8 +535,8 @@ export default function Connection({
           return null;
         }
         // Apply drag offset if this element is being dragged
-        const adjustedEl = dragState?.ids?.has(el.id)
-          ? { ...el, x: el.x + dragState.offset.x, y: el.y + dragState.offset.y }
+        const adjustedEl = activeDrag?.ids?.has(el.id)
+          ? { ...el, x: el.x + activeDrag.offset.x, y: el.y + activeDrag.offset.y }
           : el;
 
         const pack = packRegistry?.get?.(adjustedEl.packId);
@@ -534,7 +551,7 @@ export default function Connection({
         };
       })
       .filter(Boolean);
-  }, [elements, source, target, packRegistry, dragState]);
+  }, [elements, source, target, packRegistry, activeDrag]);
 
   // Calculate label position based on actual path points
   const labelPos = useMemo(() => {
@@ -542,7 +559,7 @@ export default function Connection({
     if ((lineStyle === 'step' || lineStyle === 'step-sharp') && sourcePos && targetPos) {
       const pathResult = buildOrthogonalPath(sourcePos, targetPos, effectivePorts.sourcePort, effectivePorts.targetPort, {
         sharp: isSharp,
-        waypoints: connection.waypoints || [],
+        waypoints,
         sourceBounds,
         targetBounds,
       });
@@ -631,7 +648,7 @@ export default function Connection({
         targetPort={effectivePorts.targetPort}
         sourceBounds={sourceBounds}
         targetBounds={targetBounds}
-        waypoints={connection.waypoints || []}
+        waypoints={waypoints}
         obstacles={obstacles}
         curveAmount={connection.curve ?? null}
         sharp={isSharp}

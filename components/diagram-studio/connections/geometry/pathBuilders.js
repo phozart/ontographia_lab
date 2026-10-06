@@ -246,6 +246,16 @@ export function buildRoundedPath(points, cornerRadius = 8) {
   }
 
   let path = `M ${points[0].x} ${points[0].y}`;
+  // Current pen position, so adjacent corners that meet exactly (segment == 2 * radius)
+  // do not emit a zero-length `L` between their curves.
+  let penX = points[0].x;
+  let penY = points[0].y;
+  const lineTo = (x, y) => {
+    if (Math.abs(x - penX) < 0.01 && Math.abs(y - penY) < 0.01) return;
+    path += ` L ${x} ${y}`;
+    penX = x;
+    penY = y;
+  };
 
   for (let i = 1; i < points.length - 1; i++) {
     const prev = points[i - 1];
@@ -266,7 +276,7 @@ export function buildRoundedPath(points, cornerRadius = 8) {
     const maxRadius = Math.min(cornerRadius, len1 / 2, len2 / 2);
 
     if (maxRadius <= 1) {
-      path += ` L ${curr.x} ${curr.y}`;
+      lineTo(curr.x, curr.y);
     } else {
       // Normalized directions
       const n1x = d1x / len1;
@@ -280,12 +290,14 @@ export function buildRoundedPath(points, cornerRadius = 8) {
       const afterX = curr.x + n2x * maxRadius;
       const afterY = curr.y + n2y * maxRadius;
 
-      path += ` L ${beforeX} ${beforeY}`;
+      lineTo(beforeX, beforeY);
       path += ` Q ${curr.x} ${curr.y} ${afterX} ${afterY}`;
+      penX = afterX;
+      penY = afterY;
     }
   }
 
-  path += ` L ${points[points.length - 1].x} ${points[points.length - 1].y}`;
+  lineTo(points[points.length - 1].x, points[points.length - 1].y);
   return path;
 }
 
