@@ -42,6 +42,9 @@ import { useClipboard, useQuickCreate, useAlignmentGuides } from './hooks';
 import { useCanvasInteractions } from './hooks/composite/useCanvasInteractions';
 import { getZIndexForOrder, compareByZOrder } from './hooks/interaction/zOrder';
 import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOptions';
+import { shouldHandleShortcut, isOverlayOpen } from './hooks/interaction/keyboardFocus';
+import { resolveFKey } from './hooks/interaction/editorShortcuts';
+import { findFreePlacement, placeAtPoint, DEFAULT_STICKY_SIZE, DEFAULT_STENCIL_SIZE } from './hooks/interaction/placement';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
 import FloatingBox from './ui/FloatingBox';
@@ -641,6 +644,8 @@ function Node({
   const color = element.color || stencil?.color || '#3b82f6';
   const fontSize = element.fontSize || 13;
   const fontWeight = element.fontWeight || 'normal';
+  const fontStyle = element.fontStyle || 'normal';
+  const textDecoration = element.textDecoration || 'none';
   const textAlign = element.textAlign || 'center';
   const verticalAlign = element.verticalAlign || 'center';
   const fontFamily = element.fontFamily || null; // null means system default
@@ -691,6 +696,8 @@ function Node({
       style={{
         fontSize,
         fontWeight,
+        fontStyle,
+        textDecoration,
         fontFamily: fontFamily || 'inherit',
         textAlign,
         color: textColor,
@@ -705,7 +712,7 @@ function Node({
   ) : (
     <span
       className="ds-node-label"
-      style={{ fontSize, fontWeight, fontFamily: fontFamily || 'inherit', textAlign, color: textColor, width: '100%' }}
+      style={{ fontSize, fontWeight, fontStyle, textDecoration, fontFamily: fontFamily || 'inherit', textAlign, color: textColor, width: '100%' }}
     >
       {element.label || element.name || 'Untitled'}
     </span>
@@ -1144,6 +1151,8 @@ function Grid({ showGrid, gridStyle = 'dots', viewport }) {
 }
 
 // ============ MAIN CANVAS COMPONENT ============
+
+const isTextLikeStencil = (typeId) => typeId === 'text-block' || String(typeId || '').startsWith('sticky');
 
 export default function DiagramCanvas({
   packRegistry,
@@ -2979,6 +2988,29 @@ export default function DiagramCanvas({
     // (Panning must be applied in exactly one place, otherwise the delta is doubled.)
   }, [ isConnecting, connectSource, draggingWaypoint, draggingSegment, draggingEndpoint, resizing, marquee, drawing, connections, elements, packRegistry, setViewport, updateConnection]);
 
+  // Place a sticky note and put the caret in it so typing goes straight into the note.
+  const placeSticky = useCallback((x, y, size = DEFAULT_STICKY_SIZE) => {
+    const newElement = {
+      id: generateId('sticky'),
+      type: 'sticky-medium',
+      packId: 'sticky-notes',
+      label: '',
+      x: snapToGrid(x),
+      y: snapToGrid(y),
+      size: { width: size, height: size },
+      color: stickyNoteColor || '#fef08a',
+      shape: 'sticky',
+      data: {},
+      isAnnotation: true,
+    };
+    addElement(newElement);
+    selectElement(newElement.id);
+    setActiveTool('select');
+    freshNodeIdsRef.current.add(newElement.id);
+    setEditingLabelId(newElement.id);
+    return newElement;
+  }, [addElement, selectElement, setActiveTool, stickyNoteColor]);
+
   const handleMouseUp = useCallback((e) => {
     // Complete draw-to-size (requires actual drag, not just click)
     if (drawing) {
@@ -2999,24 +3031,7 @@ export default function DiagramCanvas({
         if (drawing.isSticky) {
           // Keep sticky notes square, use the larger dimension
           const stickySize = Math.max(width, height, 100); // Minimum 100px
-          const newElement = {
-            id: generateId('sticky'),
-            type: 'sticky-medium',
-            packId: 'sticky-notes',
-            label: '',
-            x: snapToGrid(minX),
-            y: snapToGrid(minY),
-            size: { width: snapToGrid(stickySize), height: snapToGrid(stickySize) },
-            color: stickyNoteColor || '#fef08a',
-            shape: 'sticky',
-            data: {},
-            isAnnotation: true,
-          };
-          addElement(newElement);
-          recordHistory();
-          selectElement(newElement.id);
-          // Return to select mode after creating element
-          setActiveTool('select');
+          placeSticky(minX, minY, snapToGrid(stickySize));
         }
         // Handle regular stencil creation
         else if (selectedStencil) {
@@ -3038,14 +3053,46 @@ export default function DiagramCanvas({
           };
 
           addElement(newElement);
-          recordHistory();
           selectElement(newElement.id);
           // Return to select mode after creating element
           setActiveTool('select');
           setSelectedStencil(null);
+          if (isTextLikeStencil(newElement.type)) {
+            freshNodeIdsRef.current.add(newElement.id);
+            setEditingLabelId(newElement.id);
+          }
         }
       }
-      // If didn't drag enough, just cancel the drawing (no element created)
+      // A plain click places the item at its default size, centered on the click point.
+      // Drags below the threshold on the same spot count as clicks.
+      else if (drawing.isSticky) {
+        const pos = placeAtPoint({ x: drawing.startX, y: drawing.startY }, { width: DEFAULT_STICKY_SIZE, height: DEFAULT_STICKY_SIZE }, GRID_SIZE);
+        placeSticky(pos.x, pos.y, DEFAULT_STICKY_SIZE);
+      } else if (selectedStencil) {
+        const size = selectedStencil.defaultSize || DEFAULT_STENCIL_SIZE;
+        const pos = placeAtPoint({ x: drawing.startX, y: drawing.startY }, size, GRID_SIZE);
+        const newElement = {
+          id: generateId('el'),
+          type: selectedStencil.id,
+          packId: selectedStencil.packId,
+          name: selectedStencil.name,
+          label: selectedStencil.defaultLabel ?? selectedStencil.name,
+          x: pos.x,
+          y: pos.y,
+          size: { width: size.width, height: size.height },
+          color: selectedStencil.color,
+          layerId: 'default',
+          properties: {},
+        };
+        addElement(newElement);
+        selectElement(newElement.id);
+        setActiveTool('select');
+        setSelectedStencil(null);
+        if (isTextLikeStencil(newElement.type)) {
+          freshNodeIdsRef.current.add(newElement.id);
+          setEditingLabelId(newElement.id);
+        }
+      }
 
       setDrawing(null);
       return;
@@ -3356,7 +3403,7 @@ export default function DiagramCanvas({
     setRotationIndicator(null);
     setIsRotating?.(false); // Notify context to show toolbar again
     setIsDragging?.(false); // Notify context that dragging ended
-  }, [draggingElement, draggingWaypoint, draggingSegment, draggingEndpoint, draggingCurve, resizing, rotating, marquee, drawing, selectedStencil, stickyNoteColor, elements, packRegistry, selectElements, selectElement, addElement, recordHistory, isConnecting, connectSource, viewport, addConnection, updateConnection, updateElement, lastLineStyle, setIsDragging, setIsRotating, setActiveTool, setSelectedStencil]);
+  }, [draggingElement, draggingWaypoint, draggingSegment, draggingEndpoint, draggingCurve, resizing, rotating, marquee, drawing, selectedStencil, stickyNoteColor, elements, packRegistry, selectElements, selectElement, addElement, recordHistory, isConnecting, connectSource, viewport, addConnection, updateConnection, updateElement, lastLineStyle, setIsDragging, setIsRotating, setActiveTool, setSelectedStencil, placeSticky]);
 
   // ============ PAN HANDLING ============
 
@@ -3505,14 +3552,8 @@ export default function DiagramCanvas({
           setConnectMousePos({ x, y });
         }
       } else if (!readOnly && activeTool === 'draw' && selectedStencil) {
-        // If there's a selection, first deselect and exit draw mode
-        // This prevents accidental creation when clicking away from a selection
-        if (selection?.nodeIds?.length > 0) {
-          clearSelection();
-          setSelectedStencil(null);
-          setActiveTool('select');
-          return;
-        }
+        // An explicitly armed stencil always places (click = default size, drag = custom size),
+        // even when something else is selected - the placement replaces the selection.
         // Start draw-to-size mode
         const rect = canvasRef.current?.getBoundingClientRect();
         if (rect) {
@@ -3522,39 +3563,14 @@ export default function DiagramCanvas({
           clearSelection();
         }
       } else if (!readOnly && activeTool === 'sticky') {
-        // Sticky note uses draw-to-size (drag to create)
-        // Shift+click for instant placement at default size
+        // Sticky tool: drag to size, or a plain click to place at the default size
+        // (the decision is made on mouse-up).
         const rect = canvasRef.current?.getBoundingClientRect();
         if (rect) {
           const x = (e.clientX - rect.left) / viewport.scale - viewport.x;
           const y = (e.clientY - rect.top) / viewport.scale - viewport.y;
-
-          if (e.shiftKey) {
-            // Shift+click: instant placement at default size
-            const stickySize = 150;
-            const newElement = {
-              id: generateId('sticky'),
-              type: 'sticky-medium',
-              packId: 'sticky-notes',
-              label: '',
-              x: snapToGrid(x - stickySize / 2),
-              y: snapToGrid(y - stickySize / 2),
-              size: { width: stickySize, height: stickySize },
-              color: stickyNoteColor || '#fef08a',
-              shape: 'sticky',
-              data: {},
-              isAnnotation: true,
-            };
-            recordHistory();
-            addElement(newElement);
-            selectElement(newElement.id);
-            // Return to select mode after creating element
-            setActiveTool('select');
-          } else {
-            // Regular click: start draw-to-size mode
-            setDrawing({ startX: x, startY: y, currentX: x, currentY: y, isSticky: true });
-            clearSelection();
-          }
+          setDrawing({ startX: x, startY: y, currentX: x, currentY: y, isSticky: true });
+          clearSelection();
         }
       } else if (!readOnly && activeTool === 'select') {
         // In select mode:
@@ -3704,7 +3720,7 @@ export default function DiagramCanvas({
           const snappedX = snapToGrid(x - (stencil.defaultSize?.width || 60) / 2);
           const snappedY = snapToGrid(y - (stencil.defaultSize?.height || 30) / 2);
 
-          addElement({
+          const dropped = addElement({
             type: stencil.id,
             packId: data.packId || activePack,
             name: stencil.name,
@@ -3714,6 +3730,11 @@ export default function DiagramCanvas({
             size: stencil.defaultSize || { width: 120, height: 60 },
             color: stencil.color,
           });
+          selectElement(dropped.id);
+          if (isTextLikeStencil(stencil.id)) {
+            freshNodeIdsRef.current.add(dropped.id);
+            setEditingLabelId(dropped.id);
+          }
           // Return to select mode after creating element
           setActiveTool('select');
           setSelectedStencil(null);
@@ -3731,7 +3752,7 @@ export default function DiagramCanvas({
           const snappedX = snapToGrid(x - (stencil.defaultSize?.width || 150) / 2);
           const snappedY = snapToGrid(y - (stencil.defaultSize?.height || 150) / 2);
 
-          addElement({
+          const droppedNote = addElement({
             type: stencil.id,
             packId: 'sticky-notes',
             name: stencil.name,
@@ -3741,6 +3762,9 @@ export default function DiagramCanvas({
             size: stencil.defaultSize || { width: 150, height: 150 },
             color: data.color || stencil.color,
           });
+          selectElement(droppedNote.id);
+          freshNodeIdsRef.current.add(droppedNote.id);
+          setEditingLabelId(droppedNote.id);
           // Return to select mode after creating element
           setActiveTool('select');
         }
@@ -3750,7 +3774,7 @@ export default function DiagramCanvas({
     }
 
     onDragEnd?.();
-  }, [viewport, packRegistry, activePack, addElement, onDragEnd, setActiveTool, setSelectedStencil]);
+  }, [viewport, packRegistry, activePack, addElement, selectElement, onDragEnd, setActiveTool, setSelectedStencil]);
 
   // ============ CONNECTION HANDLING ============
 
@@ -3837,9 +3861,26 @@ export default function DiagramCanvas({
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Don't intercept keys when typing in input fields or contenteditable elements
-      const activeEl = document.activeElement;
-      if (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || activeEl?.isContentEditable) return;
+      // Single focus rule (see hooks/interaction/keyboardFocus.js): no single-key shortcuts
+      // while typing, inside an on-canvas editor, or over a dialog.
+      if (!shouldHandleShortcut(e, {
+        activeElement: document.activeElement,
+        editorActive: editingLabelId != null,
+        overlayOpen: isOverlayOpen(),
+      })) return;
+
+      // N - add a sticky note at a free spot near the viewport center, caret in the note
+      if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && !readOnly) {
+        e.preventDefault();
+        const cw = containerRef.current?.clientWidth || 1200;
+        const ch = containerRef.current?.clientHeight || 800;
+        const size = { width: DEFAULT_STICKY_SIZE, height: DEFAULT_STICKY_SIZE };
+        const bounds = { x: -viewport.x, y: -viewport.y, width: cw / viewport.scale, height: ch / viewport.scale };
+        const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
+        const pos = findFreePlacement({ center, size, elements, bounds, grid: GRID_SIZE });
+        placeSticky(pos.x, pos.y, size.width);
+        return;
+      }
 
       // Space key for pan mode (only when not in a text field)
       if (e.key === ' ' && !e.repeat) {
@@ -3926,8 +3967,8 @@ export default function DiagramCanvas({
         }
       }
 
-      // F - Fit all elements in view
-      if (e.key === 'f' || e.key === 'F') {
+      // F - Fit all elements in view (Shift+F is focus mode, handled in DiagramStudio)
+      if (resolveFKey(e) === 'fit') {
         e.preventDefault();
         if (elements.length > 0) {
           const containerWidth = containerRef.current?.clientWidth || 1200;
@@ -4258,7 +4299,7 @@ export default function DiagramCanvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [readOnly, clearSelection, selectAll, selection, elements, connections, removeElement, removeConnection, clipboardCopy, clipboardPaste, clipboardDuplicate, handleNudge, groupElements, ungroupElements, packRegistry, setActiveTool, setSelectedStencil, selectedStencil, updateElement, zoomToFitAll, resetZoom, addElement, addConnection, selectElement, setEditingLabelId]);
+  }, [readOnly, clearSelection, selectAll, selection, elements, connections, removeElement, removeConnection, clipboardCopy, clipboardPaste, clipboardDuplicate, handleNudge, groupElements, ungroupElements, packRegistry, setActiveTool, setSelectedStencil, selectedStencil, updateElement, zoomToFitAll, resetZoom, addElement, addConnection, selectElement, setEditingLabelId, editingLabelId, viewport, placeSticky]);
 
   // ============ ALIGNMENT HANDLERS ============
 
