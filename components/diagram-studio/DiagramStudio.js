@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { generateId } from './utils/ids';
 import { useSession } from 'next-auth/react';
-import { resolveEditorShortcut, isTypingTarget } from './hooks/interaction/editorShortcuts';
+import { resolveEditorShortcut, resolveFKey } from './hooks/interaction/editorShortcuts';
+import { shouldHandleShortcut, isOverlayOpen } from './hooks/interaction/keyboardFocus';
 import { getTemplateBounds, getContentBounds, computeTemplatePlacement, computeFitViewport } from './utils/templatePlacement';
 import { DiagramProvider, useDiagram, useDiagramViewport, useDiagramSelection } from './DiagramContext';
 import { getProfile, isActionAllowed, isModeAllowed } from './DiagramProfile';
@@ -262,10 +263,10 @@ function DiagramStudioInner({
 
   // Sync panel collapsed state with user settings
   useEffect(() => {
-    if (settingsLoaded && userSettings.leftPanelCollapsed !== undefined) {
-      setLeftPanelCollapsed(userSettings.leftPanelCollapsed);
+    if (settingsLoaded && userSettings.shapesPanelHidden !== undefined) {
+      setLeftPanelCollapsed(userSettings.shapesPanelHidden);
     }
-  }, [settingsLoaded, userSettings.leftPanelCollapsed]);
+  }, [settingsLoaded, userSettings.shapesPanelHidden]);
 
   // Handle export
   const handleExport = useCallback(async (format) => {
@@ -299,10 +300,7 @@ function DiagramStudioInner({
   // Handle stencil drag start (for visual feedback)
   const handleStencilDragStart = useCallback((stencil) => {
     setDraggingStencil(stencil);
-    // Auto-collapse the stencil panel when dragging starts
-    setLeftPanelCollapsed(true);
-    updateUserSetting('leftPanelCollapsed', true);
-  }, [updateUserSetting]);
+  }, []);
 
   // Handle stencil drag end
   const handleStencilDragEnd = useCallback(() => {
@@ -313,7 +311,7 @@ function DiagramStudioInner({
   const toggleLeftPanel = useCallback(() => {
     setLeftPanelCollapsed(prev => {
       const next = !prev;
-      updateUserSetting('leftPanelCollapsed', next);
+      updateUserSetting('shapesPanelHidden', next);
       return next;
     });
   }, [updateUserSetting]);
@@ -321,8 +319,14 @@ function DiagramStudioInner({
   // Open the stencil panel (called by EmptyCanvasWelcome)
   const handleOpenStencilPanel = useCallback(() => {
     // Open the first pack's flyout in the ShapeSidebar
+    if (leftPanelCollapsed) {
+      setLeftPanelCollapsed(false);
+      updateUserSetting('shapesPanelHidden', false);
+      setTimeout(() => iconBarRef.current?.openFirstPack(), 0);
+      return;
+    }
     iconBarRef.current?.openFirstPack();
-  }, []);
+  }, [leftPanelCollapsed, updateUserSetting]);
 
   // Open template selection (called by EmptyCanvasWelcome)
   const handleOpenTemplates = useCallback(() => {
@@ -499,8 +503,8 @@ function DiagramStudioInner({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Skip if typing in an input / textarea / select / contenteditable
-      if (isTypingTarget(e.target)) return;
+      // Single focus rule: suspend shortcuts while typing, in an editor, or over a dialog
+      if (!shouldHandleShortcut(e, { activeElement: document.activeElement, overlayOpen: isOverlayOpen() })) return;
 
       // Undo / redo / tool switching / zoom (V, H, +, -)
       const editorAction = resolveEditorShortcut(e);
@@ -525,8 +529,8 @@ function DiagramStudioInner({
         }
       }
 
-      // F key to toggle focus mode
-      if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Shift+F toggles focus mode (plain F is Fit, handled by the canvas)
+      if (resolveFKey(e) === 'focus-mode') {
         setFocusMode(prev => !prev);
       }
 
@@ -540,32 +544,7 @@ function DiagramStudioInner({
         toggleCommentTool();
       }
 
-      // N key to add sticky note at center of viewport
-      if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && !profile.editingPolicy?.readOnly) {
-        e.preventDefault();
-        // Calculate center of current viewport
-        const containerEl = document.querySelector('.ds-canvas-container');
-        if (containerEl && viewport) {
-          const rect = containerEl.getBoundingClientRect();
-          const centerX = (rect.width / 2) / viewport.scale - viewport.x;
-          const centerY = (rect.height / 2) / viewport.scale - viewport.y;
-
-          // Snap to grid
-          const gridSize = 20;
-          const snappedX = Math.round(centerX / gridSize) * gridSize - 75; // Center the 150px note
-          const snappedY = Math.round(centerY / gridSize) * gridSize - 75;
-
-          addElement({
-            type: 'sticky-medium',
-            packId: 'sticky-notes',
-            label: '',
-            x: snappedX,
-            y: snappedY,
-            size: { width: 150, height: 150 },
-            color: stickyNoteColor || '#fef08a',
-          });
-        }
-      }
+      // (N - add sticky note - lives in DiagramCanvas, which owns the label editor so the caret can land in the new note)
 
       // (H is the Pan tool; comment visibility is toggled from the toolbar / command palette)
 
@@ -610,7 +589,7 @@ function DiagramStudioInner({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [saveDiagram, profile.editingPolicy?.readOnly, focusMode, toggleLeftPanel, toggleCommentTool, activeTool, setActiveTool, setSelectedStencil, cancelNewComment, hasSelection, showPropertiesPanel, toggleContextualToolbar, viewport, addElement, stickyNoteColor, isPreviewMode, undo, redo, zoomIn, zoomOut]);
+  }, [saveDiagram, profile.editingPolicy?.readOnly, focusMode, toggleLeftPanel, toggleCommentTool, activeTool, setActiveTool, setSelectedStencil, cancelNewComment, hasSelection, showPropertiesPanel, toggleContextualToolbar, isPreviewMode, undo, redo, zoomIn, zoomOut]);
 
   // UI visibility from profile
   const showRightPanel = profile.uiPolicy?.showRightPanel !== false;
@@ -686,6 +665,7 @@ function DiagramStudioInner({
             onAddPack={() => setShowStarterPacks(true)}
             onTogglePack={handleTogglePack}
             readOnly={profile?.editingPolicy?.readOnly}
+            hidden={leftPanelCollapsed}
           />
         </>
       )}

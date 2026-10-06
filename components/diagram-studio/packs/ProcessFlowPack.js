@@ -895,6 +895,8 @@ function GatewayNode({ element, stencil, gatewayType, labelInside = true }) {
           lineHeight: 1.15,
           fontSize: element.fontSize || 12,
           fontWeight: element.fontWeight || 500,
+          fontStyle: element.fontStyle || 'normal',
+          textDecoration: element.textDecoration || 'none',
           color: element.textColor || pickLabelColor(fill, DARK_TEXT),
           pointerEvents: 'none',
           userSelect: 'none',

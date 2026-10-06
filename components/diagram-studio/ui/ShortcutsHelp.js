@@ -1,86 +1,16 @@
 // components/diagram-studio/ui/ShortcutsHelp.js
 // Keyboard shortcuts help panel
 
+import { createPortal } from 'react-dom';
 import { useState, useEffect, useCallback } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
 import SearchIcon from '@mui/icons-material/Search';
+import { SHORTCUT_GROUPS, displayKey } from './shortcutKeymap';
+import { isMac } from '../../../lib/platform';
 
-const SHORTCUT_CATEGORIES = [
-  {
-    name: 'Tools',
-    shortcuts: [
-      { keys: ['V'], description: 'Select tool' },
-      { keys: ['C'], description: 'Connect tool' },
-      { keys: ['H'], description: 'Pan tool' },
-      { keys: ['Space'], description: 'Pan (hold, then drag)' },
-      { keys: ['K'], description: 'Comment mode' },
-    ],
-  },
-  {
-    name: 'Selection',
-    shortcuts: [
-      { keys: ['Ctrl', 'A'], description: 'Select all' },
-      { keys: ['Esc'], description: 'Deselect all / Cancel' },
-      { keys: ['Tab'], description: 'Select next element' },
-      { keys: ['Shift', 'Tab'], description: 'Select previous element' },
-      { keys: ['Click'], description: 'Select element' },
-      { keys: ['Shift', 'Click'], description: 'Add to selection' },
-    ],
-  },
-  {
-    name: 'Editing',
-    shortcuts: [
-      { keys: ['Delete'], description: 'Delete selected' },
-      { keys: ['Backspace'], description: 'Delete selected' },
-      { keys: ['Ctrl', 'D'], description: 'Duplicate selected' },
-      { keys: ['Ctrl', 'C'], description: 'Copy' },
-      { keys: ['Ctrl', 'V'], description: 'Paste' },
-      { keys: ['Ctrl', 'X'], description: 'Cut' },
-      { keys: ['Ctrl', 'Z'], description: 'Undo' },
-      { keys: ['Ctrl', 'Y'], description: 'Redo' },
-      { keys: ['Ctrl', 'Shift', 'Z'], description: 'Redo' },
-      { keys: ['T'], description: 'Connection toolbar' },
-    ],
-  },
-  {
-    name: 'View',
-    shortcuts: [
-      { keys: ['+'], description: 'Zoom in' },
-      { keys: ['-'], description: 'Zoom out' },
-      { keys: ['0'], description: 'Fit all to screen' },
-      { keys: ['Ctrl', '0'], description: 'Zoom to selection' },
-      { keys: ['F'], description: 'Fit all to screen' },
-      { keys: ['G'], description: 'Toggle grid' },
-    ],
-  },
-  {
-    name: 'Panels',
-    shortcuts: [
-      { keys: ['['], description: 'Toggle left panel' },
-      { keys: [']'], description: 'Toggle right panel' },
-      { keys: ['Ctrl', 'K'], description: 'Open command palette' },
-      { keys: ['?'], description: 'Show keyboard shortcuts' },
-    ],
-  },
-  {
-    name: 'File',
-    shortcuts: [
-      { keys: ['Ctrl', 'S'], description: 'Save' },
-      { keys: ['Ctrl', 'Shift', 'S'], description: 'Save as...' },
-      { keys: ['Ctrl', 'E'], description: 'Export' },
-    ],
-  },
-  {
-    name: 'Navigation',
-    shortcuts: [
-      { keys: ['Arrow keys'], description: 'Move selected elements' },
-      { keys: ['Shift', 'Arrow'], description: 'Move by 10px' },
-      { keys: ['Home'], description: 'Pan to origin' },
-      { keys: ['Alt', 'W'], description: 'Workspace switcher' },
-    ],
-  },
-];
+const SHORTCUT_CATEGORIES = SHORTCUT_GROUPS;
+const MAC = isMac();
 
 export default function ShortcutsHelp({ isOpen, onClose }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -127,9 +57,9 @@ export default function ShortcutsHelp({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  return (
+  const content = (
     <div className="ds-shortcuts-overlay" onClick={onClose}>
-      <div className="ds-shortcuts-panel" onClick={e => e.stopPropagation()}>
+      <div className="ds-shortcuts-panel" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="ds-shortcuts-header">
           <div className="ds-shortcuts-title">
@@ -173,7 +103,7 @@ export default function ShortcutsHelp({ isOpen, onClose }) {
                         <div className="ds-shortcut-keys">
                           {shortcut.keys.map((key, keyIdx) => (
                             <span key={keyIdx}>
-                              <kbd>{key}</kbd>
+                              <kbd>{displayKey(key, MAC)}</kbd>
                               {keyIdx < shortcut.keys.length - 1 && ' + '}
                             </span>
                           ))}
@@ -202,7 +132,7 @@ export default function ShortcutsHelp({ isOpen, onClose }) {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1000;
+          z-index: 10100;
           padding: 40px;
         }
 
@@ -388,6 +318,7 @@ export default function ShortcutsHelp({ isOpen, onClose }) {
       `}</style>
     </div>
   );
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
 }
 
 // Hook to open shortcuts help

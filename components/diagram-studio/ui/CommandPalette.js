@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useDiagram } from '../DiagramContext';
 import { isMac } from '../../../lib/platform';
+import { commandShortcut } from './shortcutKeymap';
 
 // Action categories
 const CATEGORIES = {
@@ -16,38 +17,44 @@ const CATEGORIES = {
 };
 
 // Built-in commands
-const COMMANDS = [
+const COMMAND_DEFS = [
   // Canvas actions
-  { id: 'zoom-in', name: 'Zoom In', category: 'view', shortcut: 'Cmd++', action: 'zoom-in' },
-  { id: 'zoom-out', name: 'Zoom Out', category: 'view', shortcut: 'Cmd+-', action: 'zoom-out' },
-  { id: 'zoom-fit', name: 'Zoom to Fit', category: 'view', shortcut: 'Cmd+0', action: 'zoom-fit' },
-  { id: 'zoom-100', name: 'Zoom to 100%', category: 'view', shortcut: 'Cmd+1', action: 'zoom-100' },
-  { id: 'toggle-grid', name: 'Toggle Grid', category: 'view', shortcut: 'Cmd+G', action: 'toggle-grid' },
-  { id: 'toggle-minimap', name: 'Toggle Minimap', category: 'view', shortcut: 'Cmd+M', action: 'toggle-minimap' },
+  { id: 'zoom-in', name: 'Zoom In', category: 'view', action: 'zoom-in' },
+  { id: 'zoom-out', name: 'Zoom Out', category: 'view', action: 'zoom-out' },
+  { id: 'zoom-fit', name: 'Zoom to Fit', category: 'view', action: 'zoom-fit' },
+  { id: 'zoom-100', name: 'Zoom to 100%', category: 'view', action: 'zoom-100' },
+  { id: 'toggle-grid', name: 'Toggle Grid', category: 'view', action: 'toggle-grid' },
+  { id: 'toggle-minimap', name: 'Toggle Minimap', category: 'view', action: 'toggle-minimap' },
 
   // Selection actions
-  { id: 'select-all', name: 'Select All', category: 'selection', shortcut: 'Cmd+A', action: 'select-all' },
-  { id: 'deselect', name: 'Deselect All', category: 'selection', shortcut: 'Esc', action: 'deselect' },
-  { id: 'delete-selected', name: 'Delete Selected', category: 'selection', shortcut: 'Delete', action: 'delete' },
-  { id: 'duplicate', name: 'Duplicate', category: 'selection', shortcut: 'Cmd+D', action: 'duplicate' },
-  { id: 'copy', name: 'Copy', category: 'selection', shortcut: 'Cmd+C', action: 'copy' },
-  { id: 'paste', name: 'Paste', category: 'selection', shortcut: 'Cmd+V', action: 'paste' },
+  { id: 'select-all', name: 'Select All', category: 'selection', action: 'select-all' },
+  { id: 'deselect', name: 'Deselect All', category: 'selection', action: 'deselect' },
+  { id: 'delete-selected', name: 'Delete Selected', category: 'selection', action: 'delete' },
+  { id: 'duplicate', name: 'Duplicate', category: 'selection', action: 'duplicate' },
+  { id: 'copy', name: 'Copy', category: 'selection', action: 'copy' },
+  { id: 'paste', name: 'Paste', category: 'selection', action: 'paste' },
 
   // File actions
-  { id: 'save', name: 'Save', category: 'file', shortcut: 'Cmd+S', action: 'save' },
+  { id: 'save', name: 'Save', category: 'file', action: 'save' },
   { id: 'export-svg', name: 'Export as SVG', category: 'file', action: 'export-svg' },
   { id: 'export-png', name: 'Export as PNG', category: 'file', action: 'export-png' },
   { id: 'export-json', name: 'Export as JSON', category: 'file', action: 'export-json' },
 
   // Canvas actions
-  { id: 'focus-mode', name: 'Toggle Focus Mode', category: 'canvas', shortcut: 'F', action: 'focus-mode' },
-  { id: 'toggle-left-panel', name: 'Toggle Left Panel', category: 'canvas', shortcut: '[', action: 'toggle-left' },
-  { id: 'toggle-right-panel', name: 'Toggle Right Panel', category: 'canvas', shortcut: ']', action: 'toggle-right' },
+  { id: 'focus-mode', name: 'Toggle Focus Mode', category: 'canvas', action: 'focus-mode' },
+  { id: 'toggle-left-panel', name: 'Toggle Left Panel', category: 'canvas', action: 'toggle-left' },
+  { id: 'toggle-right-panel', name: 'Toggle Right Panel', category: 'canvas', action: 'toggle-right' },
 
   // Comment actions
-  { id: 'add-comment', name: 'Add Comment', category: 'canvas', shortcut: 'K', action: 'add-comment' },
-  { id: 'toggle-comments', name: 'Toggle Comment Visibility', category: 'canvas', shortcut: 'H', action: 'toggle-comments' },
+  { id: 'add-comment', name: 'Add Comment', category: 'canvas', action: 'add-comment' },
+  { id: 'toggle-comments', name: 'Toggle Comment Visibility', category: 'canvas', action: 'toggle-comments' },
 ];
+
+// Shortcut labels come from the shared keymap so the palette can never drift from the sheet.
+const COMMANDS = COMMAND_DEFS.map((c) => {
+  const shortcut = commandShortcut(c.id);
+  return shortcut ? { ...c, shortcut } : c;
+});
 
 export default function CommandPalette({
   isOpen,
@@ -273,11 +280,7 @@ export default function CommandPalette({
                         </div>
                         {item.shortcut && (
                           <div className="ds-command-palette-shortcut">
-                            {item.shortcut.split('+').map((key, i) => (
-                              <span key={i} className="ds-command-palette-key">
-                                {key === 'Cmd' ? (isMac() ? '⌘' : 'Ctrl') : key}
-                              </span>
-                            ))}
+                            <span className="ds-command-palette-key">{item.shortcut}</span>
                           </div>
                         )}
                       </div>
