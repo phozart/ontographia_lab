@@ -15,6 +15,18 @@ const common = {
   modulePathIgnorePatterns: ['<rootDir>/.next/'],
 };
 
+// Suites that create/drop throwaway PostgreSQL databases (or hit a real DB).
+// They contend with each other when run in parallel, so they live in their own
+// `db` project and `npm test` runs that project with --runInBand.
+// Add new real-DB suites here (suites that mock lib/db belong in `unit`).
+const dbTests = [
+  '<rootDir>/__tests__/scripts/migrate.test.js',
+  '<rootDir>/__tests__/scripts/migrate0002.test.js',
+  '<rootDir>/__tests__/scripts/migrate0003.test.js',
+  '<rootDir>/__tests__/lib/versionRepository.test.js',
+  '<rootDir>/__tests__/lib/apiTokensConcurrency.test.js',
+];
+
 // Unit tests configuration
 const unitConfig = {
   ...common,
@@ -25,7 +37,20 @@ const unitConfig = {
     '<rootDir>/__tests__/**/*.test.{js,jsx,ts,tsx}',
     '!<rootDir>/__tests__/e2e/**',
   ],
-  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/', '<rootDir>/__tests__/e2e/'],
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/.next/',
+    '<rootDir>/__tests__/e2e/',
+    ...dbTests,
+  ],
+};
+
+// DB-backed tests (run serially via `npm run test:db`)
+const dbConfig = {
+  ...unitConfig,
+  displayName: 'db',
+  testMatch: dbTests,
+  testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.next/'],
 };
 
 // E2E tests configuration (uses Node environment for Puppeteer)
@@ -50,6 +75,7 @@ module.exports = async () => ({
   ],
   projects: [
     await createJestConfig(unitConfig)(),
+    await createJestConfig(dbConfig)(),
     await createJestConfig(e2eConfig)(),
   ],
 });
