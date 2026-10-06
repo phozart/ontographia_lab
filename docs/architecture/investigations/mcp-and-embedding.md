@@ -324,6 +324,8 @@ Each slice follows the repo rules: TDD, append to `docs/release/IMPLEMENTATION-L
 
 ## 7. Open questions for the owner (each with a recommended default)
 
+> **Decision (2026-10-06):** the product owner approved the recommendation and accepted all recommended defaults below (any diagram type; developer hosts with API tokens first, OAuth later; editor-capped tokens only with a diagram allowlist; no Mermaid input in v1; no server-side PNG in v1; external embeds behind a separate flag, off at launch, explicit allowed origins per link; live embeds with optional version pin). M1 is scheduled after the in-flight UI fixes; M2 after the versions slice.
+
 | ID     | Question                                                                   | Recommended default                                                                                                |
 | ------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Q-MCP0 | "Flows" means process-flow diagrams only, or any diagram?                  | **Any diagram type**: the surface is generic (substrate); process flow is just one pack in the catalog             |
