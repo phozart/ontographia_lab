@@ -1,6 +1,8 @@
 // components/diagram-studio/packs/ITILPack.js
 // ITIL 4 IT Service Management Pack
 
+import { pickLabelColor } from './colorUtils';
+
 // ============ STENCILS ============
 
 const stencils = [
@@ -631,7 +633,7 @@ function ServiceRenderer({ element, stencil }) {
     }}>
       <div style={{
         background: color,
-        color: 'white',
+        color: pickLabelColor(color),
         padding: '6px 10px',
         fontSize: 11,
         fontWeight: 600,
@@ -691,7 +693,7 @@ function IncidentRenderer({ element, stencil }) {
     }}>
       <div style={{
         background: color,
-        color: 'white',
+        color: pickLabelColor(color),
         padding: '4px 8px',
         fontSize: 10,
         fontWeight: 600,
@@ -742,7 +744,7 @@ function ProblemRenderer({ element, stencil }) {
     }}>
       <div style={{
         background: color,
-        color: 'white',
+        color: pickLabelColor(color),
         padding: '4px 8px',
         fontSize: 10,
         fontWeight: 600,

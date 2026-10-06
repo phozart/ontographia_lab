@@ -41,6 +41,16 @@ export function contrastRatio(rgbA, rgbB) {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
+// Default label colour for the generic node renderer. The canvas paints
+// `backgroundColor || color || var(--panel)`, so the label must contrast with
+// that same fill (the stencil colour is not painted unless the element has it).
+export function resolveLabelColor(element, _stencil) {
+  if (element?.textColor) return element.textColor;
+  const fill = element?.backgroundColor || element?.color;
+  // No explicit fill: the node sits on the themed panel, so use the themed text colour.
+  return fill ? pickLabelColor(fill, DARK_TEXT) : 'var(--text, #374151)';
+}
+
 // Pick white or dark gray, whichever has the higher contrast against the fill.
 // Unknown formats return `fallback`.
 export function pickLabelColor(fill, fallback = LIGHT_TEXT) {

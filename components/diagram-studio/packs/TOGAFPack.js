@@ -1616,6 +1616,8 @@ function ArchiMateNode({ element, stencil, isSelected }) {
         width: '100%',
         padding: isContainer ? '0 4px' : '0',
         marginTop: isContainer ? 2 : 0,
+        // keep the label clear of the stick figure drawn at the right edge
+        paddingRight: ['business-actor', 'stakeholder'].includes(type) ? 34 : undefined,
       }}>
         {/* Icon */}
         {!['business-actor', 'stakeholder', 'application-component', 'system-software'].includes(type) && (

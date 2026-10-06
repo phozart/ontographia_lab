@@ -13,6 +13,6 @@ export function resolveQuickCreateOptions(sourceElement, stencil) {
   }
   return {
     stencil: stencil ? { ...stencil, packId: sourceElement.packId } : null,
-    label: stencil?.name || 'New Node',
+    label: stencil?.defaultLabel ?? stencil?.name ?? 'New Node',
   };
 }
