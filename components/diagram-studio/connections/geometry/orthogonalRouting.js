@@ -2,6 +2,7 @@
 // Functions for calculating orthogonal (step/elbow) connection routes
 
 import { getPortDirection, getPortAxis, buildRoundedPath } from './pathBuilders';
+import { routeOrthogonal, normalizePoints, validateRoute, segmentHitsInterior } from './orthogonalRouter';
 
 // Constants
 const MIN_OFFSET = 30; // Minimum perpendicular stub distance from port (visible outside stencil)
@@ -1002,6 +1003,18 @@ function segmentCrossesRect(p1, p2, rect, padding = 0) {
   return false;
 }
 
+function pathHitsObstacles(points, obstacles, padding = 8) {
+  if (!obstacles || obstacles.length === 0) return false;
+  for (let i = 0; i < points.length - 1; i++) {
+    for (const o of obstacles) {
+      if (segmentHitsInterior(points[i], points[i + 1], {
+        x: o.x - padding, y: o.y - padding, width: o.width + padding * 2, height: o.height + padding * 2,
+      })) return true;
+    }
+  }
+  return false;
+}
+
 export function buildOrthogonalPath(sourcePos, targetPos, sourcePort, targetPort, options = {}) {
   // Guard against null/undefined positions
   if (!sourcePos || !targetPos ||
@@ -1055,6 +1068,14 @@ export function buildOrthogonalPath(sourcePos, targetPos, sourcePort, targetPort
 
   // Nearly horizontal - snap to straight (if ports align, no waypoints, and path doesn't cross stencils)
   if (!hasManualWaypoints && dy <= SNAP_TO_STRAIGHT_THRESHOLD && dx > dy && horizontalPorts) {
+    // Straight line on the shared mid line when both shapes span it (no jog)
+    const midYLine = (sourcePos.y + targetPos.y) / 2;
+    const straightH = [{ x: sourcePos.x, y: midYLine }, { x: targetPos.x, y: midYLine }];
+    if (spansLine(sourceBounds, midYLine, true) && spansLine(targetBounds, midYLine, true) &&
+        validateRoute(straightH, sourceBounds, targetBounds, sourcePort, targetPort).valid &&
+        !pathHitsObstacles(straightH, obstacles)) {
+      return { path: buildRoundedPath(straightH, cornerRadius), points: straightH, segments: calculateSegments(straightH) };
+    }
     // Create path with perpendicular stubs at both ends
     const exitPoint = { x: sourcePos.x + sourceDir.x * MIN_STUB, y: sourcePos.y };
     const entryPoint = { x: targetPos.x + targetDir.x * MIN_STUB, y: targetPos.y };
@@ -1074,14 +1095,24 @@ export function buildOrthogonalPath(sourcePos, targetPos, sourcePort, targetPort
         { x: entryPoint.x, y: targetPos.y },
         targetPos
       ];
-      const path = buildRoundedPath(points, cornerRadius);
-      return { path, points, segments: calculateSegments(points) };
+      const snapped = normalizePoints(points);
+      if (validateRoute(snapped, sourceBounds, targetBounds, sourcePort, targetPort).valid && !pathHitsObstacles(snapped, obstacles)) {
+        const path = buildRoundedPath(snapped, cornerRadius);
+        return { path, points: snapped, segments: calculateSegments(snapped) };
+      }
     }
     // Fall through to orthogonal routing if straight line crosses stencils
   }
 
   // Nearly vertical - snap to straight (if ports align, no waypoints, and path doesn't cross stencils)
   if (!hasManualWaypoints && dx <= SNAP_TO_STRAIGHT_THRESHOLD && dy > dx && verticalPorts) {
+    const midXLine = (sourcePos.x + targetPos.x) / 2;
+    const straightV = [{ x: midXLine, y: sourcePos.y }, { x: midXLine, y: targetPos.y }];
+    if (spansLine(sourceBounds, midXLine, false) && spansLine(targetBounds, midXLine, false) &&
+        validateRoute(straightV, sourceBounds, targetBounds, sourcePort, targetPort).valid &&
+        !pathHitsObstacles(straightV, obstacles)) {
+      return { path: buildRoundedPath(straightV, cornerRadius), points: straightV, segments: calculateSegments(straightV) };
+    }
     // Create path with perpendicular stubs at both ends
     const exitPoint = { x: sourcePos.x, y: sourcePos.y + sourceDir.y * MIN_STUB };
     const entryPoint = { x: targetPos.x, y: targetPos.y + targetDir.y * MIN_STUB };
@@ -1101,50 +1132,74 @@ export function buildOrthogonalPath(sourcePos, targetPos, sourcePort, targetPort
         { x: targetPos.x, y: entryPoint.y },
         targetPos
       ];
-      const path = buildRoundedPath(points, cornerRadius);
-      return { path, points, segments: calculateSegments(points) };
+      const snapped = normalizePoints(points);
+      if (validateRoute(snapped, sourceBounds, targetBounds, sourcePort, targetPort).valid && !pathHitsObstacles(snapped, obstacles)) {
+        const path = buildRoundedPath(snapped, cornerRadius);
+        return { path, points: snapped, segments: calculateSegments(snapped) };
+      }
     }
     // Fall through to orthogonal routing if straight line crosses stencils
   }
 
-  let allPoints;
+  const portsKnown = !!getPortDirection(sourcePort) && !!getPortDirection(targetPort) &&
+    (getPortDirection(sourcePort).x !== 0 || getPortDirection(sourcePort).y !== 0) &&
+    (getPortDirection(targetPort).x !== 0 || getPortDirection(targetPort).y !== 0);
+  const attached = !!(sourceBounds && targetBounds && portsKnown);
+  const isValid = (pts) => validateRoute(pts, sourceBounds, targetBounds, sourcePort, targetPort).valid;
 
-  if (waypoints.length > 0) {
-    // User has defined waypoints - use them directly
-    // Users manually route around obstacles by dragging segments
-    allPoints = buildOrthogonalThroughWaypoints(sourcePos, targetPos, waypoints, sourcePort, targetPort);
-  } else {
-    // Calculate initial waypoints based on port directions (4 routing cases)
-    const calculatedWaypoints = calculateOrthogonalWaypoints(sourcePos, targetPos, sourcePort, targetPort);
-    allPoints = [sourcePos, ...calculatedWaypoints, targetPos];
+  // Legacy pipeline: waypoint/port based construction followed by clean-up passes.
+  const legacyRoute = () => {
+    let pts;
+    if (waypoints.length > 0) {
+      // User has defined waypoints - use them directly
+      pts = buildOrthogonalThroughWaypoints(sourcePos, targetPos, waypoints, sourcePort, targetPort);
+    } else {
+      pts = [sourcePos, ...calculateOrthogonalWaypoints(sourcePos, targetPos, sourcePort, targetPort), targetPos];
+    }
+    pts = ensureCorrectApproach(pts, sourcePos, targetPos, sourcePort, targetPort);
+    pts = removeReversals(pts);
+    pts = routeAroundSelfStencils(pts, sourceBounds, targetBounds, sourcePort, targetPort, selfPadding);
+    if (obstacles.length > 0) {
+      const routed = avoidObstacles(sourcePos, targetPos, pts.slice(1, -1), obstacles, 8, sourcePort);
+      const withObstacles = ensureCorrectApproach([sourcePos, ...routed, targetPos], sourcePos, targetPos, sourcePort, targetPort);
+      pts = (!attached || isValid(normalizePoints(withObstacles))) ? withObstacles : pts;
+    }
+    return normalizePoints(pts);
+  };
+
+  let allPoints = null;
+  if (attached) {
+    // Manual waypoints are honored only while the resulting path stays valid
+    // (never re-enters its own shapes, leaves/enters ports in the right direction).
+    // Stale waypoints (e.g. saved before a resize) fall through to a fresh route.
+    if (waypoints.length > 0) {
+      const manual = legacyRoute();
+      // Bends sitting on (or inside) an endpoint's border are leftovers of a stub: reject them too
+      const clearOfOwnShapes = manual.slice(1, -1).every(pt =>
+        [sourceBounds, targetBounds].every(r => !r ||
+          pt.x < r.x - 1 || pt.x > r.x + r.width + 1 || pt.y < r.y - 1 || pt.y > r.y + r.height + 1));
+      if (isValid(manual) && clearOfOwnShapes) allPoints = manual;
+    }
+    if (!allPoints) {
+      allPoints = routeOrthogonal(sourcePos, targetPos, sourcePort, targetPort, sourceBounds, targetBounds, { obstacles });
+    }
   }
-
-  // Ensure path approaches source/target from correct direction (perpendicular)
-  allPoints = ensureCorrectApproach(allPoints, sourcePos, targetPos, sourcePort, targetPort);
-
-  // Remove any direction reversal artifacts (e.g., UP-then-DOWN at start)
-  allPoints = removeReversals(allPoints);
-
-  // Ensure path doesn't cross through source or target stencils
-  allPoints = routeAroundSelfStencils(allPoints, sourceBounds, targetBounds, sourcePort, targetPort, selfPadding);
-
-  // Route around other stencils on the canvas (obstacles)
-  // Per CLAUDE.md: Nodes are hard obstacles, connectors MUST route around with 8px minimum clearance
-  if (obstacles.length > 0) {
-    // Extract waypoints from allPoints (exclude source and target)
-    const currentWaypoints = allPoints.slice(1, -1);
-    // Pass sourcePort for smarter routing decisions with non-center connections
-    const routedWaypoints = avoidObstacles(sourcePos, targetPos, currentWaypoints, obstacles, 8, sourcePort);
-    allPoints = [sourcePos, ...routedWaypoints, targetPos];
-
-    // Re-ensure correct approach after obstacle avoidance (may have altered entry/exit)
-    allPoints = ensureCorrectApproach(allPoints, sourcePos, targetPos, sourcePort, targetPort);
+  if (!allPoints) {
+    allPoints = legacyRoute();
   }
 
   const path = buildRoundedPath(allPoints, cornerRadius);
   const segments = calculateSegments(allPoints);
 
   return { path, points: allPoints, segments };
+}
+
+/** Does the shape's border span `line` (a y for horizontal, an x for vertical) with a 4px margin? */
+function spansLine(bounds, line, horizontal) {
+  if (!bounds) return false;
+  const lo = horizontal ? bounds.y : bounds.x;
+  const size = horizontal ? bounds.height : bounds.width;
+  return line >= lo + 4 && line <= lo + size - 4;
 }
 
 /**

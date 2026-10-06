@@ -30,6 +30,7 @@ export function LineStyleIcon({ type, size = 20, active = false }) {
     'step-sharp': <path d="M3 14 L3 6 L17 6 L17 2" fill="none" stroke={color} strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter" />,
     curved: <path d="M3 14 Q10 14 10 10 Q10 6 17 6" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />,
     arc: <path d="M3 14 Q17 14 17 6" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />,
+    smart: <path d="M3 14 Q3 8 8 8 L12 8 Q17 8 17 3" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" />,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 20 20">

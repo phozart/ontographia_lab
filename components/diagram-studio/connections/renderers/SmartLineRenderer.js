@@ -50,6 +50,8 @@ export default function SmartLineRenderer({
   targetPort = 'left',
   waypoints = [],
   obstacles = [],
+  sourceBounds = null,
+  targetBounds = null,
   isSelected = false,
   isHovered = false,
   style = {},
@@ -98,6 +100,8 @@ export default function SmartLineRenderer({
     const result = buildOrthogonalPath(sourcePos, targetPos, sourcePort, targetPort, {
       obstacles,
       waypoints,
+      sourceBounds,
+      targetBounds,
       sharp: false, // Smart routing uses rounded corners
     });
 
@@ -106,7 +110,7 @@ export default function SmartLineRenderer({
       segments: result.segments,
       isOrthogonal: true,
     };
-  }, [sourcePos, targetPos, sourcePort, targetPort, waypoints, obstacles]);
+  }, [sourcePos, targetPos, sourcePort, targetPort, waypoints, obstacles, sourceBounds, targetBounds]);
 
   // Handle mousedown - check if clicking on a draggable segment (for orthogonal paths)
   const handleMouseDown = useCallback((e) => {
