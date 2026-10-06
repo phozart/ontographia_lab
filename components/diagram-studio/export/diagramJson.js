@@ -2,7 +2,7 @@
 // Pure helpers for the JSON export envelope and JSON import (validation, sanitizing, re-id/offset).
 // No DOM or React dependencies so everything here is unit-testable.
 
-import { isSafeUrl, isUrlKey } from '../../../lib/safeUrl';
+import { isUnsafeUrlValue } from '../../../lib/safeUrl';
 import {
   MAX_CONTENT_BYTES, MAX_ELEMENTS, MAX_CONNECTIONS, MAX_COLLECTION, MAX_DEPTH, FORBIDDEN_KEYS, CONTENT_KEYS,
 } from '../../../lib/diagramLimits';
@@ -79,7 +79,7 @@ export function deepSanitize(value, depth = 0, stats = null) {
     const out = {};
     for (const key of Object.keys(value)) {
       if (FORBIDDEN_KEY_SET.has(key)) continue;
-      if (typeof value[key] === 'string' && isUrlKey(key) && value[key] !== '' && !isSafeUrl(value[key])) {
+      if (isUnsafeUrlValue(key, value[key])) {
         if (stats) stats.urls = (stats.urls || 0) + 1;
         continue;
       }

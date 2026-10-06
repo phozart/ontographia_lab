@@ -5,6 +5,7 @@
 import { diagramRepository } from '../../../lib/diagramRepository';
 import { withDiagramAuth } from '../../../lib/authz/next';
 import { validateDiagramContent } from '../../../lib/diagramContent';
+import { validateMetadata } from '../../../lib/diagramMetadata';
 import { isValidThumbnail } from '../../../lib/thumbnail';
 import { migrateDiagram } from '../../../components/diagram-studio/migrations/migrateDiagram';
 
@@ -69,6 +70,9 @@ async function handlePut(req, res, ctx) {
       });
     }
   }
+
+  const metaError = validateMetadata(body);
+  if (metaError) return res.status(400).json({ error: metaError, code: 'VALIDATION_FAILED' });
 
   if (body.thumbnail !== undefined && body.thumbnail !== null && !isValidThumbnail(body.thumbnail)) {
     return res.status(400).json({ error: 'thumbnail must be a PNG data URL of at most 200 KB', code: 'VALIDATION_FAILED' });

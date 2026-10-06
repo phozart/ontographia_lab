@@ -38,6 +38,8 @@ Moves the `short_id` add/backfill from `lib/db.js` into a recorded, idempotent m
 
 ### 0002_diagram_identity_and_revision (slice 1) *(shipped)*
 **As built:** additive and idempotent; `owner_id` backfill matches `created_by` case-insensitively (an exact-case match wins if two accounts differ only by case); unmatched rows (Q-M1) go to the account named by `ADMIN_EMAIL` (the runner passes it as the transaction-local setting `app.admin_email`), else to the oldest `role = 'admin'` user, and every such row is printed as a migration NOTICE; if no admin exists the rows keep `owner_id` NULL and are reported as UNASSIGNED (nobody can open them until an operator assigns an owner). `version_seq` is seeded with `MAX(version_number)`. The runner now also prints `RAISE NOTICE` output.
+
+**Operator note (after `0002`):** diagrams left with `owner_id IS NULL` (listed as UNASSIGNED in the migration output) are inaccessible to everyone. After verifying that list, assign an owner: `UPDATE diagrams SET owner_id = '<user-uuid>' WHERE owner_id IS NULL;`.
 ```sql
 ALTER TABLE diagrams
   ADD COLUMN IF NOT EXISTS revision     BIGINT  NOT NULL DEFAULT 0,  -- bumped on every content write

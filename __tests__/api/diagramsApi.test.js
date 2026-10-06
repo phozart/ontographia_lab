@@ -359,6 +359,25 @@ describe('POST /api/diagrams/[id]/duplicate', () => {
     expect(res.body.id).toBe('new');
   });
 
+  test('legacy content is validated: sanitized copy stored, warnings returned', async () => {
+    repo.findById.mockResolvedValue({ ...row, content: { elements: [{ id: 'a', x: 0, y: 0, imageUrl: 'javascript:1' }] } });
+    const res = await dup();
+    expect(res.statusCode).toBe(201);
+    const src = repo.duplicateDiagram.mock.calls[0][0];
+    expect(src.content.elements[0]).toEqual({ id: 'a', x: 0, y: 0 });
+    expect(res.body.warnings[0]).toMatch(/unsafe URL/);
+  });
+
+  test('legacy content with forbidden keys -> 400, oversize -> 413, nothing copied', async () => {
+    repo.findById.mockResolvedValue({ ...row, content: JSON.parse('{"elements":[{"id":"a","__proto__":{"x":1}}]}') });
+    const res = await dup();
+    expect(res.statusCode).toBe(400);
+    repo.findById.mockResolvedValue({ ...row, content: { elements: [{ id: 'a', blob: 'x'.repeat(5 * 1024 * 1024 + 10) }] } });
+    const res2 = await dup();
+    expect(res2.statusCode).toBe(413);
+    expect(repo.duplicateDiagram).not.toHaveBeenCalled();
+  });
+
   test.each(['stranger', 'admin'])('%s -> 404, nothing copied', async (who) => {
     mockUser = users[who];
     expect((await dup()).statusCode).toBe(404);
@@ -375,5 +394,31 @@ describe('POST /api/diagrams/[id]/duplicate', () => {
   test('unauthenticated -> 401', async () => {
     mockUser = null;
     expect((await dup()).statusCode).toBe(401);
+  });
+});
+
+describe('metadata validation (tags, description, isTemplate)', () => {
+  const bad = [
+    ['tags', 'x'], ['tags', [1]], ['tags', Array(51).fill('a')], ['tags', ['a'.repeat(65)]],
+    ['description', { a: 1 }], ['description', 'd'.repeat(2001)],
+    ['isTemplate', 'yes'], ['isTemplate', 1],
+  ];
+  test.each(bad)('PUT %s=%j -> 400 naming the field', async (field, value) => {
+    const res = await call(idHandler, { method: 'PUT', query: { id: UUID }, body: { [field]: value } });
+    expect(res.statusCode).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_FAILED');
+    expect(res.body.error).toMatch(new RegExp(field));
+    expect(repo.updateDiagram).not.toHaveBeenCalled();
+  });
+  test.each(bad)('POST %s=%j -> 400 naming the field', async (field, value) => {
+    const res = await call(indexHandler, { method: 'POST', body: { type: 'infinite-canvas', name: 'n', [field]: value } });
+    expect(res.statusCode).toBe(400);
+    expect(res.body.code).toBe('VALIDATION_FAILED');
+    expect(res.body.error).toMatch(new RegExp(field));
+    expect(repo.createDiagram).not.toHaveBeenCalled();
+  });
+  test('valid metadata accepted', async () => {
+    const res = await call(idHandler, { method: 'PUT', query: { id: UUID }, body: { tags: ['a'], description: 'd', isTemplate: false } });
+    expect(res.statusCode).toBe(200);
   });
 });

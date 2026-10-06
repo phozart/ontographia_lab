@@ -110,9 +110,9 @@ describe('validateDiagramContent', () => {
     expect(e.link).toBe('https://example.com/x');
     expect('href' in e.data).toBe(false);
     expect(e.data.src).toBe('data:image/png;base64,AAAA');
-    expect(e.data.notAUrlKey).toBe('javascript:1');
+    expect('notAUrlKey' in e.data).toBe(false);
     expect('url' in r.content.connections[0]).toBe(false);
-    expect(r.warnings.join(' ')).toMatch(/3 unsafe URL/);
+    expect(r.warnings.join(' ')).toMatch(/4 unsafe URL/);
     // input not mutated
     expect(content.elements[0].imageUrl).toBe('javascript:alert(1)');
   });
@@ -120,5 +120,24 @@ describe('validateDiagramContent', () => {
   test('empty URL strings are kept', () => {
     const r = validateDiagramContent({ elements: [{ id: 'a', imageUrl: '' }] });
     expect(r.content.elements[0].imageUrl).toBe('');
+  });
+
+  test.each(['uri', 'image', 'icon', 'background', 'anything'])('blocked scheme under non-URL key "%s" is stripped', (key) => {
+    const r = validateDiagramContent({ elements: [{ id: 'a', x: 0, y: 0, [key]: ' JaVa\tScript:alert(1)' }] });
+    expect(r.ok).toBe(true);
+    expect(key in r.content.elements[0]).toBe(false);
+    expect(r.warnings.join(' ')).toMatch(/1 unsafe URL/);
+  });
+
+  test.each(['vbscript:msgbox(1)', 'data:text/html;base64,AAAA', '\u0001javascript:void(0)'])('"%s" stripped under any key', (v) => {
+    const r = validateDiagramContent({ elements: [{ id: 'a', x: 0, y: 0, data: { deep: [{ icon: v }] } }] });
+    expect(r.content.elements[0].data.deep[0]).toEqual({});
+  });
+
+  test('label text and image data URLs are not affected under non-URL keys', () => {
+    const el = { id: 'a', x: 0, y: 0, label: 'javascript: the good parts', note: 'data: see table', icon: 'data:image/png;base64,AAAA', t: 'http: nothing' };
+    const r = validateDiagramContent({ elements: [el] });
+    expect(r.content.elements[0]).toEqual(el);
+    expect(r.warnings).toEqual([]);
   });
 });

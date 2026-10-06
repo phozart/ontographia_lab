@@ -5,6 +5,7 @@
 import { diagramRepository } from '../../../lib/diagramRepository';
 import { withUserAuth } from '../../../lib/authz/next';
 import { validateDiagramContent } from '../../../lib/diagramContent';
+import { validateMetadata } from '../../../lib/diagramMetadata';
 
 export const config = { api: { bodyParser: { sizeLimit: '6mb' } } };
 
@@ -35,6 +36,9 @@ async function handler(req, res, { user }) {
       code: 'VALIDATION_FAILED',
     });
   }
+
+  const metaError = validateMetadata(req.body);
+  if (metaError) return res.status(400).json({ error: metaError, code: 'VALIDATION_FAILED' });
 
   let data = req.body;
   let warnings = [];
