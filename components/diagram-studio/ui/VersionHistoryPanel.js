@@ -31,6 +31,7 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
   const [newName, setNewName] = useState('');
 
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTitle, setConfirmTitle] = useState(''); // kept separately so the dialog text survives its close transition
   const [restoring, setRestoring] = useState(false);
   const [restoreError, setRestoreError] = useState(null);
 
@@ -146,7 +147,7 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
     if (!selected || restoring) return;
     setRestoring(true);
     setRestoreError(null);
-    const title = versionTitle(selected);
+    const title = confirmTitle;
     const result = await onRestore(selected.number);
     setRestoring(false);
     if (!result?.ok) {
@@ -247,7 +248,7 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
                     Rename
                   </button>
                 )}
-                <button type="button" className="vh-primary" onClick={() => { setRestoreError(null); setConfirmOpen(true); }}>
+                <button type="button" className="vh-primary" onClick={() => { setRestoreError(null); setConfirmTitle(selectedTitle); setConfirmOpen(true); }}>
                   Restore this version
                 </button>
               </div>
@@ -293,7 +294,7 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
       </div>
 
       <Dialog open={confirmOpen} onClose={() => !restoring && setConfirmOpen(false)} aria-labelledby="vh-restore-title" aria-describedby="vh-restore-desc">
-        <DialogTitle id="vh-restore-title">Restore &ldquo;{selectedTitle}&rdquo;?</DialogTitle>
+        <DialogTitle id="vh-restore-title">Restore &ldquo;{confirmTitle}&rdquo;?</DialogTitle>
         <DialogContent>
           <DialogContentText id="vh-restore-desc">
             The diagram will be replaced with this version. Your current state is kept as a version (&quot;Before restore&quot;), so
