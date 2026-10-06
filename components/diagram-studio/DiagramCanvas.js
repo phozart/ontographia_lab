@@ -43,6 +43,7 @@ import { getZIndexForOrder, compareByZOrder } from './hooks/interaction/zOrder';
 import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOptions';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
+import FloatingBox from './ui/FloatingBox';
 
 // Extracted utilities (refactored 2025-12-29)
 import {
@@ -1389,6 +1390,10 @@ export default function DiagramCanvas({
   // Marquee selection state
   const [marquee, setMarquee] = useState(null); // { startX, startY, currentX, currentY }
   const [resizing, setResizing] = useState(null); // { elementId, direction, startX, startY, startSize, startPos }
+  // Hide floating toolbars while a resize is in progress (mouseup clears isDragging)
+  useEffect(() => {
+    if (resizing) setIsDragging?.(true);
+  }, [resizing, setIsDragging]);
   const [rotating, setRotating] = useState(null); // { elementId, centerX, centerY, startAngle, startRotation }
   const [rotationIndicator, setRotationIndicator] = useState(null); // { x, y, angle } for showing angle during drag
   const [floatingHandlePos, setFloatingHandlePos] = useState(null); // { x, y } for floating rotation handle
@@ -4969,6 +4974,9 @@ export default function DiagramCanvas({
         elements.forEach(el => selectElement(el.id, true));
         break;
       case 'fit-view':
+        if (elements.length > 0) zoomToFitAll(elements);
+        else resetZoom();
+        break;
       case 'reset-zoom':
         setViewport({ x: 0, y: 0, scale: 1 });
         break;
@@ -5056,7 +5064,7 @@ export default function DiagramCanvas({
       default:
         break;
     }
-  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry]);
+  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry, zoomToFitAll, resetZoom]);
 
   // ============ RENDER ============
 
@@ -5693,36 +5701,31 @@ export default function DiagramCanvas({
         const selectedEls = elements.filter(el => selection.nodeIds.includes(el.id));
         if (selectedEls.length < 2) return null;
 
-        // Calculate center of selection for toolbar position
+        // Selection bounds in screen coordinates; FloatingBox flips/clamps and stacks above the style toolbar
         const minX = Math.min(...selectedEls.map(el => el.x));
         const maxX = Math.max(...selectedEls.map(el => el.x + (el.size?.width || 120)));
         const minY = Math.min(...selectedEls.map(el => el.y));
+        const maxY = Math.max(...selectedEls.map(el => el.y + (el.size?.height || 60)));
 
-        const centerX = (minX + maxX) / 2;
-        const topY = minY - 60;
-
-        // Convert to screen coordinates
         const rect = canvasRef.current?.getBoundingClientRect();
         if (!rect) return null;
 
-        const screenX = rect.left + (centerX + viewport.x) * viewport.scale;
-        const screenY = rect.top + (topY + viewport.y) * viewport.scale;
+        const anchor = {
+          left: rect.left + (minX + viewport.x) * viewport.scale,
+          top: rect.top + (minY + viewport.y) * viewport.scale,
+          width: (maxX - minX) * viewport.scale,
+          height: (maxY - minY) * viewport.scale,
+        };
 
         return (
-          <div style={{
-            position: 'fixed',
-            left: screenX,
-            top: Math.max(60, screenY),
-            transform: 'translateX(-50%)',
-            zIndex: 200,
-          }}>
+          <FloatingBox anchor={anchor} preferred="top" avoidSelectors={['.ds-contextual-toolbar']}>
             <AlignmentToolbar
               selectedElements={selectedEls}
               onAlign={handleAlign}
               onDistribute={handleDistribute}
               onMatchSize={handleMatchSize}
             />
-          </div>
+          </FloatingBox>
         );
       })()}
 
@@ -5774,15 +5777,14 @@ export default function DiagramCanvas({
             }}
             onClick={() => setContextMenu(null)}
           />
-          <div
-            className="ds-context-menu"
-            style={{
-              position: 'fixed',
-              left: contextMenu.x,
-              top: contextMenu.y,
-              zIndex: 1000,
-            }}
+          <FloatingBox
+            anchor={{ left: contextMenu.x, top: contextMenu.y, width: 0, height: 0 }}
+            preferred="bottom"
+            align="start"
+            gap={0}
+            zIndex={1000}
           >
+          <div className="ds-context-menu" style={{ position: 'static' }}>
             {contextMenu.items.map((item, idx) =>
               item.type === 'divider' ? (
                 <div key={idx} className="ds-context-menu-divider" />
@@ -5800,6 +5802,7 @@ export default function DiagramCanvas({
               )
             )}
           </div>
+          </FloatingBox>
         </>
       )}
 
