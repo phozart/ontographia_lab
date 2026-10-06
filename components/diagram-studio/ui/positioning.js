@@ -321,6 +321,8 @@ export function placePopoverElement(el, { preferred = 'bottom', align = 'center'
   el.style.left = `${r.left}px`;
   el.style.top = `${r.top}px`;
   el.dataset.placement = r.placement;
+  // Popovers hold inputs (custom colour, font size): suspend single-key shortcuts while open
+  el.setAttribute('data-suspend-shortcuts', '');
   // An ancestor with transform/backdrop-filter becomes the containing block for fixed
   // descendants; correct by whatever offset that introduces.
   const actual = el.getBoundingClientRect();
