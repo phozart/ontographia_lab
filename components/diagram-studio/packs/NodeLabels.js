@@ -33,6 +33,8 @@ export function BelowLabel({ element }) {
         ...BELOW_STYLE,
         fontSize: element.fontSize || 12,
         fontWeight: element.fontWeight || 500,
+        fontStyle: element.fontStyle || 'normal',
+        textDecoration: element.textDecoration || 'none',
         color: element.textColor || 'var(--text, #1f2937)',
       }}
     >
@@ -63,6 +65,8 @@ export function SvgBelowLabel({ element, width, height }) {
       textAnchor="middle"
       fontSize={element.fontSize || 12}
       fontWeight={element.fontWeight || 500}
+      fontStyle={element.fontStyle || 'normal'}
+      textDecoration={element.textDecoration || 'none'}
       fill={element.textColor || 'var(--text, #1f2937)'}
       style={{ userSelect: 'none' }}
     >

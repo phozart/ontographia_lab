@@ -1,7 +1,7 @@
 // components/diagram-studio/StarterPackModal.js
 // Modal for selecting and applying templates
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import CloseIcon from '@mui/icons-material/Close';
 
@@ -177,6 +177,21 @@ export default function StarterPackModal({ isOpen, onClose, onApply }) {
     onClose();
     setSelectedPack(null);
   }, [onClose]);
+
+  // Esc closes the modal and releases focus so canvas shortcuts work again.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      handleClose();
+      // The canvas is not focusable; releasing focus leaves the body active, which the shortcut rule treats as "canvas".
+      requestAnimationFrame(() => document.activeElement?.blur?.());
+    };
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [isOpen, handleClose]);
 
   const filteredPacks = activeCategory === 'All'
     ? STARTER_PACKS

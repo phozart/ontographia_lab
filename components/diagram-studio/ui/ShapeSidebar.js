@@ -148,6 +148,7 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
   onAddPack,
   onTogglePack,
   readOnly,
+  hidden = false,
 }, ref) {
   const { activeTool, setActiveTool, setSelectedStencil } = useDiagram();
   const [showFlyout, setShowFlyout] = useState(false);
@@ -326,6 +327,8 @@ const ShapeSidebar = forwardRef(function ShapeSidebar({
 
   // Check if a shape is selected
   const isShapeActive = (shape) => isStencilArmed(selectedStencil, shape);
+
+  if (hidden) return null;
 
   return (
     <div className="ds-shape-sidebar" ref={sidebarRef}>

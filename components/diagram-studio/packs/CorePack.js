@@ -359,6 +359,8 @@ function DiamondNode({ element, stencil, isSelected, outlined = false }) {
         textAlign: 'center',
         fontSize: element.fontSize || 13,
         fontWeight: element.fontWeight || 500,
+        fontStyle: element.fontStyle || 'normal',
+        textDecoration: element.textDecoration || 'none',
         color: element.textColor || (useOutline ? 'var(--text, #1f2937)' : pickTextColor(fill)),
         overflowWrap: 'break-word',
         pointerEvents: 'none',

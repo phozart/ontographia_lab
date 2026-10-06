@@ -643,6 +643,8 @@ function Node({
   const color = element.color || stencil?.color || '#3b82f6';
   const fontSize = element.fontSize || 13;
   const fontWeight = element.fontWeight || 'normal';
+  const fontStyle = element.fontStyle || 'normal';
+  const textDecoration = element.textDecoration || 'none';
   const textAlign = element.textAlign || 'center';
   const verticalAlign = element.verticalAlign || 'center';
   const fontFamily = element.fontFamily || null; // null means system default
@@ -693,6 +695,8 @@ function Node({
       style={{
         fontSize,
         fontWeight,
+        fontStyle,
+        textDecoration,
         fontFamily: fontFamily || 'inherit',
         textAlign,
         color: textColor,
@@ -707,7 +711,7 @@ function Node({
   ) : (
     <span
       className="ds-node-label"
-      style={{ fontSize, fontWeight, fontFamily: fontFamily || 'inherit', textAlign, color: textColor, width: '100%' }}
+      style={{ fontSize, fontWeight, fontStyle, textDecoration, fontFamily: fontFamily || 'inherit', textAlign, color: textColor, width: '100%' }}
     >
       {element.label || element.name || 'Untitled'}
     </span>

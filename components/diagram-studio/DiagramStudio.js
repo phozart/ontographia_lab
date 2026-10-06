@@ -263,10 +263,10 @@ function DiagramStudioInner({
 
   // Sync panel collapsed state with user settings
   useEffect(() => {
-    if (settingsLoaded && userSettings.leftPanelCollapsed !== undefined) {
-      setLeftPanelCollapsed(userSettings.leftPanelCollapsed);
+    if (settingsLoaded && userSettings.shapesPanelHidden !== undefined) {
+      setLeftPanelCollapsed(userSettings.shapesPanelHidden);
     }
-  }, [settingsLoaded, userSettings.leftPanelCollapsed]);
+  }, [settingsLoaded, userSettings.shapesPanelHidden]);
 
   // Handle export
   const handleExport = useCallback(async (format) => {
@@ -300,10 +300,7 @@ function DiagramStudioInner({
   // Handle stencil drag start (for visual feedback)
   const handleStencilDragStart = useCallback((stencil) => {
     setDraggingStencil(stencil);
-    // Auto-collapse the stencil panel when dragging starts
-    setLeftPanelCollapsed(true);
-    updateUserSetting('leftPanelCollapsed', true);
-  }, [updateUserSetting]);
+  }, []);
 
   // Handle stencil drag end
   const handleStencilDragEnd = useCallback(() => {
@@ -314,7 +311,7 @@ function DiagramStudioInner({
   const toggleLeftPanel = useCallback(() => {
     setLeftPanelCollapsed(prev => {
       const next = !prev;
-      updateUserSetting('leftPanelCollapsed', next);
+      updateUserSetting('shapesPanelHidden', next);
       return next;
     });
   }, [updateUserSetting]);
@@ -322,8 +319,14 @@ function DiagramStudioInner({
   // Open the stencil panel (called by EmptyCanvasWelcome)
   const handleOpenStencilPanel = useCallback(() => {
     // Open the first pack's flyout in the ShapeSidebar
+    if (leftPanelCollapsed) {
+      setLeftPanelCollapsed(false);
+      updateUserSetting('shapesPanelHidden', false);
+      setTimeout(() => iconBarRef.current?.openFirstPack(), 0);
+      return;
+    }
     iconBarRef.current?.openFirstPack();
-  }, []);
+  }, [leftPanelCollapsed, updateUserSetting]);
 
   // Open template selection (called by EmptyCanvasWelcome)
   const handleOpenTemplates = useCallback(() => {
@@ -660,6 +663,7 @@ function DiagramStudioInner({
             onAddPack={() => setShowStarterPacks(true)}
             onTogglePack={handleTogglePack}
             readOnly={profile?.editingPolicy?.readOnly}
+            hidden={leftPanelCollapsed}
           />
         </>
       )}

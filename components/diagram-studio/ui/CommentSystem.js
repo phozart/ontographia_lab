@@ -403,8 +403,12 @@ export function NewCommentInput({
   const inputRef = useRef(null);
   const containerRef = useRef(null);
 
+  // Focus again after the originating mousedown finishes: the canvas's default focus
+  // handling would otherwise steal it and typing would fire single-key shortcuts.
   useEffect(() => {
     inputRef.current?.focus();
+    const raf = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   // Delay adding click-outside handler to prevent the initial click from closing the popup
@@ -441,6 +445,7 @@ export function NewCommentInput({
     <div
       ref={containerRef}
       className="ds-new-comment-input"
+      data-suspend-shortcuts=""
       style={{
         position: 'fixed',
         left: position.x + 52, // Account for ShapeSidebar width (--ds-icon-bar-width: 52px)

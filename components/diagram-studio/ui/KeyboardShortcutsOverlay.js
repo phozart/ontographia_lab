@@ -213,8 +213,9 @@ export default function KeyboardShortcutsOverlay({ isOpen, onClose }) {
 
         .keyboard-shortcut-item {
           display: flex;
+          flex-wrap: wrap;
           align-items: center;
-          gap: 10px;
+          gap: 4px 10px;
         }
 
         .keyboard-shortcut-key {
@@ -233,9 +234,13 @@ export default function KeyboardShortcutsOverlay({ isOpen, onClose }) {
           border-radius: 6px;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 0 rgba(255, 255, 255, 0.8) inset;
           white-space: nowrap;
+          flex-shrink: 0;
         }
 
         .keyboard-shortcut-description {
+          flex: 1 1 96px;
+          min-width: 0;
+          overflow-wrap: anywhere;
           font-size: 13px;
           color: var(--text-muted, #64748b);
         }
