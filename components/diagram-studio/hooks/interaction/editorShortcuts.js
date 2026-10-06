@@ -27,3 +27,13 @@ export function resolveEditorShortcut(e) {
   if (e.key === '-' || e.key === '_') return 'zoom-out';
   return null;
 }
+
+/**
+ * F = fit to screen, Shift+F = toggle focus mode. One key, one thing each.
+ * Returns 'fit' | 'focus-mode' | null.
+ */
+export function resolveFKey(e) {
+  if (!e || (e.key || '').toLowerCase() !== 'f') return null;
+  if (e.ctrlKey || e.metaKey || e.altKey) return null;
+  return e.shiftKey ? 'focus-mode' : 'fit';
+}

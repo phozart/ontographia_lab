@@ -1,6 +1,7 @@
 // components/diagram-studio/ui/KeyboardShortcutsOverlay.js
 // Full-screen keyboard shortcuts overlay - appears on '?' key press
 
+import { createPortal } from 'react-dom';
 import { useEffect, useCallback, useState } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
@@ -35,7 +36,7 @@ export default function KeyboardShortcutsOverlay({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  return (
+  const content = (
     <div className="keyboard-shortcuts-overlay" onClick={handleOverlayClick}>
       <div className="keyboard-shortcuts-modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
         {/* Header */}
@@ -89,7 +90,7 @@ export default function KeyboardShortcutsOverlay({ isOpen, onClose }) {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: var(--ds-z-modal, 400);
+          z-index: 10100;
           padding: 24px;
           animation: fadeIn 0.2s ease-out;
         }
@@ -266,6 +267,7 @@ export default function KeyboardShortcutsOverlay({ isOpen, onClose }) {
       `}</style>
     </div>
   );
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
 }
 
 // Hook to manage keyboard shortcuts overlay state

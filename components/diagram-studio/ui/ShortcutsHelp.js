@@ -1,6 +1,7 @@
 // components/diagram-studio/ui/ShortcutsHelp.js
 // Keyboard shortcuts help panel
 
+import { createPortal } from 'react-dom';
 import { useState, useEffect, useCallback } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
 import KeyboardIcon from '@mui/icons-material/Keyboard';
@@ -56,7 +57,7 @@ export default function ShortcutsHelp({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  return (
+  const content = (
     <div className="ds-shortcuts-overlay" onClick={onClose}>
       <div className="ds-shortcuts-panel" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" onClick={e => e.stopPropagation()}>
         {/* Header */}
@@ -131,7 +132,7 @@ export default function ShortcutsHelp({ isOpen, onClose }) {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1000;
+          z-index: 10100;
           padding: 40px;
         }
 
@@ -317,6 +318,7 @@ export default function ShortcutsHelp({ isOpen, onClose }) {
       `}</style>
     </div>
   );
+  return typeof document !== 'undefined' ? createPortal(content, document.body) : content;
 }
 
 // Hook to open shortcuts help

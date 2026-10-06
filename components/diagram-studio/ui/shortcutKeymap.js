@@ -1,3 +1,5 @@
+import { formatShortcut, isMac } from '../../../lib/platform';
+
 // components/diagram-studio/ui/shortcutKeymap.js
 // Single source of truth for the shortcut list shown in ShortcutsHelp and
 // KeyboardShortcutsOverlay. Every entry must match a real key binding in
@@ -12,7 +14,7 @@ export const SHORTCUT_GROUPS = [
       { keys: ['C'], description: 'Connect tool' },
       { keys: ['H'], description: 'Pan tool' },
       { keys: ['Space'], description: 'Pan (hold, then drag)' },
-      { keys: ['K'], description: 'Comment mode' },
+      { keys: ['K'], description: 'Comment mode', commandId: 'add-comment' },
       { keys: ['S'], description: 'Draw a Task shape' },
       { keys: ['N'], description: 'Add a sticky note near the center' },
     ],
@@ -20,8 +22,8 @@ export const SHORTCUT_GROUPS = [
   {
     name: 'Selection',
     shortcuts: [
-      { keys: ['Mod', 'A'], description: 'Select all' },
-      { keys: ['Esc'], description: 'Deselect / cancel' },
+      { keys: ['Mod', 'A'], description: 'Select all', commandId: 'select-all' },
+      { keys: ['Esc'], description: 'Deselect / cancel', commandId: 'deselect' },
       { keys: ['Click'], description: 'Select element' },
       { keys: ['Shift', 'Click'], description: 'Add to selection' },
     ],
@@ -39,11 +41,11 @@ export const SHORTCUT_GROUPS = [
   {
     name: 'Editing',
     shortcuts: [
-      { keys: ['Delete'], description: 'Delete selected' },
+      { keys: ['Delete'], description: 'Delete selected', commandId: 'delete-selected' },
       { keys: ['Backspace'], description: 'Delete selected' },
-      { keys: ['Mod', 'D'], description: 'Duplicate selected' },
-      { keys: ['Mod', 'C'], description: 'Copy' },
-      { keys: ['Mod', 'V'], description: 'Paste' },
+      { keys: ['Mod', 'D'], description: 'Duplicate selected', commandId: 'duplicate' },
+      { keys: ['Mod', 'C'], description: 'Copy', commandId: 'copy' },
+      { keys: ['Mod', 'V'], description: 'Paste', commandId: 'paste' },
       { keys: ['Mod', 'Z'], description: 'Undo' },
       { keys: ['Mod', 'Y'], description: 'Redo' },
       { keys: ['Mod', 'Shift', 'Z'], description: 'Redo' },
@@ -63,21 +65,22 @@ export const SHORTCUT_GROUPS = [
   {
     name: 'View',
     shortcuts: [
-      { keys: ['+'], description: 'Zoom in' },
-      { keys: ['-'], description: 'Zoom out' },
+      { keys: ['+'], description: 'Zoom in', commandId: 'zoom-in' },
+      { keys: ['-'], description: 'Zoom out', commandId: 'zoom-out' },
       { keys: ['0'], description: 'Fit all to screen' },
       { keys: ['Home'], description: 'Fit all to screen' },
       { keys: ['Mod', '0'], description: 'Zoom to selection' },
-      { keys: ['F'], description: 'Fit all to screen (also toggles focus mode)' },
-      { keys: ['M'], description: 'Toggle minimap' },
+      { keys: ['F'], description: 'Fit all to screen', commandId: 'zoom-fit' },
+      { keys: ['Shift', 'F'], description: 'Toggle focus mode', commandId: 'focus-mode' },
+      { keys: ['M'], description: 'Toggle minimap', commandId: 'toggle-minimap' },
     ],
   },
   {
     name: 'Panels',
     shortcuts: [
-      { keys: ['1'], description: 'Toggle left (shapes) panel' },
+      { keys: ['1'], description: 'Toggle left (shapes) panel', commandId: 'toggle-left-panel' },
       { keys: ['P'], description: 'Toggle properties panel (with a selection)' },
-      { keys: ['T'], description: 'Toggle contextual toolbar' },
+      { keys: ['T'], description: 'Toggle style toolbar' },
       { keys: ['Mod', 'K'], description: 'Open command palette' },
       { keys: ['?'], description: 'Show keyboard shortcuts' },
     ],
@@ -85,7 +88,7 @@ export const SHORTCUT_GROUPS = [
   {
     name: 'File',
     shortcuts: [
-      { keys: ['Mod', 'S'], description: 'Save' },
+      { keys: ['Mod', 'S'], description: 'Save', commandId: 'save' },
     ],
   },
   {
@@ -105,4 +108,11 @@ export function displayKey(key, mac = false) {
   if (key === 'Mod') return mac ? '⌘' : 'Ctrl';
   if (key === 'Shift' && mac) return '⇧';
   return key;
+}
+
+/** Shortcut label for a command-palette command, derived from the keymap ('' if unbound). */
+export function commandShortcut(commandId, mac = isMac()) {
+  const entry = flattenShortcuts().find((e) => e.commandId === commandId);
+  if (!entry) return '';
+  return formatShortcut(entry.keys.join('+'), mac);
 }

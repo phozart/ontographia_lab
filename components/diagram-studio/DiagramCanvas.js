@@ -43,6 +43,7 @@ import { useCanvasInteractions } from './hooks/composite/useCanvasInteractions';
 import { getZIndexForOrder, compareByZOrder } from './hooks/interaction/zOrder';
 import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOptions';
 import { shouldHandleShortcut, isOverlayOpen } from './hooks/interaction/keyboardFocus';
+import { resolveFKey } from './hooks/interaction/editorShortcuts';
 import { findFreePlacement, placeAtPoint, DEFAULT_STICKY_SIZE, DEFAULT_STENCIL_SIZE } from './hooks/interaction/placement';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
@@ -3957,8 +3958,8 @@ export default function DiagramCanvas({
         }
       }
 
-      // F - Fit all elements in view
-      if (e.key === 'f' || e.key === 'F') {
+      // F - Fit all elements in view (Shift+F is focus mode, handled in DiagramStudio)
+      if (resolveFKey(e) === 'fit') {
         e.preventDefault();
         if (elements.length > 0) {
           const containerWidth = containerRef.current?.clientWidth || 1200;

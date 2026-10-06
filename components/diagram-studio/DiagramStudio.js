@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
 import { generateId } from './utils/ids';
 import { useSession } from 'next-auth/react';
-import { resolveEditorShortcut } from './hooks/interaction/editorShortcuts';
+import { resolveEditorShortcut, resolveFKey } from './hooks/interaction/editorShortcuts';
 import { shouldHandleShortcut, isOverlayOpen } from './hooks/interaction/keyboardFocus';
 import { getTemplateBounds, getContentBounds, computeTemplatePlacement, computeFitViewport } from './utils/templatePlacement';
 import { DiagramProvider, useDiagram, useDiagramViewport, useDiagramSelection } from './DiagramContext';
@@ -524,8 +524,8 @@ function DiagramStudioInner({
         }
       }
 
-      // F key to toggle focus mode
-      if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Shift+F toggles focus mode (plain F is Fit, handled by the canvas)
+      if (resolveFKey(e) === 'focus-mode') {
         setFocusMode(prev => !prev);
       }
 
