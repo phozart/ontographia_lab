@@ -118,6 +118,7 @@ const stencils = [
     group: 'Colored',
     shape: 'rect',
     icon: '●',
+    tintIcon: true, // palette tile shows the topic's own colour
     color: '#ef4444',
     defaultSize: { width: 120, height: 40 },
     ports: [
@@ -135,6 +136,7 @@ const stencils = [
     group: 'Colored',
     shape: 'rect',
     icon: '●',
+    tintIcon: true, // palette tile shows the topic's own colour
     color: '#3b82f6',
     defaultSize: { width: 120, height: 40 },
     ports: [
@@ -152,6 +154,7 @@ const stencils = [
     group: 'Colored',
     shape: 'rect',
     icon: '●',
+    tintIcon: true, // palette tile shows the topic's own colour
     color: '#22c55e',
     defaultSize: { width: 120, height: 40 },
     ports: [
@@ -169,6 +172,7 @@ const stencils = [
     group: 'Colored',
     shape: 'rect',
     icon: '●',
+    tintIcon: true, // palette tile shows the topic's own colour
     color: '#8b5cf6',
     defaultSize: { width: 120, height: 40 },
     ports: [

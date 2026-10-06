@@ -2,6 +2,7 @@
 // Sticky notes pack for freeform canvas
 
 import { cssUrl } from '../export/safeUrl';
+import { withBelowLabel } from './NodeLabels';
 
 // ============ STENCILS ============
 
@@ -714,12 +715,12 @@ function renderNode(element, stencil, isSelected) {
 
   // Circle marker
   if (type === 'circle-marker') {
-    return <CircleMarkerNode element={element} stencil={stencil} />;
+    return withBelowLabel(<CircleMarkerNode element={element} stencil={stencil} />, element);
   }
 
   // Arrow marker
   if (type === 'arrow-marker') {
-    return <ArrowMarkerNode element={element} stencil={stencil} />;
+    return withBelowLabel(<ArrowMarkerNode element={element} stencil={stencil} />, element);
   }
 
   // Image placeholder

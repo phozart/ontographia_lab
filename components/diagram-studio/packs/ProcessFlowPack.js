@@ -2,6 +2,8 @@
 // Unified Process Flows pack - combines BPMN and general process flow elements
 
 import { StyledRectRenderer, getVariantTextColor } from '../styling';
+import { withBelowLabel, labelOf } from './NodeLabels';
+import { pickLabelColor, DARK_TEXT } from './colorUtils';
 
 // ============ STENCILS ============
 
@@ -118,9 +120,9 @@ const stencils = [
     description: 'Exclusive gateway - only one path can be taken (XOR)',
     group: 'Flow Control',
     shape: 'diamond',
-    icon: '✕',
+    icon: '◇',
     color: '#f59e0b',
-    defaultSize: { width: 50, height: 50 },
+    defaultSize: { width: 110, height: 70 },
     ports: [
       { id: 'top', position: 'top' },
       { id: 'right', position: 'right' },
@@ -140,7 +142,7 @@ const stencils = [
     shape: 'diamond',
     icon: '+',
     color: '#22c55e',
-    defaultSize: { width: 50, height: 50 },
+    defaultSize: { width: 60, height: 60 },
     ports: [
       { id: 'top', position: 'top' },
       { id: 'right', position: 'right' },
@@ -157,7 +159,7 @@ const stencils = [
     shape: 'diamond',
     icon: '○',
     color: '#8b5cf6',
-    defaultSize: { width: 50, height: 50 },
+    defaultSize: { width: 60, height: 60 },
     ports: [
       { id: 'top', position: 'top' },
       { id: 'right', position: 'right' },
@@ -174,7 +176,7 @@ const stencils = [
     shape: 'diamond',
     icon: '⋈',
     color: '#06b6d4',
-    defaultSize: { width: 50, height: 50 },
+    defaultSize: { width: 60, height: 60 },
     ports: [
       { id: 'top', position: 'top' },
       { id: 'right', position: 'right' },
@@ -402,7 +404,7 @@ const templates = [
       { id: 'start1', type: 'start-event', label: 'Start', x: 50, y: 150, size: { width: 44, height: 44 } },
       { id: 'task1', type: 'task', label: 'Submit Request', x: 150, y: 127, size: { width: 140, height: 70 } },
       { id: 'task2', type: 'task', label: 'Review Request', x: 340, y: 127, size: { width: 140, height: 70 } },
-      { id: 'dec1', type: 'exclusive-gateway', label: 'Approved?', x: 530, y: 145, size: { width: 50, height: 50 } },
+      { id: 'dec1', type: 'exclusive-gateway', label: 'Approved?', x: 500, y: 135, size: { width: 110, height: 70 } },
       { id: 'task3', type: 'task', label: 'Process Approved', x: 650, y: 50, size: { width: 140, height: 70 } },
       { id: 'task4', type: 'task', label: 'Handle Rejection', x: 650, y: 220, size: { width: 140, height: 70 } },
       { id: 'end1', type: 'end-event', label: 'End', x: 850, y: 150, size: { width: 44, height: 44 } },
@@ -792,7 +794,19 @@ function SubprocessNode({ element, stencil }) {
 }
 
 // Gateway (modern diamond shape with internal marker)
-function GatewayNode({ element, stencil, gatewayType }) {
+// Rough fit test: does the label fit inside the diamond's inscribed text box?
+export function decisionLabelFits(element, stencil) {
+  const { width, height } = element.size || stencil?.defaultSize || { width: 110, height: 70 };
+  const text = labelOf(element);
+  const fs = element.fontSize || 12;
+  const innerW = width * 0.56;
+  const innerH = height * 0.56;
+  const lines = Math.ceil((text.length * fs * 0.55) / Math.max(1, innerW));
+  const longestWord = Math.max(0, ...text.split(/\s+/).map((w) => w.length));
+  return lines * fs * 1.15 <= innerH && longestWord * fs * 0.55 <= innerW;
+}
+
+function GatewayNode({ element, stencil, gatewayType, labelInside = true }) {
   const { width, height } = element.size || stencil?.defaultSize || { width: 50, height: 50 };
   const cx = width / 2;
   const cy = height / 2;
@@ -803,7 +817,11 @@ function GatewayNode({ element, stencil, gatewayType }) {
     inclusive: '#8b5cf6',
     merge: '#06b6d4',
   };
-  const color = colors[gatewayType] || '#f59e0b';
+  const color = element.color || colors[gatewayType] || '#f59e0b';
+  const fill = element.backgroundColor || 'white';
+  // The generic Decision (exclusive gateway) carries its label inside the diamond;
+  // marker-only variants keep their BPMN marker and show the label below the shape.
+  const label = gatewayType === 'exclusive' && labelInside ? labelOf(element) : '';
 
   const getMarker = () => {
     switch (gatewayType) {
@@ -846,21 +864,44 @@ function GatewayNode({ element, stencil, gatewayType }) {
         {/* Diamond with shadow */}
         <polygon
           points={`${cx},4 ${width - 4},${cy} ${cx},${height - 4} 4,${cy}`}
-          fill="white"
+          fill={fill}
           filter={`url(#gateway-shadow-${element.id})`}
         />
 
         {/* Diamond border */}
         <polygon
           points={`${cx},4 ${width - 4},${cy} ${cx},${height - 4} 4,${cy}`}
-          fill="white"
+          fill={fill}
           stroke={color}
           strokeWidth="2"
         />
 
-        {/* Inner marker */}
-        {getMarker()}
+        {/* Inner marker (hidden when the Decision label occupies the diamond) */}
+        {!label && getMarker()}
       </svg>
+      {label && (
+        <div style={{
+          position: 'absolute',
+          top: '22%',
+          left: '22%',
+          width: '56%',
+          height: '56%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          overflow: 'hidden',
+          overflowWrap: 'anywhere',
+          lineHeight: 1.15,
+          fontSize: element.fontSize || 12,
+          fontWeight: element.fontWeight || 500,
+          color: element.textColor || pickLabelColor(fill, DARK_TEXT),
+          pointerEvents: 'none',
+          userSelect: 'none',
+        }}>
+          {label}
+        </div>
+      )}
     </div>
   );
 }
@@ -1045,23 +1086,28 @@ function renderNode(element, stencil, isSelected) {
 
   switch (type) {
     case 'start-event':
-      return <StartEventNode element={element} stencil={stencil} />;
+      return withBelowLabel(<StartEventNode element={element} stencil={stencil} />, element);
     case 'end-event':
-      return <EndEventNode element={element} stencil={stencil} />;
+      return withBelowLabel(<EndEventNode element={element} stencil={stencil} />, element);
     case 'intermediate-event':
-      return <IntermediateEventNode element={element} stencil={stencil} />;
+      return withBelowLabel(<IntermediateEventNode element={element} stencil={stencil} />, element);
     case 'task':
       return <TaskNode element={element} stencil={stencil} isSelected={isSelected} />;
     case 'subprocess':
       return <SubprocessNode element={element} stencil={stencil} />;
-    case 'exclusive-gateway':
-      return <GatewayNode element={element} stencil={stencil} gatewayType="exclusive" />;
+    case 'exclusive-gateway': {
+      // Small stored Decisions (e.g. legacy 50x50) show the label (and marker) below instead of clipping it
+      if (decisionLabelFits(element, stencil)) {
+        return <GatewayNode element={element} stencil={stencil} gatewayType="exclusive" />;
+      }
+      return withBelowLabel(<GatewayNode element={element} stencil={stencil} gatewayType="exclusive" labelInside={false} />, element);
+    }
     case 'parallel-gateway':
-      return <GatewayNode element={element} stencil={stencil} gatewayType="parallel" />;
+      return withBelowLabel(<GatewayNode element={element} stencil={stencil} gatewayType="parallel" />, element);
     case 'inclusive-gateway':
-      return <GatewayNode element={element} stencil={stencil} gatewayType="inclusive" />;
+      return withBelowLabel(<GatewayNode element={element} stencil={stencil} gatewayType="inclusive" />, element);
     case 'merge':
-      return <GatewayNode element={element} stencil={stencil} gatewayType="merge" />;
+      return withBelowLabel(<GatewayNode element={element} stencil={stencil} gatewayType="merge" />, element);
     case 'pool':
       return <SwimLaneNode element={element} stencil={stencil} isPool={true} />;
     case 'lane':

@@ -858,6 +858,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     // Element operations
     addElement,
     updateElement,
+    endGesture,
     removeElement,
     discardElement,
 
