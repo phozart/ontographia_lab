@@ -113,3 +113,26 @@ describe('migrateDiagram', () => {
     });
   });
 });
+
+describe('migrateDiagram frame membership', () => {
+  const content = () => ({
+    elements: [
+      { id: 'f', type: 'frame', x: 0, y: 0, size: { width: 500, height: 500 } },
+      { id: 'in', type: 'rectangle', packId: 'core', x: 10, y: 10, size: { width: 100, height: 50 } },
+      { id: 'out', type: 'rectangle', packId: 'core', x: 900, y: 10, size: { width: 100, height: 50 } },
+    ],
+  });
+
+  it('derives explicit membership once for legacy frames and flags them', () => {
+    const out = migrateDiagram(content());
+    expect(out.elements.find((e) => e.id === 'in').parentFrameId).toBe('f');
+    expect(out.elements.find((e) => e.id === 'out').parentFrameId).toBeUndefined();
+    expect(out.elements.find((e) => e.id === 'f').membershipExplicit).toBe(true);
+  });
+
+  it('does not re-adopt after the user released a shape (idempotent)', () => {
+    const once = migrateDiagram(content());
+    const released = { ...once, elements: once.elements.map((e) => (e.id === 'in' ? { ...e, parentFrameId: null } : e)) };
+    expect(migrateDiagram(released)).toBe(released);
+  });
+});

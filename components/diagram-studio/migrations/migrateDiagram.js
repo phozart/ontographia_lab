@@ -1,5 +1,7 @@
 // components/diagram-studio/migrations/migrateDiagram.js
 // Pure, idempotent migration of saved diagram content to current element types.
+// Also derives explicit frame membership (parentFrameId) once for legacy frames.
+import { deriveLegacyFrameMembership } from '../utils/frameMembership';
 
 import { normalizePoints } from '../connections/geometry/orthogonalRouter';
 
@@ -19,7 +21,10 @@ function migrateElements(list) {
     changed = true;
     return { ...el, type: target.type, packId: target.packId };
   });
-  return changed ? next : list;
+  const result = changed ? next : list;
+  // Legacy frames (no `membershipExplicit`) adopt the shapes they geometrically
+  // contain, exactly once; afterwards membership is explicit and persisted.
+  return deriveLegacyFrameMembership(result);
 }
 
 const EPS = 0.5;
