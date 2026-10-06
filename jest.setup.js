@@ -45,7 +45,8 @@ const localStorageMock = {
 global.localStorage = localStorageMock;
 
 // Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
+// (guarded so server-side suites can opt into the node test environment with a docblock)
+if (typeof window !== 'undefined') Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: jest.fn().mockImplementation(query => ({
     matches: false,
