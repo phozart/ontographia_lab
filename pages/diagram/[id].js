@@ -101,8 +101,9 @@ export default function DiagramEditorPage({ theme }) {
         router.replace('/login');
         return;
       }
-      if (res.status === 403) {
-        setError('You do not have access to this diagram');
+      // 404 covers both "does not exist" and "no access" (the server never reveals which)
+      if (res.status === 403 || res.status === 404) {
+        setError('This diagram was not found, or you do not have access to it');
         setLoading(false);
         return;
       }

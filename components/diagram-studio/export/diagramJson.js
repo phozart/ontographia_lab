@@ -2,15 +2,15 @@
 // Pure helpers for the JSON export envelope and JSON import (validation, sanitizing, re-id/offset).
 // No DOM or React dependencies so everything here is unit-testable.
 
-import { isSafeUrl, isUrlKey } from './safeUrl';
+import { isUnsafeUrlValue } from '../../../lib/safeUrl';
+import {
+  MAX_CONTENT_BYTES, MAX_ELEMENTS, MAX_CONNECTIONS, MAX_COLLECTION, MAX_DEPTH, FORBIDDEN_KEYS, CONTENT_KEYS,
+} from '../../../lib/diagramLimits';
 
+export { MAX_ELEMENTS, MAX_CONNECTIONS, MAX_COLLECTION };
 export const FORMAT_ID = 'ontographia-diagram';
 export const FORMAT_VERSION = 1;
-export const MAX_IMPORT_BYTES = 5 * 1024 * 1024; // 5 MB
-export const MAX_ELEMENTS = 5000;
-export const MAX_CONNECTIONS = 10000;
-export const MAX_COLLECTION = 1000; // layers / groups
-const MAX_DEPTH = 24;
+export const MAX_IMPORT_BYTES = MAX_CONTENT_BYTES; // 5 MB, same cap the server enforces on save
 const MAX_STRING = 200000;
 const DEFAULT_SIZE = { width: 120, height: 60 };
 
@@ -22,8 +22,7 @@ export const VALID_DIAGRAM_TYPES = [
 ];
 export const FALLBACK_DIAGRAM_TYPE = 'infinite-canvas';
 
-const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-const CONTENT_KEYS = ['elements', 'connections', 'layers', 'groups', 'viewport'];
+const FORBIDDEN_KEY_SET = new Set(FORBIDDEN_KEYS);
 
 // ============ EXPORT ============
 
@@ -79,8 +78,8 @@ export function deepSanitize(value, depth = 0, stats = null) {
   if (isPlainObject(value)) {
     const out = {};
     for (const key of Object.keys(value)) {
-      if (FORBIDDEN_KEYS.has(key)) continue;
-      if (typeof value[key] === 'string' && isUrlKey(key) && value[key] !== '' && !isSafeUrl(value[key])) {
+      if (FORBIDDEN_KEY_SET.has(key)) continue;
+      if (isUnsafeUrlValue(key, value[key])) {
         if (stats) stats.urls = (stats.urls || 0) + 1;
         continue;
       }
