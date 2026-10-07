@@ -3,6 +3,7 @@
 // (The full endpoint x role matrix lives in __tests__/authz/endpointMatrix.test.js.)
 let mockUser = null;
 let mockRole = 'owner';
+let mockOwnerId = '99999999-9999-4999-8999-999999999999';
 jest.mock('../../lib/useAuth', () => ({
   requireActiveUser: jest.fn(async (req, res) => {
     if (!mockUser) { res.status(401).json({ error: 'Unauthorized' }); return null; }
@@ -19,7 +20,7 @@ jest.mock('../../lib/authz/index', () => {
     authorize: jest.fn(async (principal, ref, action) => {
       if (!mockRole) throw new actual.AuthzError(404, 'NOT_FOUND', 'Diagram not found');
       if (!policy.can(mockRole, action)) throw new actual.AuthzError(403, 'FORBIDDEN', 'Access denied');
-      return { diagram: { id: ref, short_id: 'LAB-1', owner_id: '99999999-9999-4999-8999-999999999999' }, role: mockRole, source: 'member', capabilities: policy.capabilitiesFor(mockRole) };
+      return { diagram: { id: ref, short_id: 'LAB-1', owner_id: mockOwnerId }, role: mockRole, source: 'member', capabilities: policy.capabilitiesFor(mockRole) };
     }),
   };
 });
@@ -28,6 +29,9 @@ jest.mock('../../lib/memberRepository', () => ({
     findActiveUserByEmail: jest.fn(), getMember: jest.fn(), listAccess: jest.fn(),
     addMember: jest.fn(), setRole: jest.fn(), removeMember: jest.fn(), listSharedWith: jest.fn(),
   },
+}));
+jest.mock('../../lib/diagramRepository', () => ({
+  diagramRepository: { findById: jest.fn(), duplicateDiagram: jest.fn(), updateDiagram: jest.fn() },
 }));
 jest.mock('../../lib/audit', () => ({ recordAuditEvent: jest.fn(async () => {}), listAuditEvents: jest.fn() }));
 let mockLimited = false;
@@ -42,6 +46,9 @@ jest.mock('../../lib/rateLimit', () => ({
 
 import { memberRepository as repo } from '../../lib/memberRepository';
 import { recordAuditEvent, listAuditEvents } from '../../lib/audit';
+import { diagramRepository as diagrams } from '../../lib/diagramRepository';
+import diagramHandler from '../../pages/api/diagrams/[id]';
+import duplicateHandler from '../../pages/api/diagrams/[id]/duplicate';
 import accessHandler from '../../pages/api/diagrams/[id]/access';
 import sharesHandler from '../../pages/api/diagrams/[id]/shares';
 import memberHandler from '../../pages/api/diagrams/[id]/members/[userId]';
@@ -66,7 +73,8 @@ beforeEach(() => {
   Object.values(repo).forEach((f) => f.mockReset());
   recordAuditEvent.mockClear();
   listAuditEvents.mockReset();
-  mockUser = ME; mockRole = 'owner'; mockLimited = false;
+  mockUser = ME; mockRole = 'owner'; mockLimited = false; mockOwnerId = OWNER_ID;
+  diagrams.findById.mockReset(); diagrams.duplicateDiagram.mockReset();
 });
 
 describe('GET /access', () => {
@@ -330,5 +338,92 @@ describe('GET /audit', () => {
     mockRole = role;
     expect((await call(auditHandler, { method: 'GET' })).statusCode).toBe(403);
     expect(listAuditEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe('UUID case in /members/{userId}', () => {
+  const LOWER = 'abcdefab-abcd-4abc-8abc-abcdefabcdef';
+  const del = (userId) => call(memberHandler, { method: 'DELETE', query: { id: ID, userId } });
+
+  test('the owner is immutable whatever the case of the id (409)', async () => {
+    mockOwnerId = LOWER;
+    const res = await del(LOWER.toUpperCase());
+    expect([res.statusCode, res.body.code]).toEqual([409, 'OWNER_IMMUTABLE']);
+    const put = await call(memberHandler, { method: 'PUT', query: { id: ID, userId: LOWER.toUpperCase() }, body: { role: 'viewer' } });
+    expect(put.statusCode).toBe(409);
+    expect(repo.removeMember).not.toHaveBeenCalled();
+  });
+
+  test('self-leave works with an uppercase id (acts on the lowercase row)', async () => {
+    mockUser = { ...ME, id: LOWER };
+    mockRole = 'viewer';
+    repo.getMember.mockResolvedValue({ diagramId: ID, userId: LOWER, role: 'viewer' });
+    repo.removeMember.mockResolvedValue(true);
+    const res = await del(LOWER.toUpperCase());
+    expect(res.statusCode).toBe(204);
+    expect(repo.removeMember).toHaveBeenCalledWith(ID, LOWER, 'viewer');
+    expect(recordAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ target: { userId: LOWER, role: 'viewer', self: true } }));
+  });
+});
+
+describe('owner decisions 2026-10-07', () => {
+  test('4a: a viewer may duplicate (diagram.read is sufficient); the copy is theirs', async () => {
+    mockRole = 'viewer';
+    diagrams.findById.mockResolvedValue({ id: ID, name: 'D', content: { elements: [], connections: [], layers: [], groups: [], viewport: { x: 0, y: 0, zoom: 1 } } });
+    diagrams.duplicateDiagram.mockResolvedValue({ id: 'new', name: 'D (copy)', revision: '0' });
+    const res = await call(duplicateHandler, { method: 'POST' });
+    expect(res.statusCode).toBe(201);
+    expect(diagrams.duplicateDiagram).toHaveBeenCalledWith(expect.anything(), ME.email, ME.id);
+  });
+
+  test.each(['viewer', 'commenter'])('4b: an editor may change or revoke a %s regardless of who granted them', async (target) => {
+    mockRole = 'editor';
+    const someoneElse = '44444444-4444-4444-8444-444444444444'; // neither the actor nor the owner
+    repo.getMember.mockResolvedValue({ diagramId: ID, userId: TARGET, role: target, grantedBy: someoneElse });
+    repo.removeMember.mockResolvedValue(true);
+    expect((await call(memberHandler, { method: 'DELETE', query: { id: ID, userId: TARGET } })).statusCode).toBe(204);
+    const other = target === 'viewer' ? 'commenter' : 'viewer';
+    repo.setRole.mockImplementation(async (d, u, from, to) => ({ diagramId: d, userId: u, role: to }));
+    expect((await call(memberHandler, { method: 'PUT', query: { id: ID, userId: TARGET }, body: { role: other } })).statusCode).toBe(200);
+  });
+
+  test('4c: the dashboard "shared with me" payload carries the owner name, never the owner address', async () => {
+    const { memberRepository: actual } = jest.requireActual('../../lib/memberRepository');
+    const { query } = require('../../lib/db');
+    query.mockResolvedValueOnce({ rows: [
+      { id: 'd1', revision: '1', role: 'viewer', oid: OWNER_ID, oname: 'Alice Owner', oemail: 'alice@corp.example', oimage: null },
+      { id: 'd2', revision: '1', role: 'viewer', oid: OWNER_ID, oname: null, oemail: 'bob.smith@corp.example', oimage: null },
+    ] });
+    const rows = await actual.listSharedWith(ME.id);
+    expect(rows[0].owner).toEqual({ id: OWNER_ID, name: 'Alice Owner', image: null });
+    expect(rows[1].owner.name).toBe('bob.smith');
+    expect(JSON.stringify(rows)).not.toMatch(/corp\.example/);
+  });
+
+  describe('4c: GET /api/diagrams/{id} hides stored addresses from non-owners', () => {
+    const full = { id: ID, short_id: 'LAB-1', owner_id: OWNER_ID, created_by: 'alice@corp.example', updated_by: 'ed@corp.example', revision: '2', content: { elements: [], connections: [] } };
+    test.each(['editor', 'commenter', 'viewer'])('%s sees local parts only', async (role) => {
+      mockRole = role;
+      diagrams.findById.mockResolvedValue(full);
+      const res = await call(diagramHandler, { method: 'GET', query: { id: ID } });
+      expect(res.statusCode).toBe(200);
+      expect(res.body.created_by).toBe('alice');
+      expect(res.body.updated_by).toBe('ed');
+      expect(JSON.stringify(res.body)).not.toMatch(/corp\.example/);
+    });
+    test('the owner still sees the stored values', async () => {
+      diagrams.findById.mockResolvedValue(full);
+      const res = await call(diagramHandler, { method: 'GET', query: { id: ID } });
+      expect(res.body.created_by).toBe('alice@corp.example');
+    });
+  });
+
+  test('4c: the access list (owner/editor only) keeps full e-mails', async () => {
+    mockRole = 'editor';
+    repo.listAccess.mockResolvedValue({ owner: ref(OWNER_ID, 'o@x.co'), members: [] });
+    const res = await call(accessHandler, { method: 'GET' });
+    expect(res.body.owner.email).toBe('o@x.co');
+    mockRole = 'viewer';
+    expect((await call(accessHandler, { method: 'GET' })).statusCode).toBe(403);
   });
 });

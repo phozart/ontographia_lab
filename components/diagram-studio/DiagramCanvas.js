@@ -3734,6 +3734,9 @@ export default function DiagramCanvas({
     dragCounterRef.current = 0;
     setIsDragOver(false);
 
+    // View/comment-only: nothing may be created locally (it could never be saved)
+    if (readOnly) return;
+
     // A dropped .json file opens the import dialog (handled by the title bar)
     if (requestJsonImportFromDrop(e.dataTransfer)) return;
 
@@ -3821,7 +3824,7 @@ export default function DiagramCanvas({
     }
 
     onDragEnd?.();
-  }, [viewport, packRegistry, activePack, addElement, selectElement, onDragEnd, setActiveTool, setSelectedStencil]);
+  }, [viewport, packRegistry, activePack, addElement, selectElement, onDragEnd, setActiveTool, setSelectedStencil, readOnly]);
 
   // ============ CONNECTION HANDLING ============
 

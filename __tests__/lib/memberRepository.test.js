@@ -118,11 +118,27 @@ dbDescribe('memberRepository + authorize + audit (throwaway database)', () => {
     const other = await mkDiagram(owner); // not shared with ed
     const rows = await repo.listSharedWith(ed.id);
     expect(rows.map((r) => r.id)).toEqual([diagramId]);
-    expect(rows[0]).toMatchObject({ role: 'editor', owner: { id: owner.id, email: 'owner@x.co' } });
+    // member-facing: owner name (else e-mail local part), never the address
+    expect(rows[0]).toMatchObject({ role: 'editor', owner: { id: owner.id, name: 'owner' } });
+    expect(rows[0].owner).not.toHaveProperty('email');
     expect(rows[0]).not.toHaveProperty('content');
     expect(rows.find((r) => r.id === other)).toBeUndefined();
     expect(await repo.listSharedWith(stranger.id)).toEqual([]);
     expect(await repo.listSharedWith(owner.id)).toEqual([]); // own diagrams are not "shared with me"
+  });
+
+  test('grants made by an editor persist after that editor is removed (granted_by is informational)', async () => {
+    const d3 = await mkDiagram(owner);
+    const grantor = await mkUser('grantor@x.co');
+    const grantee = await mkUser('grantee@x.co');
+    await repo.addMember(d3, grantor.id, 'editor', owner.id);
+    await repo.addMember(d3, grantee.id, 'viewer', grantor.id);
+    expect(await repo.removeMember(d3, grantor.id, 'editor')).toBe(true);
+    expect(await repo.getMember(d3, grantee.id)).toMatchObject({ role: 'viewer', grantedBy: grantor.id });
+    expect((await authz.authorize({ kind: 'user', userId: grantee.id, platformRole: 'user', status: 'active' }, d3, 'diagram.read')).role).toBe('viewer');
+    // even deleting the grantor account only nulls granted_by
+    await pg.query('delete from users where id=$1', [grantor.id]);
+    expect(await repo.getMember(d3, grantee.id)).toMatchObject({ role: 'viewer', grantedBy: null });
   });
 
   test('deleting a user or a diagram cascades the membership', async () => {

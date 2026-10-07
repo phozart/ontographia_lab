@@ -26,3 +26,27 @@ export function applyAccessToProfile(profile, access) {
   if (!profile || canWrite(access)) return profile;
   return { ...profile, editingPolicy: { ...profile.editingPolicy, readOnly: true } };
 }
+
+export const ACCESS_NOTICE_TEXT = {
+  changed: 'Your access to this diagram changed — you can no longer edit.',
+  removed: 'Your access to this diagram was removed — you can no longer edit.',
+  denied: 'The server refused to save this diagram — your latest changes were not saved.',
+};
+
+/**
+ * Decides what a refused save (PUT 403/404) means once access has been re-fetched.
+ * @param {{status:number, body?:object}|null} refetch result of GET /api/diagrams/{id} (null when it failed to complete)
+ * @returns {{kind:'removed'|'changed'|'denied', access:object}}
+ *  removed: 403/404 on re-read, access is gone; changed: still readable, new role cannot write;
+ *  denied: still an editor (unexpected) so autosave must still stop to avoid a retry loop.
+ */
+export function resolveAccessAfterDenied(current, refetch) {
+  if (!refetch || refetch.status === 403 || refetch.status === 404) {
+    return { kind: 'removed', access: { role: null, source: null, capabilities: [] } };
+  }
+  if (refetch.status >= 200 && refetch.status < 300 && refetch.body?.access) {
+    const access = refetch.body.access;
+    return canWrite(access) ? { kind: 'denied', access: current } : { kind: 'changed', access };
+  }
+  return { kind: 'denied', access: current };
+}

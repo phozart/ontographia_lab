@@ -135,6 +135,19 @@ maybe('Sharing matrix (slice 5)', () => {
     const after = (await api(alice, 'GET', `/api/diagrams/${id}`)).body.revision;
     check('viewer UI interaction does not change revision', before === after, `${before}->${after}`);
 
+    // Palette drop by a viewer: nothing is created locally and no contextual toolbar appears
+    const nodesBefore = await dave.$$eval('[data-node-id]', (n) => n.length);
+    await dave.evaluate(() => {
+      const area = document.querySelector('.ds-canvas-area');
+      const dt = new DataTransfer();
+      dt.setData('application/json', JSON.stringify({ type: 'stencil', packId: 'process-flow', stencilId: 'task' }));
+      const r = area.getBoundingClientRect();
+      area.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.left + 400, clientY: r.top + 300 }));
+    });
+    await sleep(500);
+    check('viewer palette drop creates no element', (await dave.$$eval('[data-node-id]', (n) => n.length)) === nodesBefore);
+    check('viewer palette drop shows no contextual toolbar', !(await dave.$('.ds-contextual-toolbar')));
+
     await carol.goto(`${BASE}/diagram/${shortId}`, { waitUntil: 'networkidle0' });
     await sleep(2500);
     const carolPill = await carol.$eval('[data-testid="access-pill"]', (e) => e.textContent).catch(() => null);

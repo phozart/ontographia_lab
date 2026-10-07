@@ -1,7 +1,7 @@
 // components/diagram-studio/DiagramContext.js
 // State management for DiagramStudio component
 
-import { canWrite as accessCanWrite } from './sharing/accessMode';
+import { canWrite as accessCanWrite, resolveAccessAfterDenied, ACCESS_NOTICE_TEXT } from './sharing/accessMode';
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { computeFitForCanvas, FIT_PADDING } from './viewportFit';
 import { getObstacleRects, getAvoidRects } from './ui/positioning';
@@ -115,6 +115,9 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   // Diagram data
   const [diagram, setDiagramState] = useState(null);
+  // Mirrors the caller's write capability so every mutator can refuse synchronously (a missing access block = edit)
+  const canEditRef = useRef(true);
+  canEditRef.current = accessCanWrite(diagram?.access);
   const [elements, setElementsState] = useState([]);
   const [connections, setConnectionsState] = useState([]);
   const [layers, setLayersState] = useState([DEFAULT_LAYER]);
@@ -210,6 +213,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [elements, connections]);
 
   const undo = useCallback(() => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     if (historyPast.length === 0) return;
     lastCoalesceKeyRef.current = null;
 
@@ -226,6 +230,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [historyPast, elements, connections]);
 
   const redo = useCallback(() => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     if (historyFuture.length === 0) return;
     lastCoalesceKeyRef.current = null;
 
@@ -273,11 +278,13 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [elements, connections]);
 
   const setElements = useCallback((newElements) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
     setElementsState(typeof newElements === 'function' ? newElements(elements) : newElements);
   }, [elements, recordHistory]);
 
   const addElement = useCallback((element) => {
+    if (!canEditRef.current) return element; // view/comment-only: no local edits
     recordHistory();
     const newElement = {
       id: element.id || generateId('el'),
@@ -291,6 +298,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [recordHistory]);
 
   const updateElement = useCallback((elementId, updates, options) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory(options?.coalesceKey);
     setElementsState(prev => prev.map(el =>
       el.id === elementId
@@ -300,6 +308,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [recordHistory]);
 
   const removeElement = useCallback((elementId) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
     // Deleting a frame releases its members (no dangling parentFrameId)
     setElementsState(prev => prev
@@ -319,11 +328,13 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   // ============ CONNECTION OPERATIONS ============
 
   const setConnections = useCallback((newConnections) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
     setConnectionsState(typeof newConnections === 'function' ? newConnections(connections) : newConnections);
   }, [connections, recordHistory]);
 
   const addConnection = useCallback((connection) => {
+    if (!canEditRef.current) return connection; // view/comment-only: no local edits
     recordHistory();
     const newConnection = {
       id: connection.id || generateId('conn'),
@@ -338,6 +349,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [recordHistory]);
 
   const updateConnection = useCallback((connectionId, updates, options) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory(options?.coalesceKey);
     // Track line style changes to remember for new connections
     if (updates.lineStyle) {
@@ -351,6 +363,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [recordHistory]);
 
   const removeConnection = useCallback((connectionId) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
     setConnectionsState(prev => prev.filter(conn => conn.id !== connectionId));
     // Clear selection if removed connection was selected
@@ -363,6 +376,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   // ============ LAYER OPERATIONS ============
 
   const addLayer = useCallback((layer) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
     const newLayer = {
       id: layer.id || generateId('layer'),
@@ -377,6 +391,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [recordHistory, layers.length]);
 
   const updateLayer = useCallback((layerId, updates) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
     setLayersState(prev => prev.map(layer =>
       layer.id === layerId ? { ...layer, ...updates } : layer
@@ -384,6 +399,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [recordHistory]);
 
   const removeLayer = useCallback((layerId) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     if (layerId === 'default') return; // Cannot remove default layer
     recordHistory();
     // Move elements from deleted layer to default layer
@@ -394,6 +410,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [recordHistory]);
 
   const reorderLayers = useCallback((newOrder) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
     setLayersState(prev => {
       const layerMap = Object.fromEntries(prev.map(l => [l.id, l]));
@@ -404,6 +421,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   // ============ GROUP OPERATIONS ============
 
   const groupElements = useCallback((elementIds) => {
+    if (!canEditRef.current) return null; // view/comment-only: no local edits
     if (elementIds.length < 2) return null;
     recordHistory();
 
@@ -434,6 +452,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }, [recordHistory, elements, groups.length]);
 
   const ungroupElements = useCallback((groupId) => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
 
     // Remove groupId from elements
@@ -449,6 +468,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   // Delete all selected elements and connections
   const deleteSelected = useCallback(() => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
 
     // Get selected IDs
@@ -479,6 +499,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   // Duplicate all selected elements
   const duplicateSelected = useCallback(() => {
+    if (!canEditRef.current) return; // view/comment-only: no local edits
     recordHistory();
 
     const selectedNodeIds = selection.nodeIds || [];
@@ -700,6 +721,9 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   // Set when the server answers 409 REVISION_CONFLICT; pauses autosave until the user chooses.
   const [conflict, setConflict] = useState(null);
+  // Set when a save is refused with 403/404 (access revoked or demoted while the page was open): autosave stops
+  // and the editor drops to read-only/comment mode. { kind: 'changed'|'removed'|'denied' }
+  const [accessNotice, setAccessNotice] = useState(null);
   const [conflictBusy, setConflictBusy] = useState(false);
   const [conflictError, setConflictError] = useState(null);
   const skipUnloadSaveRef = useRef(false);
@@ -758,6 +782,22 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
         return null;
       }
 
+      if (res.status === 403 || res.status === 404) {
+        // Access changed under us. Never retry blindly (autosave would loop once a second): re-read access.
+        let refetch = null;
+        try {
+          const r = await fetch(`/api/diagrams/${diagram.id}`);
+          let body = null;
+          try { body = await r.json(); } catch (_) { /* empty */ }
+          refetch = { status: r.status, body };
+        } catch (_) { /* network: treated as removed-or-denied below */ }
+        const { kind, access } = resolveAccessAfterDenied(diagram.access, refetch);
+        setDiagramState(prev => (prev ? { ...prev, access } : prev));
+        setAccessNotice({ kind });
+        setSaveStatus(prev => ({ ...prev, saving: false }));
+        return null;
+      }
+
       if (!res.ok) {
         throw new Error('Failed to save diagram');
       }
@@ -791,7 +831,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     }
 
     // Set up debounced save when dirty
-    if (diagram?.id && saveStatus.dirty && !saveStatus.saving && !conflict && accessCanWrite(diagram.access)) {
+    if (diagram?.id && saveStatus.dirty && !saveStatus.saving && !conflict && !accessNotice && accessCanWrite(diagram.access)) {
       autoSaveTimerRef.current = setTimeout(() => {
         saveDiagram();
       }, autoSaveDelayMs);
@@ -802,7 +842,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
         clearTimeout(autoSaveTimerRef.current);
       }
     };
-  }, [diagram?.id, saveStatus.dirty, saveStatus.saving, saveDiagram, elements, connections, conflict]);
+  }, [diagram?.id, saveStatus.dirty, saveStatus.saving, saveDiagram, elements, connections, conflict, accessNotice]);
 
   // Save before unload
   useEffect(() => {
@@ -1071,6 +1111,12 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   return (
     <DiagramContext.Provider value={value}>
       {children}
+      {accessNotice && (
+        <div role="alert" data-testid="access-changed-notice" style={{ position: 'fixed', top: 64, left: '50%', transform: 'translateX(-50%)', zIndex: 2000, maxWidth: 520, padding: '10px 14px', borderRadius: 8, background: '#fff7e6', color: '#5c3b00', border: '1px solid #f0c36d', boxShadow: '0 4px 16px rgba(0,0,0,.15)', display: 'flex', gap: 12, alignItems: 'center' }}>
+          <span>{ACCESS_NOTICE_TEXT[accessNotice.kind] || ACCESS_NOTICE_TEXT.denied}</span>
+          <button type="button" onClick={() => setAccessNotice(null)} aria-label="Dismiss" style={{ border: 0, background: 'transparent', cursor: 'pointer', fontSize: 16 }}>&times;</button>
+        </div>
+      )}
       <SaveConflictDialog
         open={!!conflict}
         busy={conflictBusy}

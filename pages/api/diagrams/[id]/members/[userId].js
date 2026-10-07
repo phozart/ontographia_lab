@@ -18,7 +18,7 @@ const ownerImmutable = (res) =>
   res.status(409).json({ error: 'The owner cannot be changed or removed', code: 'OWNER_IMMUTABLE' });
 
 async function handlePut(req, res, { diagram, user, role }, userId) {
-  if (userId === diagram.owner_id) return ownerImmutable(res);
+  if (userId === String(diagram.owner_id).toLowerCase()) return ownerImmutable(res);
   const newRole = req.body && req.body.role;
   if (typeof newRole !== 'string' || !['viewer', 'commenter', 'editor'].includes(newRole)) {
     return res.status(400).json({ error: 'role must be viewer, commenter or editor', code: 'VALIDATION_FAILED' });
@@ -40,8 +40,8 @@ async function handlePut(req, res, { diagram, user, role }, userId) {
 }
 
 async function handleDelete(req, res, { diagram, user, role }, userId) {
-  if (userId === diagram.owner_id) return ownerImmutable(res);
-  const self = userId === user.id;
+  if (userId === String(diagram.owner_id).toLowerCase()) return ownerImmutable(res);
+  const self = userId === String(user.id).toLowerCase();
   // Anyone with a role may leave; removing someone else needs share.manage.
   if (!self && !can(role, 'share.manage')) return forbidden(res);
   const member = await memberRepository.getMember(diagram.id, userId);
@@ -61,7 +61,9 @@ async function handleDelete(req, res, { diagram, user, role }, userId) {
 
 // `diagram.read` is the floor for DELETE so members can leave; PUT needs share.manage.
 export default withDiagramAuth({ PUT: 'share.manage', DELETE: 'diagram.read' }, async (req, res, ctx) => {
-  const userId = req.query && req.query.userId;
-  if (typeof userId !== 'string' || !UUID_RE.test(userId)) return notFound(res);
+  const raw = req.query && req.query.userId;
+  if (typeof raw !== 'string' || !UUID_RE.test(raw)) return notFound(res);
+  // UUIDs are case-insensitive: normalize so the owner (409) and self-leave checks cannot be dodged by case
+  const userId = raw.toLowerCase();
   return req.method === 'PUT' ? handlePut(req, res, ctx, userId) : handleDelete(req, res, ctx, userId);
 });
