@@ -3913,6 +3913,23 @@
   opacity: 0.5;
 }
 
+/* Detached thread (its element was removed): faded marker at the creation position, dashed outline */
+.ds-comment-marker.detached {
+  opacity: 0.4;
+}
+
+.ds-comment-marker.detached .ds-comment-marker-icon svg path {
+  stroke: var(--text-muted);
+  stroke-dasharray: 3 2;
+  stroke-width: 1.5;
+}
+
+.ds-comment-error {
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--danger, #c0392b);
+}
+
 .ds-comment-marker-icon {
   position: relative;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));

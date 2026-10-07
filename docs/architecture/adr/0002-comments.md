@@ -67,3 +67,14 @@ Replying to a resolved thread reopens it (common expectation; Q-C2).
 - − Soft reference from thread to element id means referential integrity is by convention; therefore **element ids must be stable and globally unique** (ADR-0004 prerequisite P1).
 - − Two fetches on editor load (content + threads). Acceptable; threads list is small and paginated server-side for large diagrams.
 - − Real-time comment updates arrive with Group D; until then the client re-fetches threads on focus and every 60 s while the panel is open.
+## As built — slice 4 (server comments)
+
+- Shipped: migration `0006_comments` (data-model.md; renumbered from 0004 because 0004/0005 were taken), `lib/commentRepository.js`, the threads/comments API (api-contracts section 4 "As built"), `useComments` on the API (`components/diagram-studio/ui/useComments.js`), a "Detached comments" group, and the one-time localStorage import prompt.
+- **Attachment is derived at read time, no restore hook.** `anchorState` is computed from the diagram's _current_ content ids: server side in `listThreads`/`getThread` (ids only, via `jsonb_array_elements`, never the whole content) and client side in `resolveMarker` (the marker position follows the element). Deleting an element, or a version restore that removes it, detaches its threads; a later edit or restore that brings the id back re-attaches them. Nothing is written to the comment tables by content writes or restores, so the two write paths stay independent and there is no restore code to keep in sync. Cost: one small extra query per list.
+- Anchors created through the API are not checked against content (an autosave may not have reached the server yet when the first comment is posted); a bogus `targetId` simply reads as `detached`.
+- Connection anchors are supported by the API and anchor-state logic; the UI creates `canvas` and `element` anchors only (a connection thread is drawn at its fallback position).
+- The thread list returns the newest 20 comments of each thread plus `commentCount`; the editor loads the full thread when it is opened.
+- Q-C1 import: offered to users who can comment; posts through the normal endpoints as the importer (replies and resolved state kept, timestamps not preserved), then clears the key. A failed import keeps the key (a retry can duplicate threads that were already posted). "Discard" clears the key without importing.
+- Q-C2: any role >= commenter resolves/reopens; a reply reopens. Q-C3: detached threads are listed in the "Detached comments" group and drawn faded/dashed at their creation position. Q-C4/C5 (mentions, notifications) are slice 9, not built.
+- Rate limit: 30 thread/reply creates per user per minute (in-memory `lib/rateLimit`, per instance).
+- Existing bugs fixed on the way: canvas comment clicks never carried an element id (`dataset.elementId` vs `data-node-id`), and the context-menu "Add comment" passed a screen position object as canvas x.

@@ -268,3 +268,10 @@ An MCP server (separate process or route) authenticates with a **personal access
 | `diagrams.update({ id, content, ifRevision })`                                 | `PUT` with `If-Match`                                  | editor (and `roleCap` ≥ editor) |
 
 Sharing management is deliberately **not** exposed to agents in the first iteration (Q-AI1).
+**As built (slice 4, section 4):**
+
+- Routes: `GET/POST /threads`, `GET/PATCH /threads/{t}`, `POST /threads/{t}/comments`, `PATCH/DELETE /comments/{c}`; all wrapped with `withDiagramAuth` (actions `comment.read`, `comment.create`, `thread.resolve`, `comment.reply`, `comment.edit_own`, `comment.delete_own`; the handler additionally allows deleting others' comments when the role has `comment.delete_any`, i.e. owner). Non-members get 404, too-low roles 403.
+- Edit is author-only (403 otherwise). Delete is idempotent and soft (`204`); a thread whose comments are all deleted is hidden (404 on GET, absent from lists) and cannot be replied to or resolved.
+- Validation: `body` is plain text, kept verbatim, must be non-blank, no NUL; over 10 000 characters is `413 PAYLOAD_TOO_LARGE`. Anchor coordinates are finite numbers within +-1e7; `element`/`connection` anchors require `targetId` (1-128) and `fallbackX/Y`; a `canvas` anchor must not have `targetId`. `status` filter defaults to `open`; `limit` 1-100 (default 50), cursor is opaque.
+- Thread/reply creation is rate limited per user (30/min, `429`). Lists send `Cache-Control: no-store`.
+- `resolvedBy` is `{ id, name, image: null }`. `createdVia` is always `web` until the agent write tools exist.

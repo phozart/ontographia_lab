@@ -84,7 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_versions_diagram_kind    ON diagram_versions(diag
 
 Note: the `UNIQUE(diagram_id, version_number)` constraint already exists. The legacy `created_by VARCHAR` remains populated with the email for display; new code reads `created_by_user_id`.
 
-### 0004_comments (slice 4)
+### 0006_comments (slice 4; numbered 0006 as built: 0004 is api_tokens, 0005 is sharing)
 ```sql
 CREATE TABLE IF NOT EXISTS comment_threads (
   id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -121,7 +121,7 @@ CREATE INDEX IF NOT EXISTS idx_threads_anchor        ON comment_threads(diagram_
 CREATE INDEX IF NOT EXISTS idx_comments_thread       ON comments(thread_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_comments_author       ON comments(author_id, created_at DESC);
 ```
-Later slices (not in 0004): `comment_mentions(comment_id, user_id, PK both)`, `comment_thread_reads(thread_id, user_id, last_read_at, PK both)`.
+Later slices (not in 0006): `comment_mentions(comment_id, user_id, PK both)`, `comment_thread_reads(thread_id, user_id, last_read_at, PK both)`.
 
 ### 0005_sharing (slices 5–7)
 Replaces the unused `diagram_shares` (free-text `shared_with`). The migration asserts the table is empty before dropping it; if not empty it aborts with a message (no silent data loss).

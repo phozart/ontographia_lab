@@ -26,6 +26,7 @@ const dbTests = [
   '<rootDir>/__tests__/scripts/migrate0007.test.js',
   '<rootDir>/__tests__/lib/memberRepository.test.js',
   '<rootDir>/__tests__/lib/versionRepository.test.js',
+  '<rootDir>/__tests__/lib/commentRepository.test.js',
   '<rootDir>/__tests__/lib/apiTokensConcurrency.test.js',
 ];
 
