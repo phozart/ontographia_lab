@@ -29,7 +29,7 @@ import StarterPackModal from './StarterPackModal';
 import { LogoIcon } from '../ui/Logo';
 import { ExportManager, downloadExport } from './export/ExportManager';
 import ExportDialog, { useExportDialog } from './ui/ExportDialog';
-import { VersionHistory } from './ui/VersionHistoryPanel';
+import { VersionHistory, OPEN_VERSION_HISTORY_EVENT } from './ui/VersionHistoryPanel';
 import { initializeStencilStyles } from './styling/StencilStyleManager';
 import LoadingScreen from '../ui/LoadingScreen';
 
@@ -189,26 +189,39 @@ function DiagramStudioInner({
     updateUserSetting('styleToolbarVisible', true);
   }, [updateUserSetting]);
 
-  // Opening the Properties panel: pan just enough that it does not cover the selection
+  // Opening a right-hand panel (Properties or History): pan just enough that it does not cover the selection
+  const selectionRef = useRef(selectedElements);
+  selectionRef.current = selectedElements;
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  const panSelectionClearOfPanel = useCallback((selector) => {
+    const sel = selectionRef.current;
+    const vp = viewportRef.current;
+    const panel = document.querySelector(selector);
+    const container = canvasContainerRef.current;
+    if (!sel?.length || !panel || !container) return;
+    const p = panel.getBoundingClientRect();
+    const c = container.getBoundingClientRect();
+    const bounds = getContentBounds(sel);
+    if (!bounds) return;
+    const right = c.left + (bounds.x + bounds.width + vp.x) * vp.scale;
+    const left = c.left + (bounds.x + vp.x) * vp.scale;
+    if (right <= p.left - 16 || left >= p.right) return;
+    const shift = Math.min(right - (p.left - 24), Math.max(0, left - (c.left + 24)));
+    if (shift > 0) setViewport?.(prev => ({ ...prev, x: prev.x - shift / prev.scale }));
+  }, [setViewport]);
+
   useEffect(() => {
-    if (!showPropertiesPanel || !selectedElements?.length) return undefined;
-    const timer = setTimeout(() => {
-      const panel = document.querySelector('.ds-panel-right');
-      const container = canvasContainerRef.current;
-      if (!panel || !container) return;
-      const p = panel.getBoundingClientRect();
-      const c = container.getBoundingClientRect();
-      const bounds = getContentBounds(selectedElements);
-      if (!bounds) return;
-      const right = c.left + (bounds.x + bounds.width + viewport.x) * viewport.scale;
-      const left = c.left + (bounds.x + viewport.x) * viewport.scale;
-      if (right <= p.left - 16 || left >= p.right) return;
-      const shift = Math.min(right - (p.left - 24), Math.max(0, left - (c.left + 24)));
-      if (shift > 0) setViewport?.(prev => ({ ...prev, x: prev.x - shift / prev.scale }));
-    }, 350);
+    if (!showPropertiesPanel) return undefined;
+    const timer = setTimeout(() => panSelectionClearOfPanel('.ds-panel-right'), 350);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPropertiesPanel]);
+  }, [showPropertiesPanel, panSelectionClearOfPanel]);
+
+  useEffect(() => {
+    const onOpen = () => setTimeout(() => panSelectionClearOfPanel('.vh-panel'), 150);
+    window.addEventListener(OPEN_VERSION_HISTORY_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_VERSION_HISTORY_EVENT, onOpen);
+  }, [panSelectionClearOfPanel]);
 
   // Edit label request - triggers editing in DiagramCanvas
   const [editLabelRequest, setEditLabelRequest] = useState(null);

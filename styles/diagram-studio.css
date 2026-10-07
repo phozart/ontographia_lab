@@ -490,6 +490,10 @@
 .ds-canvas-container {
   flex: 1;
   position: relative;
+  /* Own stacking context: selection/rotation handles and ports (z-index up to 1000)
+     must never paint above side panels, the title bar, or modals. */
+  z-index: 0;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3796,6 +3800,7 @@
 .ds-panel-wrapper {
   display: flex;
   position: relative;
+  z-index: 20;
   transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

@@ -16,7 +16,7 @@ export const DEFAULT_GAP = 8;
 export const FLOATING_LAYOUT_EVENT = 'ds:floating-layout';
 
 // CSS selectors of persistent chrome that floating UI must stay clear of.
-export const OBSTACLE_SELECTORS = ['.ds-title-bar', '.ds-shape-sidebar', '.ds-panel-right'];
+export const OBSTACLE_SELECTORS = ['.ds-title-bar', '.ds-shape-sidebar', '.ds-panel-right', '.vh-panel'];
 
 const EDGE_TOLERANCE = 16;
 
