@@ -123,7 +123,8 @@ CREATE INDEX IF NOT EXISTS idx_comments_author       ON comments(author_id, crea
 ```
 Later slices (not in 0006): `comment_mentions(comment_id, user_id, PK both)`, `comment_thread_reads(thread_id, user_id, last_read_at, PK both)`.
 
-### 0005_sharing (slices 5–7)
+### 0007_diagram_members (slice 5; as built) and 0005_sharing (slices 6–7, invitations/links)
+Slice 5 shipped only `diagram_members` as `0007_diagram_members.sql` (no `diagram_shares` drop; it stays unused). The remaining tables below (`diagram_invitations`, `diagram_links`) ship with slices 6/7 under the next free numbers.
 Replaces the unused `diagram_shares` (free-text `shared_with`). The migration asserts the table is empty before dropping it; if not empty it aborts with a message (no silent data loss).
 ```sql
 CREATE TABLE IF NOT EXISTS diagram_members (
@@ -174,7 +175,8 @@ CREATE INDEX IF NOT EXISTS idx_links_diagram ON diagram_links(diagram_id) WHERE 
 -- DROP TABLE diagram_shares;  -- guarded: only when SELECT count(*) = 0
 ```
 
-### 0006_audit (slice 5)
+### 0008_audit_events (slice 5; as built)
+Shipped as `0008_audit_events.sql`; `idx_audit_diagram` also includes `id DESC` for keyset paging.
 ```sql
 CREATE TABLE IF NOT EXISTS audit_events (
   id            BIGSERIAL PRIMARY KEY,

@@ -30,7 +30,7 @@ jest.mock('../../components/ui/AppSidebar', () => function MockAppSidebar() {
 const diagram = { id: '1', name: 'WS One', type: 'mindmap', updated_at: new Date().toISOString() };
 
 beforeEach(() => {
-  global.fetch = jest.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve([diagram]) }));
+  global.fetch = jest.fn((url) => Promise.resolve({ ok: true, json: () => Promise.resolve(String(url).includes('scope=shared') ? [] : [diagram]) }));
 });
 
 describe('Dashboard responsive sidebar', () => {
@@ -70,6 +70,7 @@ function routeFetch(extra = {}) {
     const method = opts.method || 'GET';
     const key = `${method} ${url}`;
     if (extra[key]) return Promise.resolve(extra[key]);
+    if (key === 'GET /api/diagrams?scope=shared') return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
     if (key === 'GET /api/diagrams') return Promise.resolve({ ok: true, json: () => Promise.resolve([diagram]) });
     return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: '2', short_id: 'LAB-2', name: 'x' }) });
   });

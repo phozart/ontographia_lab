@@ -22,6 +22,17 @@ function toApi(row, extra = {}) {
   return { ...row, revision: Number(row.revision), ...extra };
 }
 
+// created_by / updated_by hold e-mail addresses. Only the owner sees them whole; other roles get the local part
+// (the owner's address is not shared with members, open-questions Q-S5c).
+const localPart = (v) => (typeof v === 'string' && v.includes('@') ? v.split('@')[0] : v);
+function hideAddresses(row, role) {
+  if (role === 'owner' || !row) return row;
+  const out = { ...row };
+  if ('created_by' in out) out.created_by = localPart(out.created_by);
+  if ('updated_by' in out) out.updated_by = localPart(out.updated_by);
+  return out;
+}
+
 function setEtag(res, revision) {
   res.setHeader('ETag', `"${revision}"`);
 }
@@ -30,7 +41,7 @@ async function handleGet(req, res, { diagram, role, source, capabilities }) {
   const full = await diagramRepository.findById(diagram.id);
   if (!full) return res.status(404).json({ error: 'Diagram not found', code: 'NOT_FOUND' });
 
-  const body = toApi(full, {
+  const body = toApi(hideAddresses(full, role), {
     // Upgrade legacy element types on read; persisted on the next save
     content: migrateDiagram(full.content),
     access: { role, source, capabilities },
@@ -55,7 +66,7 @@ async function handleThumbnailOnly(req, res, { diagram }) {
 }
 
 async function handlePut(req, res, ctx) {
-  const { diagram, user } = ctx;
+  const { diagram, user, role } = ctx;
   const body = req.body || {};
 
   const keys = Object.keys(body).filter((k) => body[k] !== undefined);
@@ -110,11 +121,11 @@ async function handlePut(req, res, ctx) {
     return res.status(409).json({
       error: 'This diagram was changed by someone else since you opened it',
       code: 'REVISION_CONFLICT',
-      current: { revision: Number(current.revision), updatedAt: current.updated_at, updatedBy: current.updated_by },
+      current: { revision: Number(current.revision), updatedAt: current.updated_at, updatedBy: hideAddresses(current, role).updated_by },
     });
   }
 
-  const out = toApi(updated, warnings.length ? { warnings } : {});
+  const out = toApi(hideAddresses(updated, role), warnings.length ? { warnings } : {});
   setEtag(res, out.revision);
   return res.status(200).json(out);
 }

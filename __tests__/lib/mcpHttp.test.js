@@ -17,8 +17,8 @@ const REVOKED = 'ogl_' + 'b'.repeat(43);
 const EXPIRED = 'ogl_' + 'c'.repeat(43);
 
 const repository = {
-  listOwned: async () => [],
-  searchOwned: async () => [],
+  listReadable: async () => [],
+  searchReadable: async () => [],
   getContent: async () => null,
   getThumbnail: async () => null,
 };

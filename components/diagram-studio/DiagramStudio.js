@@ -29,6 +29,9 @@ import StarterPackModal from './StarterPackModal';
 import { LogoIcon } from '../ui/Logo';
 import { ExportManager, downloadExport } from './export/ExportManager';
 import ExportDialog, { useExportDialog } from './ui/ExportDialog';
+import { FEATURES } from '../../lib/features';
+import { accessMode as getAccessMode, canCommentWith } from './sharing/accessMode';
+import { ShareDialog, OPEN_SHARE_DIALOG_EVENT } from './ui/ShareDialog';
 import { VersionHistory, OPEN_VERSION_HISTORY_EVENT } from './ui/VersionHistoryPanel';
 import { initializeStencilStyles } from './styling/StencilStyleManager';
 import LoadingScreen from '../ui/LoadingScreen';
@@ -306,6 +309,11 @@ function DiagramStudioInner({
   // Server comments (ADR-0002): capabilities come from the diagram's access block (default: allowed, the server
   // enforces the real policy either way).
   const canComment = access?.capabilities ? access.capabilities.includes('comment.create') : true;
+  // Share button/dialog: owners and editors (share.read). Hidden for viewers/commenters and while sharing is off.
+  const canShare = FEATURES.sharing && Array.isArray(access?.capabilities) && access.capabilities.includes('share.read');
+  const openShareDialog = useCallback(() => {
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_SHARE_DIALOG_EVENT));
+  }, []);
   const canDeleteAny = access?.capabilities ? access.capabilities.includes('comment.delete_any') : false;
   const {
     comments,
@@ -367,8 +375,9 @@ function DiagramStudioInner({
 
   // Handle stencil drag start (for visual feedback)
   const handleStencilDragStart = useCallback((stencil) => {
+    if (profile?.editingPolicy?.readOnly) return;
     setDraggingStencil(stencil);
-  }, []);
+  }, [profile?.editingPolicy?.readOnly]);
 
   // Handle stencil drag end
   const handleStencilDragEnd = useCallback(() => {
@@ -398,9 +407,10 @@ function DiagramStudioInner({
 
   // Open template selection (called by EmptyCanvasWelcome)
   const handleOpenTemplates = useCallback(() => {
+    if (profile?.editingPolicy?.readOnly) return;
     // Show the starter packs modal (which includes templates)
     setShowStarterPacks(true);
-  }, []);
+  }, [profile?.editingPolicy?.readOnly]);
 
   // Handle adding a new comment
   const handleAddComment = useCallback((text) => {
@@ -428,7 +438,7 @@ function DiagramStudioInner({
   // existing content (or centered in the viewport on an empty canvas), fit the
   // viewport to it and select everything that was inserted.
   const handleApplyStarterPack = useCallback((starterPack) => {
-    if (!starterPack) return;
+    if (!starterPack || profile?.editingPolicy?.readOnly) return;
 
     const rect = canvasContainerRef.current?.getBoundingClientRect();
     const container = { width: rect?.width || 1200, height: rect?.height || 800 };
@@ -502,12 +512,13 @@ function DiagramStudioInner({
       container,
     ));
     selectElements?.(insertedIds);
-  }, [addElement, addConnection, elements, viewport, setViewport, selectElements]);
+  }, [addElement, addConnection, elements, viewport, setViewport, selectElements, profile?.editingPolicy?.readOnly]);
 
   // Toggle comment tool
   const toggleCommentTool = useCallback(() => {
+    if (!canCommentWith(access)) return; // viewers cannot comment (server enforces too)
     setActiveTool?.(activeTool === 'comment' ? 'select' : 'comment');
-  }, [activeTool, setActiveTool]);
+  }, [activeTool, setActiveTool, access]);
 
   // Toggle fullscreen mode
   const toggleFullscreen = useCallback(() => {
@@ -544,10 +555,10 @@ function DiagramStudioInner({
         clearSelection?.();
         break;
       case 'delete':
-        deleteSelected?.();
+        if (!profile?.editingPolicy?.readOnly) deleteSelected?.();
         break;
       case 'save':
-        saveDiagram(true);
+        if (!profile?.editingPolicy?.readOnly) saveDiagram(true);
         break;
       case 'focus-mode':
         setFocusMode(prev => !prev);
@@ -576,7 +587,7 @@ function DiagramStudioInner({
       default:
         break;
     }
-  }, [selectAll, clearSelection, deleteSelected, saveDiagram, handleExport, toggleCommentTool, shortcutsHelp]);
+  }, [selectAll, clearSelection, deleteSelected, saveDiagram, handleExport, toggleCommentTool, shortcutsHelp, profile?.editingPolicy?.readOnly]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -716,6 +727,9 @@ function DiagramStudioInner({
             onExport={handleExport}
             onShowShortcuts={shortcutsHelp.open}
             readOnly={profile?.editingPolicy?.readOnly}
+            mode={getAccessMode(access)}
+            canComment={canCommentWith(access)}
+            onShare={canShare ? openShareDialog : undefined}
             isFullscreen={isFullscreen}
             isPreviewMode={isPreviewMode}
             collaborators={[]}
@@ -732,6 +746,7 @@ function DiagramStudioInner({
               }
             }}
             onStencilSelect={(packId, stencilId) => {
+              if (profile?.editingPolicy?.readOnly) return;
               const pack = packRegistry?.get?.(packId);
               const stencil = pack?.stencils?.find(s => s.id === stencilId);
               if (stencil) {
@@ -740,7 +755,7 @@ function DiagramStudioInner({
               }
             }}
             selectedStencil={selectedStencil}
-            onAddPack={() => setShowStarterPacks(true)}
+            onAddPack={() => { if (!profile?.editingPolicy?.readOnly) setShowStarterPacks(true); }}
             onTogglePack={handleTogglePack}
             readOnly={profile?.editingPolicy?.readOnly}
             hidden={leftPanelCollapsed}
@@ -797,6 +812,9 @@ function DiagramStudioInner({
         {/* Version history panel (opened from the title-bar menu) */}
         <VersionHistory />
 
+        {/* Share dialog (title-bar Share button; owner and editors) */}
+        {canShare && <ShareDialog diagramId={diagram?.id} access={access} />}
+
         {/* Context Menu */}
         {contextMenu && (
           <ContextMenu
@@ -813,7 +831,7 @@ function DiagramStudioInner({
         )}
 
         {/* Contextual Toolbar for Selection - hidden during drag and rotation operations */}
-        {hasSelection && !isPreviewMode && showContextualToolbarOnSelect && !isDragging && !isRotating && (
+        {hasSelection && !profile?.editingPolicy?.readOnly && !isPreviewMode && showContextualToolbarOnSelect && !isDragging && !isRotating && (
           <ContextualToolbar
             viewport={viewport}
             packRegistry={packRegistry}

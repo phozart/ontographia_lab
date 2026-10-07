@@ -34,6 +34,15 @@ Each item is genuinely a product/business decision. The design works with the **
 | Q-C4 | Mentioning someone without access | Mention does **not** grant access; UI offers "Share with @name?". | — |
 | Q-C5 | Email notifications for replies/mentions — default on/off and batching | Mentions: on, immediate; replies on my threads: daily digest; per-user opt-out in settings. | Needs `lib/email.js` and a small outbox. |
 
+## Sharing follow-ups (decided 2026-10-07)
+
+| ID | Question | Decision |
+|----|----------|----------|
+| Q-S9 | May a viewer duplicate a diagram? | **Yes.** `diagram.read` is sufficient; the copy is owned by the viewer. Tested. |
+| Q-S10 | May an editor change or revoke viewer/commenter members regardless of who granted them? | **Yes.** `granted_by` is informational only; the role ceiling (viewer/commenter) is the only rule. Tested. |
+| Q-S11 | Is the owner's e-mail visible to members? | **No.** Member-facing payloads (dashboard "Shared with me", `GET /api/diagrams/{id}` `created_by`/`updated_by`, version authors) show the owner's name, falling back to the e-mail local part (same as comment authors). The full address is visible only in the access list, to owner/editor who manage shares. |
+| Q-S12 | Does a grant survive removal of the editor who made it? | **Yes.** Removing (or deleting) the grantor leaves the grantee's membership intact; `granted_by` is only nulled on account deletion. Tested. |
+
 ## Audit, accounts, data
 
 | ID | Question | Recommended default |

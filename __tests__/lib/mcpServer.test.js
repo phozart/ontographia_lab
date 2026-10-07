@@ -7,8 +7,8 @@
 jest.mock('../../lib/db', () => ({ query: jest.fn() }));
 jest.mock('../../lib/mcp/repository', () => ({
   mcpRepository: {
-    listOwned: jest.fn(),
-    searchOwned: jest.fn(),
+    listReadable: jest.fn(),
+    searchReadable: jest.fn(),
     getContent: jest.fn(),
     getThumbnail: jest.fn(),
   },
@@ -58,12 +58,12 @@ beforeEach(() => {
     const row = DB[params[0]] || Object.values(DB).find((d) => d.short_id === params[0]);
     return { rows: row ? [row] : [] };
   });
-  repo.listOwned.mockImplementation(async (userId, opts) => {
+  repo.listReadable.mockImplementation(async (userId, opts) => {
     let rows = Object.values(DB).filter((d) => d.owner_id === userId);
     if (opts.scope) rows = rows.filter((d) => opts.scope.includes(d.id));
     return rows;
   });
-  repo.searchOwned.mockResolvedValue([{ ...DB[A], matched: 'label' }]);
+  repo.searchReadable.mockResolvedValue([{ ...DB[A], matched: 'label' }]);
   repo.getContent.mockResolvedValue({ content: CONTENT, description: 'About orders', tags: ['x'] });
   repo.getThumbnail.mockResolvedValue(null);
 });
@@ -109,21 +109,21 @@ describe('diagram_list', () => {
     const client = await connect(principal({ diagramScope: [B] }));
     const r = await call(client, 'diagram_list', {});
     expect(r.structuredContent.items.map((i) => i.id)).toEqual([B]);
-    expect(repo.listOwned.mock.calls[0][1].scope).toEqual([B]);
+    expect(repo.listReadable.mock.calls[0][1].scope).toEqual([B]);
   });
 
   test('defense in depth: a row the repository returns outside the allowlist is still dropped by authorize', async () => {
-    repo.listOwned.mockResolvedValue([DB[A], DB[B]]);
+    repo.listReadable.mockResolvedValue([DB[A], DB[B]]);
     const client = await connect(principal({ diagramScope: [A] }));
     const r = await call(client, 'diagram_list', {});
     expect(r.structuredContent.items.map((i) => i.id)).toEqual([A]);
   });
 
   test('paginates: requests limit+1, returns an opaque cursor, and rejects forged cursors', async () => {
-    repo.listOwned.mockResolvedValue([DB[A], DB[B]]);
+    repo.listReadable.mockResolvedValue([DB[A], DB[B]]);
     const client = await connect();
     const r = await call(client, 'diagram_list', { limit: 1 });
-    expect(repo.listOwned.mock.calls[0][1].limit).toBe(2);
+    expect(repo.listReadable.mock.calls[0][1].limit).toBe(2);
     expect(r.structuredContent.items).toHaveLength(1);
     expect(r.structuredContent.nextCursor).toEqual(expect.any(String));
     const bad = await call(client, 'diagram_list', { cursor: 'not-a-cursor' });
@@ -142,7 +142,7 @@ describe('diagram_search', () => {
     const client = await connect();
     const r = await call(client, 'diagram_search', { query: 'stock' });
     expect(r.structuredContent.items[0]).toMatchObject({ id: A, matched: 'label' });
-    expect(repo.searchOwned.mock.calls[0][1]).toMatchObject({ text: 'stock' });
+    expect(repo.searchReadable.mock.calls[0][1]).toMatchObject({ text: 'stock' });
   });
 
   test('empty or oversize queries are refused', async () => {

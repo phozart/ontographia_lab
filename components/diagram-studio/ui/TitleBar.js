@@ -92,6 +92,8 @@ export default function TitleBar({
   onMenu,
   onNameChange,
   readOnly = false,
+  mode = 'edit',
+  canComment = true,
   isFullscreen = false,
   isPreviewMode = false,
   collaborators = [],
@@ -306,6 +308,11 @@ export default function TitleBar({
               {diagramName}
             </span>
           )}
+          {mode !== 'edit' && (
+            <span className="ds-access-pill" role="status" data-testid="access-pill" title={mode === 'comment' ? 'You can comment but not edit this diagram' : 'You can view but not edit this diagram'}>
+              {mode === 'comment' ? 'Can comment' : 'View only'}
+            </span>
+          )}
         </div>
       </div>
 
@@ -372,14 +379,16 @@ export default function TitleBar({
                     <span>Pan</span>
                     <span className="ds-key-hint">H</span>
                   </button>
-                  <button
-                    className={`ds-compact-option ${activeTool === 'comment' ? 'active' : ''}`}
-                    onClick={() => { setActiveTool(activeTool === 'comment' ? 'select' : 'comment'); setShowToolsMenu(false); }}
-                  >
-                    <ChatBubbleOutlineIcon style={{ fontSize: 18 }} />
-                    <span>Comment</span>
-                    <span className="ds-key-hint">K</span>
-                  </button>
+                  {canComment && (
+                    <button
+                      className={`ds-compact-option ${activeTool === 'comment' ? 'active' : ''}`}
+                      onClick={() => { setActiveTool(activeTool === 'comment' ? 'select' : 'comment'); setShowToolsMenu(false); }}
+                    >
+                      <ChatBubbleOutlineIcon style={{ fontSize: 18 }} />
+                      <span>Comment</span>
+                      <span className="ds-key-hint">K</span>
+                    </button>
+                  )}
                 </div>
 
                 {!readOnly && (
@@ -498,12 +507,14 @@ export default function TitleBar({
               )}
             </div>
 
-            <ToolButton
-              icon={<ChatBubbleOutlineIcon />}
-              active={activeTool === 'comment'}
-              onClick={() => setActiveTool(activeTool === 'comment' ? 'select' : 'comment')}
-              tooltip="Comment (K)"
-            />
+            {canComment && (
+              <ToolButton
+                icon={<ChatBubbleOutlineIcon />}
+                active={activeTool === 'comment'}
+                onClick={() => setActiveTool(activeTool === 'comment' ? 'select' : 'comment')}
+                tooltip="Comment (K)"
+              />
+            )}
 
             <div className="ds-tools-divider" />
 
@@ -1269,6 +1280,18 @@ export default function TitleBar({
           font-size: 10px;
           font-weight: 600;
           color: rgba(255, 255, 255, 0.7);
+        }
+
+        .ds-access-pill {
+          margin-left: 10px;
+          padding: 2px 10px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+          background: rgba(240, 217, 138, 0.18);
+          color: var(--golden, #F0D98A);
+          border: 1px solid rgba(240, 217, 138, 0.45);
         }
 
         .ds-title-action-btn {
