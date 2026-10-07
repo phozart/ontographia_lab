@@ -1,7 +1,8 @@
 // components/diagram-studio/ui/CommentSystem.js
 // Comment system for canvas and elements
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useComments } from './useComments';
 import { createPortal } from 'react-dom';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -23,7 +24,10 @@ export function CommentMarker({
 
   return (
     <div
-      className={`ds-comment-marker ${isActive ? 'active' : ''} ${comment.resolved ? 'resolved' : ''}`}
+      className={`ds-comment-marker ${isActive ? 'active' : ''} ${comment.resolved ? 'resolved' : ''} ${comment.detached ? 'detached' : ''}`}
+      data-thread-id={comment.id}
+      data-anchor-state={comment.anchorState}
+      title={comment.detached ? 'Detached: the element this comment referred to was removed' : undefined}
       style={{
         position: 'absolute',
         left: screenX,
@@ -44,9 +48,9 @@ export function CommentMarker({
             fill={comment.resolved ? 'var(--text-muted)' : 'var(--accent)'}
           />
         </svg>
-        {comment.replies?.length > 0 && (
+        {(comment.commentCount || 0) > 1 && (
           <span className="ds-comment-marker-count">
-            {comment.replies.length + 1}
+            {comment.commentCount}
           </span>
         )}
       </div>
@@ -63,6 +67,8 @@ export function CommentThread({
   onResolve,
   onDelete,
   position,
+  canComment = true,
+  canDeleteAny = false,
 }) {
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -98,7 +104,7 @@ export function CommentThread({
   };
 
   const allMessages = [
-    { ...comment, isOriginal: true },
+    { ...comment, id: comment.commentId ?? comment.id, isOriginal: true },
     ...(comment.replies || []).map(r => ({ ...r, isOriginal: false })),
   ];
 
@@ -116,10 +122,10 @@ export function CommentThread({
       {/* Header */}
       <div className="ds-comment-thread-header">
         <span className="ds-comment-thread-title">
-          {comment.elementId ? 'Comment on element' : 'Canvas comment'}
+          {comment.detached ? 'Detached comment' : comment.elementId ? 'Comment on element' : 'Canvas comment'}
         </span>
         <div className="ds-comment-thread-actions">
-          {!comment.resolved ? (
+          {!canComment ? null : !comment.resolved ? (
             <button
               className="ds-comment-resolve-btn"
               onClick={() => onResolve?.(comment.id, true)}
@@ -167,32 +173,34 @@ export function CommentThread({
                   {formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true })}
                 </span>
               </div>
-              {msg.user?.id === currentUser?.id && (
+              {!msg.deleted && !msg.pending && (canDeleteAny || (msg.user?.id && msg.user.id === currentUser?.id)) && (
                 <button
                   className="ds-comment-delete-btn"
-                  onClick={() => onDelete?.(comment.id, msg.isOriginal ? null : msg.id)}
+                  onClick={() => onDelete?.(comment.id, msg.id)}
                   title="Delete"
                 >
                   <TrashIcon />
                 </button>
               )}
             </div>
-            <div className="ds-comment-message-body">
-              {msg.text}
+            {/* Plain text only: React escapes it; never dangerouslySetInnerHTML (ADR-0002 decision 10). */}
+            <div className="ds-comment-message-body" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+              {msg.deleted ? <em>Comment deleted</em> : msg.text}
             </div>
           </div>
         ))}
       </div>
 
       {/* Reply Input */}
-      {!comment.resolved && (
+      {canComment && (
         <form className="ds-comment-reply-form" onSubmit={handleSubmit}>
           <input
             ref={inputRef}
             type="text"
+            maxLength={10000}
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Reply..."
+            placeholder={comment.resolved ? 'Reply to reopen...' : 'Reply...'}
             disabled={isSubmitting}
           />
           <button
@@ -397,6 +405,7 @@ export function NewCommentInput({
   currentUser,
   onSubmit,
   onCancel,
+  error = null,
 }) {
   const [text, setText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -470,6 +479,7 @@ export function NewCommentInput({
           onChange={(e) => setText(e.target.value)}
           placeholder="Write a comment..."
           rows={3}
+          maxLength={10000}
           disabled={isSubmitting}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -480,6 +490,7 @@ export function NewCommentInput({
             }
           }}
         />
+        {error && <div role="alert" className="ds-comment-error">{error}</div>}
         <div className="ds-new-comment-actions">
           <button type="button" onClick={onCancel} className="cancel">
             Cancel
@@ -648,119 +659,80 @@ function SendIcon() {
   );
 }
 
-// Hook for managing comments
-export function useComments(diagramId) {
-  const [comments, setComments] = useState([]);
-  const [activeComment, setActiveComment] = useState(null);
-  const [newCommentPosition, setNewCommentPosition] = useState(null);
+const floatingBase = {
+  position: 'absolute',
+  zIndex: 150,
+  background: 'var(--ds-surface-floating, var(--panel))',
+  border: '1px solid var(--border)',
+  borderRadius: 12,
+  boxShadow: 'var(--ds-shadow-floating, 0 16px 48px rgba(0,0,0,0.15))',
+  color: 'var(--text)',
+  fontSize: 13,
+};
 
-  // Load comments (would normally fetch from API)
-  useEffect(() => {
-    if (diagramId) {
-      // Load from localStorage for now
-      const stored = localStorage.getItem(`comments-${diagramId}`);
-      if (stored) {
-        try {
-          setComments(JSON.parse(stored));
-        } catch (e) {
-          // Invalid JSON
-        }
-      }
-    }
-  }, [diagramId]);
-
-  // Save comments
-  const saveComments = useCallback((newComments) => {
-    setComments(newComments);
-    if (diagramId) {
-      localStorage.setItem(`comments-${diagramId}`, JSON.stringify(newComments));
-    }
-  }, [diagramId]);
-
-  // Add a new comment
-  const addComment = useCallback((text, x, y, elementId = null, user) => {
-    const newComment = {
-      id: `comment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      text,
-      x,
-      y,
-      elementId,
-      user,
-      resolved: false,
-      read: true,
-      createdAt: new Date().toISOString(),
-      replies: [],
-    };
-    saveComments([...comments, newComment]);
-    setNewCommentPosition(null);
-    return newComment;
-  }, [comments, saveComments]);
-
-  // Add a reply to a comment
-  const addReply = useCallback((commentId, text, user) => {
-    const reply = {
-      id: `reply_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      text,
-      user,
-      read: true,
-      createdAt: new Date().toISOString(),
-    };
-    const updated = comments.map(c =>
-      c.id === commentId
-        ? { ...c, replies: [...(c.replies || []), reply] }
-        : c
-    );
-    saveComments(updated);
-  }, [comments, saveComments]);
-
-  // Resolve/unresolve a comment
-  const resolveComment = useCallback((commentId, resolved) => {
-    const updated = comments.map(c =>
-      c.id === commentId ? { ...c, resolved } : c
-    );
-    saveComments(updated);
-  }, [comments, saveComments]);
-
-  // Delete a comment or reply
-  const deleteComment = useCallback((commentId, replyId = null) => {
-    if (replyId) {
-      const updated = comments.map(c =>
-        c.id === commentId
-          ? { ...c, replies: c.replies.filter(r => r.id !== replyId) }
-          : c
-      );
-      saveComments(updated);
-    } else {
-      saveComments(comments.filter(c => c.id !== commentId));
-      if (activeComment?.id === commentId) {
-        setActiveComment(null);
-      }
-    }
-  }, [comments, activeComment, saveComments]);
-
-  // Start adding a new comment at position
-  const startNewComment = useCallback((x, y, elementId = null) => {
-    setNewCommentPosition({ x, y, elementId });
-    setActiveComment(null);
-  }, []);
-
-  // Cancel new comment
-  const cancelNewComment = useCallback(() => {
-    setNewCommentPosition(null);
-  }, []);
-
-  return {
-    comments,
-    activeComment,
-    setActiveComment,
-    newCommentPosition,
-    addComment,
-    addReply,
-    resolveComment,
-    deleteComment,
-    startNewComment,
-    cancelNewComment,
-  };
+// "Detached" group (Q-C3): threads whose element was removed. They stay open and are never auto-resolved; a
+// restore that brings the element back moves them out of this list again (anchor state is derived at read time).
+export function DetachedComments({ comments, onSelect, activeId }) {
+  const [open, setOpen] = useState(false);
+  if (!comments || comments.length === 0) return null;
+  return (
+    <div className="ds-comment-detached" data-testid="detached-comments" style={{ ...floatingBase, left: 16, bottom: 16, maxWidth: 320 }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{ all: 'unset', cursor: 'pointer', padding: '8px 12px', display: 'block', fontWeight: 600 }}
+      >
+        Detached comments ({comments.length})
+      </button>
+      {open && (
+        <ul style={{ listStyle: 'none', margin: 0, padding: '0 8px 8px', maxHeight: 240, overflowY: 'auto' }}>
+          {comments.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => onSelect?.(c)}
+                style={{
+                  all: 'unset', cursor: 'pointer', display: 'block', width: 'calc(100% - 16px)', padding: '6px 8px', borderRadius: 8,
+                  background: activeId === c.id ? 'var(--bg)' : 'transparent',
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>{c.user?.name || 'Unknown'}</span>
+                <span style={{ display: 'block', opacity: 0.75, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.deleted ? 'Comment deleted' : c.text}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
+
+// One-time import prompt for browser-only comments (Q-C1).
+export function LegacyImportPrompt({ count, importing, onImport, onDiscard }) {
+  if (!count) return null;
+  return (
+    <div className="ds-comment-import" role="region" aria-label="Import local comments" style={{ ...floatingBase, left: '50%', top: 16, transform: 'translateX(-50%)', padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'center' }}>
+      <span>{count} comment{count === 1 ? '' : 's'} saved only in this browser. Import {count === 1 ? 'it' : 'them'} to this diagram?</span>
+      <button type="button" onClick={onImport} disabled={importing}>{importing ? 'Importing...' : 'Import'}</button>
+      <button type="button" onClick={onDiscard} disabled={importing}>Discard</button>
+    </div>
+  );
+}
+
+// Errors from comment mutations (the optimistic change has already been rolled back).
+export function CommentErrorBanner({ error, onDismiss }) {
+  if (!error) return null;
+  return (
+    <div className="ds-comment-error-banner" role="alert" style={{ ...floatingBase, right: 16, bottom: 16, padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'center', borderColor: 'var(--danger, #c0392b)' }}>
+      <span>{error}</span>
+      <button type="button" onClick={onDismiss} aria-label="Dismiss">Dismiss</button>
+    </div>
+  );
+}
+
+export { useComments };
 
 export default { CommentMarker, CommentThread, NewCommentInput, useComments };

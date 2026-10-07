@@ -24,7 +24,7 @@ import { useThumbnailCapture } from './hooks/useThumbnailCapture';
 import ShortcutsHelp, { useShortcutsHelp } from './ui/ShortcutsHelp';
 import KeyboardShortcutsOverlay, { useKeyboardShortcutsOverlay } from './ui/KeyboardShortcutsOverlay';
 import ContextMenu, { useContextMenu } from './ui/ContextMenu';
-import { CommentMarker, CommentThread, NewCommentInput, useComments } from './ui/CommentSystem';
+import { CommentMarker, CommentThread, NewCommentInput, DetachedComments, LegacyImportPrompt, CommentErrorBanner, useComments } from './ui/CommentSystem';
 import StarterPackModal from './StarterPackModal';
 import { LogoIcon } from '../ui/Logo';
 import { ExportManager, downloadExport } from './export/ExportManager';
@@ -49,6 +49,7 @@ export default function DiagramStudio({
   packRegistry,
   onSave,
   onExport,
+  access = null,
   embedded = false,
   className = '',
 }) {
@@ -75,6 +76,7 @@ export default function DiagramStudio({
     >
       <DiagramStudioInner
         diagramId={diagramId}
+        access={access}
         profile={profile}
         packRegistry={packRegistry}
         availableModes={availableModes}
@@ -90,6 +92,7 @@ export default function DiagramStudio({
 
 function DiagramStudioInner({
   diagramId,
+  access,
   profile,
   packRegistry,
   availableModes,
@@ -241,8 +244,21 @@ function DiagramStudioInner({
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
 
   // Comment system
+  // Current user info for comments
+  const currentUser = useMemo(() => ({
+    id: session?.user?.id || 'local',
+    name: session?.user?.name || 'You',
+    email: session?.user?.email,
+    image: session?.user?.image,
+  }), [session]);
+
+  // Server comments (ADR-0002): capabilities come from the diagram's access block (default: allowed, the server
+  // enforces the real policy either way).
+  const canComment = access?.capabilities ? access.capabilities.includes('comment.create') : true;
+  const canDeleteAny = access?.capabilities ? access.capabilities.includes('comment.delete_any') : false;
   const {
     comments,
+    detachedComments,
     activeComment,
     setActiveComment,
     newCommentPosition,
@@ -252,15 +268,13 @@ function DiagramStudioInner({
     deleteComment,
     startNewComment,
     cancelNewComment,
-  } = useComments(diagramId);
-
-  // Current user info for comments
-  const currentUser = useMemo(() => ({
-    id: session?.user?.id || 'local',
-    name: session?.user?.name || 'You',
-    email: session?.user?.email,
-    image: session?.user?.image,
-  }), [session]);
+    error: commentError,
+    clearError: clearCommentError,
+    legacyCount,
+    importing: importingComments,
+    importLegacy,
+    discardLegacy,
+  } = useComments(diagramId, { elements, connections, currentUser, canComment });
 
   // Sync panel collapsed state with user settings
   useEffect(() => {
@@ -338,14 +352,24 @@ function DiagramStudioInner({
   // Handle adding a new comment
   const handleAddComment = useCallback((text) => {
     if (newCommentPosition) {
-      addComment(text, newCommentPosition.x, newCommentPosition.y, newCommentPosition.elementId, currentUser);
+      return addComment(text, newCommentPosition.x, newCommentPosition.y, newCommentPosition.elementId);
     }
-  }, [newCommentPosition, addComment, currentUser]);
+    return undefined;
+  }, [newCommentPosition, addComment]);
 
   // Handle reply to comment
   const handleAddReply = useCallback((commentId, text) => {
-    addReply(commentId, text, currentUser);
-  }, [addReply, currentUser]);
+    return addReply(commentId, text);
+  }, [addReply]);
+
+  // Context-menu "Add comment": the menu reports a screen position; comments live in canvas coordinates.
+  const handleContextAddComment = useCallback((screenPos) => {
+    const rect = canvasContainerRef.current?.getBoundingClientRect?.();
+    if (!rect || !viewport || !screenPos) return;
+    const x = (screenPos.x - rect.left) / viewport.scale - viewport.x;
+    const y = (screenPos.y - rect.top) / viewport.scale - viewport.y;
+    startNewComment(x, y);
+  }, [viewport, startNewComment]);
 
   // Handle applying a template: place it in the first empty region right of the
   // existing content (or centered in the viewport on an empty canvas), fit the
@@ -726,7 +750,7 @@ function DiagramStudioInner({
             position={contextMenu.position}
             targetElement={contextMenu.targetElement}
             onClose={closeContextMenu}
-            onAddComment={startNewComment}
+            onAddComment={handleContextAddComment}
             onShowProperties={() => setShowPropertiesPanel(true)}
             showContextualToolbar={showContextualToolbarOnSelect}
             onToggleContextualToolbar={toggleContextualToolbar}
@@ -794,6 +818,10 @@ function DiagramStudioInner({
                   viewport={viewport}
                 />
               ))}
+              {showComments && (
+                <DetachedComments comments={detachedComments} activeId={activeComment?.id} onSelect={(c) => setActiveComment(c)} />
+              )}
+              <LegacyImportPrompt count={legacyCount} importing={importingComments} onImport={importLegacy} onDiscard={discardLegacy} />
             </div>
 
             {/* Right Properties Panel - On-demand in floating UI mode */}
@@ -833,6 +861,8 @@ function DiagramStudioInner({
             onAddReply={handleAddReply}
             onResolve={resolveComment}
             onDelete={deleteComment}
+            canComment={canComment}
+            canDeleteAny={canDeleteAny}
             position={{
               // Convert canvas coordinates to screen coordinates
               // Same formula as CommentMarker: (canvasCoord + panOffset) * scale
@@ -854,8 +884,12 @@ function DiagramStudioInner({
             currentUser={currentUser}
             onSubmit={handleAddComment}
             onCancel={cancelNewComment}
+            error={commentError}
           />
         )}
+
+        {/* Comment failures that are not tied to the open input (reply, resolve, delete, load) */}
+        {!newCommentPosition && <CommentErrorBanner error={commentError} onDismiss={clearCommentError} />}
 
         {/* Comment Mode Indicator */}
         {activeTool === 'comment' && (

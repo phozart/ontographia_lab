@@ -72,3 +72,17 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
   - `lib/rateLimit.js` `check(req, res, key?)` accepts an explicit bucket key. `jest.setup.js` guards the `window` mock so server suites can use the node environment.
 - **Deviations from the doc:** one `stencil_catalog` tool (optional `packId`) instead of `catalog_list_packs`/`catalog_get_pack`; Mermaid resource URI is `/{id}/mermaid` (a `{id}.mmd` template is ambiguous with `{id}`); `diagram_list` has no `scope` input until sharing exists; SDK 1.32.1 negotiates up to 2025-11-25 (2026-07-28 not yet in the SDK); compact JSON measured about 2.8x smaller than raw on a synthetic 100-element flow (design target 3x; re-measure on real data).
 - **Tests:** unit suites for tokens, authz scope, projections, server tools (through the MCP protocol), HTTP pipeline (real HTTP + SDK client), token API, account section, catalog parity. Live check against a throwaway database: token create via API, SDK client initialize/tools/resources, allowlist, revoke (401 immediately), expiry, Origin, 405, 413.
+## Slice 4 — Server comments
+
+- **PR title:** `feat: slice 4 server comments (threads, replies, resolve, detached anchors)`
+- **Refs:** ADR-0002; api-contracts section 4; delivery-plan slice 4; Q-C1, Q-C2, Q-C3 (Q-C4/C5 are slice 9, not built).
+- **Branch:** `feat/slice-4-comments`
+- **What changed**
+  - **Migration `0006_comments`** (additive, idempotent; number 0006 because 0004 = api_tokens and 0005 = sharing): `comment_threads`, `comments`, indexes per data-model.
+  - **API** (all `withDiagramAuth`): `GET/POST /api/diagrams/{id}/threads`, `GET/PATCH .../threads/{t}`, `POST .../threads/{t}/comments`, `PATCH/DELETE .../comments/{c}`. Plain-text bodies <= 10 000 chars, soft delete, reply reopens, per-user create rate limit.
+  - **`lib/commentRepository.js`**, `lib/comments/{validate,http,anchors,client,legacyImport}.js`.
+  - **Editor:** `useComments` now uses the API (optimistic with rollback + error banner, refresh on focus and every 60 s); element-anchored markers follow their element; deleted element -> thread `detached` (faded dashed marker at the creation position + "Detached comments" group); restore that brings the element back re-attaches (derived at read time, no restore hook); one-time localStorage import prompt (Q-C1); bodies rendered as text.
+  - Fixed: canvas comment clicks never passed an element id; context-menu "Add comment" passed a screen position.
+- **Deviations from the docs:** attachment derived at read time rather than hooking version restore (documented in ADR-0002 as built); migration renumbered 0004 -> 0006; UI creates canvas/element anchors only (connection anchors supported by the API).
+- **Tests:** API role matrix (owner/editor/commenter/viewer/no-access/unauthenticated x 7 endpoints) + validation + rate limit; repository on a throwaway DB (13: identity, scoping, attach/detach/re-attach, resolve/reopen/reply, edit/delete rules, hidden threads, pagination, cascades); anchors / import plan / validators; `useComments` + rendering (text not HTML); e2e with two browser sessions (create, persist, author identity, reply, move/detach/restore, resolve/reopen, import, delete, non-owner 404).
+- **Deployment note:** migration `0006` runs automatically before the app starts (`prestart` / container `CMD`); take a `pg_dump` first as for any migration. It only creates two tables and four indexes.
