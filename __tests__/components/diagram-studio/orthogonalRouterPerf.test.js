@@ -81,15 +81,21 @@ describe('routing performance budget', () => {
       if (a === b) b = (b + 1) % shapes.length;
       jobs.push([a, b]);
     }
-    const t0 = performance.now();
-    for (const [a, b] of jobs) {
-      const s = shapes[a];
-      const t = shapes[b];
-      const sp = t.x >= s.x + s.width ? 'right' : t.x + t.width <= s.x ? 'left' : t.y > s.y ? 'bottom' : 'top';
-      const tp = { right: 'left', left: 'right', top: 'bottom', bottom: 'top' }[sp];
-      route(s, t, sp, tp, shapes.filter((_, i) => i !== a && i !== b));
-    }
-    const ms = performance.now() - t0;
+    const runAll = () => {
+      const t0 = performance.now();
+      for (const [a, b] of jobs) {
+        const s = shapes[a];
+        const t = shapes[b];
+        const sp = t.x >= s.x + s.width ? 'right' : t.x + t.width <= s.x ? 'left' : t.y > s.y ? 'bottom' : 'top';
+        const tp = { right: 'left', left: 'right', top: 'bottom', bottom: 'top' }[sp];
+        route(s, t, sp, tp, shapes.filter((_, i) => i !== a && i !== b));
+      }
+      return performance.now() - t0;
+    };
+    // Warm up the JIT, then take the best of three runs so a busy machine
+    // (parallel jest workers) doesn't make the budget flaky.
+    runAll();
+    const ms = Math.min(runAll(), runAll(), runAll());
     // ~10x headroom over the measured time on a dev laptop
     expect(ms).toBeLessThan(2000);
   });
