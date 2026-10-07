@@ -16,6 +16,7 @@ const DiagramStudio = dynamic(
 
 // Import profile
 import { PROFILE_INFINITE_CANVAS, getProfile } from '../../components/diagram-studio/DiagramProfile';
+import { applyAccessToProfile } from '../../components/diagram-studio/sharing/accessMode';
 
 function LoadingScreen() {
   return (
@@ -54,7 +55,7 @@ export default function DiagramEditorPage({ theme }) {
   }, []);
 
   // Determine profile based on diagram type
-  const profile = useMemo(() => {
+  const baseProfile = useMemo(() => {
     if (diagram?.type === 'infinite-canvas') {
       return PROFILE_INFINITE_CANVAS;
     }
@@ -67,6 +68,9 @@ export default function DiagramEditorPage({ theme }) {
     };
     return getProfile(typeToProfile[diagram?.type] || 'full-studio');
   }, [diagram?.type]);
+
+  // Viewers and commenters get a read-only editor (the server enforces the same rules on every request)
+  const profile = useMemo(() => applyAccessToProfile(baseProfile, diagram?.access), [baseProfile, diagram?.access]);
 
   // Handle authentication
   useEffect(() => {

@@ -137,3 +137,13 @@ Logged: `share.grant|change|revoke`, `invite.send|accept|revoke`, `link.create|r
 - − Every diagram-scoped request does 1–2 extra indexed lookups (members, link). Acceptable; can be cached per request.
 - − Migration: backfill `owner_id` from `created_by`; replace `diagram_shares` (unused) with `diagram_members` + `diagram_links`; existing list/get/put/delete routes move to the wrapper (behaviour-preserving for owners).
 - − Behaviour change if Q-S1 = "no implicit admin access" — admins lose silent access to all diagrams.
+
+## As built (slice 5: sharing with existing users)
+
+- **Grant source:** `diagram_members` is the second source in `lib/authz/index.js` (`source: 'member'`), skipped when the user is the owner. A row whose role is unknown or `owner` grants nothing; a database error propagates (500), never access. MCP tokens are capped with `min(role, roleCap)` and still honor the diagram allowlist for shared diagrams.
+- **Rules (`lib/authz/policy.js`):** `canGrant(actor, role)` and `canModifyMember(actor, current, next|null)`. Owner grants/changes/revokes anything except `owner`; editors only viewer/commenter and cannot touch editors (Q-S3). The owner is never a member row: `409 OWNER_IMMUTABLE` on PUT/DELETE of the owner. Members can leave (DELETE on themselves) at any role.
+- **Race safety:** role change and revoke are compare-and-set on the role the actor was authorized against (`409 CONFLICT` on a miss), so a concurrent change cannot widen an actor's reach.
+- **Share by e-mail:** active accounts only (`404 USER_NOT_FOUND` for unknown or pending/suspended accounts, Q-S8), 20 attempts per user per hour counted per attempt (in-process limiter, like the other limiters), `409 ALREADY_MEMBER` / `ALREADY_OWNER`. Invitations are slice 7.
+- **Revocation is immediate:** every request re-reads membership; there is no per-request cache. `NOTIFY authz_changed` is emitted by the same SQL statement as the write, payload `{diagramId, userId, change: grant|role|revoke, role}` (no e-mail addresses), for the future real-time server.
+- **Audit:** `audit_events` rows are written for `share.grant|change|revoke` (self-leave marked `self: true`) and `version.restore`; ids only in `target`, no e-mails or IPs. Writes never fail the request (a failed insert logs `AUDIT_FAILED {...}`). `GET /audit` is owner-only. Retention (365 days, Q-A2) is not implemented yet.
+- **Editor UI:** the server `access` block drives the mode: no `diagram.write` -> read-only profile, no save/autosave, "View only" pill; `comment.create` without write -> "Can comment" pill and the comment tool; the Share button shows for `share.read` (owner/editor).

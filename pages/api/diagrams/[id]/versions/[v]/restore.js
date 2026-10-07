@@ -34,7 +34,7 @@ export default withDiagramAuth({ POST: 'version.restore' }, async (req, res, { d
     }
     if (result.status !== 'ok') return sendError(res, 500, 'INTERNAL', 'Internal server error');
 
-    recordAuditEvent({
+    await recordAuditEvent({
       action: 'version.restore',
       actorUserId: user.id,
       diagramId: diagram.id,

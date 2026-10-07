@@ -1,6 +1,7 @@
 // components/diagram-studio/DiagramContext.js
 // State management for DiagramStudio component
 
+import { canWrite as accessCanWrite } from './sharing/accessMode';
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { computeFitForCanvas, FIT_PADDING } from './viewportFit';
 import { getObstacleRects, getAvoidRects } from './ui/positioning';
@@ -714,6 +715,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     const { force = false, name: nameOverride, description: descOverride, ignoreRestoreLock = false } = options;
 
     if (!diagram?.id || (!saveStatus.dirty && !force) || conflict) return;
+    if (!accessCanWrite(diagram.access)) return; // view-only / comment-only: never write (server returns 403 anyway)
     if (restoringRef.current && !ignoreRestoreLock) return;
 
     setSaveStatus(prev => ({ ...prev, saving: true }));
@@ -789,7 +791,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     }
 
     // Set up debounced save when dirty
-    if (diagram?.id && saveStatus.dirty && !saveStatus.saving && !conflict) {
+    if (diagram?.id && saveStatus.dirty && !saveStatus.saving && !conflict && accessCanWrite(diagram.access)) {
       autoSaveTimerRef.current = setTimeout(() => {
         saveDiagram();
       }, autoSaveDelayMs);
@@ -805,7 +807,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   // Save before unload
   useEffect(() => {
     const handleBeforeUnload = (e) => {
-      if (saveStatus.dirty && diagram?.id && !conflict && !skipUnloadSaveRef.current) {
+      if (saveStatus.dirty && diagram?.id && !conflict && !skipUnloadSaveRef.current && accessCanWrite(diagram.access)) {
         saveDiagram(true);
         e.preventDefault();
         e.returnValue = '';

@@ -177,6 +177,7 @@ export default function DashboardPage() {
   const { confirm, dialog } = useConfirmDialog();
 
   const [diagrams, setDiagrams] = useState([]);
+  const [shared, setShared] = useState([]); // diagrams other people shared with me (metadata only)
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('grid');
@@ -212,6 +213,11 @@ export default function DashboardPage() {
       } else if (res.status === 401) {
         router.push('/login');
       }
+      // Shared with me: a failure here must not break the owned list
+      try {
+        const sres = await fetch('/api/diagrams?scope=shared');
+        if (sres.ok) setShared(await sres.json());
+      } catch (_) { /* optional section */ }
     } catch (err) {
       console.error('Failed to fetch diagrams:', err);
       toast.error('Failed to load diagrams');
@@ -327,6 +333,13 @@ export default function DashboardPage() {
     (d) =>
       d.name.toLowerCase().includes(search.toLowerCase()) ||
       d.type.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredShared = shared.filter(
+    (d) =>
+      d.name.toLowerCase().includes(search.toLowerCase()) ||
+      d.type.toLowerCase().includes(search.toLowerCase()) ||
+      (d.owner?.name || d.owner?.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
   // Show loading while checking auth
@@ -654,6 +667,37 @@ export default function DashboardPage() {
                       </Grid>
                     )}
                   </>
+                )}
+                {filteredShared.length > 0 && (
+                  <Box component="section" aria-label="Shared with me" data-testid="shared-with-me" sx={{ mt: 4 }}>
+                    <SectionHeader icon={FolderOpenIcon} title="Shared with me" count={filteredShared.length} />
+                    <Paper elevation={0} sx={{ bgcolor: 'var(--panel, #ffffff)', border: '1px solid var(--border, #e2e8f0)', borderRadius: '12px', overflow: 'hidden' }}>
+                      {filteredShared.map((d, i) => (
+                        <Box
+                          key={d.id}
+                          sx={{ display: 'flex', alignItems: 'center', gap: 2, px: 2, py: 1.5, borderTop: i ? '1px solid var(--border, #e2e8f0)' : 'none' }}
+                        >
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Link href={`/diagram/${d.short_id || d.id}`} style={{ textDecoration: 'none' }} title={d.name}>
+                              <Typography sx={{ fontWeight: 600, fontSize: 14, color: 'var(--text, #0f172a)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {d.name}
+                              </Typography>
+                            </Link>
+                            <Typography sx={{ fontSize: 12, color: 'var(--text-light, #94a3b8)' }}>
+                              Owner: {d.owner?.name || d.owner?.email || 'Unknown'} &middot;{' '}
+                              {formatDistanceToNow(new Date(d.updated_at), { addSuffix: true })}
+                            </Typography>
+                          </Box>
+                          <Typography
+                            component="span"
+                            sx={{ fontSize: 12, fontWeight: 600, px: 1.25, py: 0.25, borderRadius: '999px', border: '1px solid var(--border, #e2e8f0)', color: 'var(--text-muted, #475569)', textTransform: 'capitalize', whiteSpace: 'nowrap' }}
+                          >
+                            {d.access?.role === 'editor' ? 'Can edit' : d.access?.role === 'commenter' ? 'Can comment' : 'View only'}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Paper>
+                  </Box>
                 )}
               </Grid>
 

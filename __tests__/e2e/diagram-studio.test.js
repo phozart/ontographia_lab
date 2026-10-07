@@ -899,10 +899,12 @@ describe('Diagram Studio E2E Tests', () => {
       }
     });
 
-    it('8.5 Share button is hidden until sharing ships (FEATURES.sharing)', async () => {
+    it('8.5 Owner sees the Share button (FEATURES.sharing); the dialog opens', async () => {
       await page.goto(DIAGRAM_URL, { waitUntil: 'networkidle0' });
       await waitForDiagramStudio(page);
-      expect(await page.$('[title="Share"]')).toBeNull();
+      await page.waitForSelector('[title="Share"]');
+      await page.click('[title="Share"]');
+      await page.waitForSelector('[data-testid="share-dialog"]');
     });
 
     it('8.6 Header with branding is visible', async () => {

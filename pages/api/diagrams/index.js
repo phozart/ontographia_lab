@@ -3,6 +3,7 @@
 // caller owns (platform admins included, Q-S1) and creation records the caller as owner.
 
 import { diagramRepository } from '../../../lib/diagramRepository';
+import { memberRepository } from '../../../lib/memberRepository';
 import { withUserAuth } from '../../../lib/authz/next';
 import { validateDiagramContent } from '../../../lib/diagramContent';
 import { validateMetadata } from '../../../lib/diagramMetadata';
@@ -13,14 +14,27 @@ const toApi = (row, extra = {}) => ({ ...row, revision: Number(row.revision), ..
 
 async function handler(req, res, { user }) {
   if (req.method === 'GET') {
-    const { type, domain_id, project_id } = req.query;
+    const { type, domain_id, project_id, scope = 'owned' } = req.query;
+    if (!['owned', 'shared', 'all'].includes(scope)) {
+      return res.status(400).json({ error: 'scope must be owned, shared or all', code: 'VALIDATION_FAILED' });
+    }
 
-    const diagrams = await diagramRepository.findAll(
-      { type, domainId: domain_id, projectId: project_id },
-      user.id
-    );
+    // "owned" is the default and unchanged. "shared" = direct member grants (metadata only, with the caller's
+    // role and the owner); platform admins get no extra diagrams (Q-S1).
+    const owned = scope === 'shared'
+      ? []
+      : await diagramRepository.findAll({ type, domainId: domain_id, projectId: project_id }, user.id);
+    if (scope === 'owned') return res.status(200).json(owned.map((d) => toApi(d)));
 
-    return res.status(200).json(diagrams.map((d) => toApi(d)));
+    const shared = scope === 'all' && (domain_id || project_id)
+      ? [] // grouping columns are not exposed for shared metadata
+      : await memberRepository.listSharedWith(user.id, { type });
+    const items = [
+      ...owned.map((d) => toApi(d, scope === 'all' ? { access: { role: 'owner' } } : {})),
+      ...shared.map(({ role, ...d }) => toApi(d, { access: { role } })),
+    ];
+    items.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+    return res.status(200).json(items);
   }
 
   // POST
