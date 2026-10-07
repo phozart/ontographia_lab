@@ -19,6 +19,8 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
   const [nextCursor, setNextCursor] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
+  const [showAuto, setShowAuto] = useState(true); // automatic checkpoints can crowd out named versions
+  const visibleItems = showAuto ? items : items.filter((v) => v.kind !== 'auto');
 
   const [label, setLabel] = useState('');
   const [description, setDescription] = useState('');
@@ -269,8 +271,17 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
               </p>
             )}
             {items.length > 0 && (
+              <label className="vh-toggle">
+                <input type="checkbox" checked={showAuto} onChange={(e) => setShowAuto(e.target.checked)} />
+                Show autosaves
+              </label>
+            )}
+            {items.length > 0 && visibleItems.length === 0 && (
+              <p className="vh-muted">No named versions yet. Turn on &ldquo;Show autosaves&rdquo; to see automatic checkpoints.</p>
+            )}
+            {visibleItems.length > 0 && (
               <ul className="vh-list" aria-label={listLabel}>
-                {items.map((v) => (
+                {visibleItems.map((v) => (
                   <li key={v.id}>
                     <button type="button" className="vh-item" onClick={() => select(v)}>
                       <span className="vh-item-title">{versionTitle(v)}</span>
@@ -335,6 +346,7 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
         .vh-notice { margin: 0; padding: 8px 10px; border-radius: 8px; }
         .vh-notice-ok { background: rgba(79, 179, 206, 0.12); }
         .vh-notice-error, .vh-error { color: #b91c1c; }
+        .vh-toggle { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12px; color: var(--text-muted, #6b7280); cursor: pointer; }
         .vh-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
         .vh-item { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--border, #e5e7eb); border-radius: 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; }
         .vh-item:hover, .vh-item:focus-visible { border-color: var(--accent, #4fb3ce); background: var(--bg-alt, #f9fafb); }

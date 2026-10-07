@@ -77,6 +77,21 @@ describe('VersionHistoryPanel', () => {
     expect(items[0].querySelector('time')).toBeTruthy();
   });
 
+  test('autosaves are shown by default and can be hidden with a toggle (named versions stay)', async () => {
+    mockApi();
+    renderPanel();
+    const list = await screen.findByRole('list', { name: /versions/i });
+    const toggle = screen.getByRole('checkbox', { name: /show autosaves/i });
+    expect(toggle).toBeChecked();
+    await click(toggle);
+    const items = within(screen.getByRole('list', { name: /versions/i })).getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+    items.forEach((li) => expect(li).not.toHaveTextContent('Autosave'));
+    await click(toggle);
+    expect(within(screen.getByRole('list', { name: /versions/i })).getAllByRole('listitem')).toHaveLength(3);
+    expect(list).toBeTruthy();
+  });
+
   test('empty state explains what a version is', async () => {
     mockApi({ items: [] });
     renderPanel();

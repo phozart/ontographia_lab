@@ -126,7 +126,7 @@ describe('PUT /api/diagrams/[id]', () => {
     expect(res.body.revision).toBe(4);
     expect(res.headers.etag).toBe('"4"');
     expect(res.body.warnings).toBeUndefined();
-    expect(repo.updateDiagram).toHaveBeenCalledWith(UUID, expect.objectContaining({ name: 'N', content: good }), { expectedRevision: null, userId: OWNER });
+    expect(repo.updateDiagram).toHaveBeenCalledWith(UUID, expect.objectContaining({ name: 'N', content: good }), { expectedRevision: null, userId: OWNER, actor: expect.objectContaining({ userId: OWNER, via: 'web' }) });
   });
 
   test.each(['stranger', 'admin'])('%s -> 404, nothing written', async (who) => {

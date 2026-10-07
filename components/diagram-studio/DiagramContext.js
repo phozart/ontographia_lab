@@ -9,6 +9,7 @@ import { generateId } from './utils/ids';
 import { normalizeDiagramContent } from './migrations/normalizeContent';
 import { migrateDiagram } from './migrations/migrateDiagram';
 import SaveConflictDialog from './ui/SaveConflictDialog';
+import { sendSessionEndCheckpoint } from './versions/versionsClient';
 import { assignFrameOnCreate, remapDuplicateParent } from './utils/frameMembership';
 
 // ============ CONTEXT ============
@@ -814,6 +815,40 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [saveStatus.dirty, diagram?.id, saveDiagram, conflict]);
+
+  // Session-end checkpoint (Q-V2, best effort): when the page is hidden/closed after at least one save this
+  // session, ask the server to snapshot the saved head. The server dedupes by content hash and rate limits, so
+  // repeated tab switches are harmless; the ref avoids even sending when nothing was saved since the last one.
+  const checkpointedRevisionRef = useRef(null);
+  const loadedRevisionRef = useRef(null);
+  useEffect(() => {
+    loadedRevisionRef.current = null;
+    checkpointedRevisionRef.current = null;
+  }, [diagram?.id]);
+  useEffect(() => {
+    if (diagram?.id && loadedRevisionRef.current === null) loadedRevisionRef.current = String(diagram.revision ?? '');
+  }, [diagram?.id, diagram?.revision]);
+  useEffect(() => {
+    const id = diagram?.id;
+    if (!id) return undefined;
+    const send = () => {
+      const role = diagram?.access?.role;
+      if (role && !['owner', 'editor'].includes(role)) return;
+      if (conflict || restoringRef.current) return;
+      const rev = String(diagram.revision ?? '');
+      const last = checkpointedRevisionRef.current ?? loadedRevisionRef.current;
+      if (!rev || rev === last) return;
+      checkpointedRevisionRef.current = rev;
+      sendSessionEndCheckpoint(id);
+    };
+    const onVisibility = () => { if (document.visibilityState === 'hidden') send(); };
+    window.addEventListener('pagehide', send);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', send);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [diagram?.id, diagram?.revision, diagram?.access?.role, conflict]);
 
   // Auto-load diagram when initialDiagramId is provided
   useEffect(() => {
