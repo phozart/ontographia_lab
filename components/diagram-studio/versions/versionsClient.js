@@ -35,6 +35,22 @@ export async function nameCurrentVersion(diagramId, { label, description }) {
   return status === 200 && body?.deduplicated ? { created: false, version: body.version } : { created: true, version: body };
 }
 
+/**
+ * Session-end checkpoint (Q-V2): best effort, fire-and-forget. `keepalive` lets the request outlive the page
+ * (pagehide / tab hidden). The server snapshots the saved head only if it differs from the latest version and
+ * rate limits per user and diagram, so over-sending is harmless. Never throws.
+ * @returns {Promise<boolean>} true when the request was handed to the browser
+ */
+export async function sendSessionEndCheckpoint(diagramId) {
+  try {
+    if (typeof fetch !== 'function') return false;
+    await fetch(base(diagramId), { ...jsonInit('POST', { kind: 'auto', reason: 'session_end' }), keepalive: true });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 export async function renameVersion(diagramId, number, label) {
   return (await request(`${base(diagramId)}/${number}`, jsonInit('PATCH', { label }))).body;
 }

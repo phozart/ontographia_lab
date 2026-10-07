@@ -97,7 +97,11 @@ async function handlePut(req, res, ctx) {
     warnings = check.warnings;
   }
 
-  const updated = await diagramRepository.updateDiagram(diagram.id, data, { expectedRevision, userId: user.id });
+  const updated = await diagramRepository.updateDiagram(diagram.id, data, {
+    expectedRevision,
+    userId: user.id,
+    actor: { userId: user.id, email: user.email, via: 'web' },
+  });
 
   if (!updated) {
     // Compare-and-set failed (or the row vanished): report the current state so the client can offer a choice.

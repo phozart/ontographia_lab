@@ -27,7 +27,7 @@ jest.mock('../../lib/versionRepository', () => {
   const actual = jest.requireActual('../../lib/versionRepository');
   return {
     ...actual,
-    versionRepository: { list: jest.fn(), get: jest.fn(), createNamed: jest.fn(), update: jest.fn(), restore: jest.fn() },
+    versionRepository: { list: jest.fn(), get: jest.fn(), createNamed: jest.fn(), update: jest.fn(), restore: jest.fn(), createCheckpoint: jest.fn() },
   };
 });
 jest.mock('../../lib/audit', () => ({ recordAuditEvent: jest.fn() }));
@@ -160,8 +160,46 @@ describe('POST /versions', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual({ deduplicated: true, version: meta(2) });
   });
+  describe("session-end checkpoint ({ kind: 'auto', reason: 'session_end' })", () => {
+    const body = { kind: 'auto', reason: 'session_end' };
+    test('creates -> 201 VersionMeta; never the named path', async () => {
+      repo.createCheckpoint.mockResolvedValue({ created: true, version: meta(5, { kind: 'auto', label: null }) });
+      const res = await call(listHandler, { method: 'POST', body, query: { id: 'cp-create' } });
+      expect(res.statusCode).toBe(201);
+      expect(res.body).toMatchObject({ number: 5, kind: 'auto' });
+      expect(repo.createCheckpoint).toHaveBeenCalledWith('cp-create', expect.objectContaining({ userId: USER.id, via: 'web' }));
+      expect(repo.createNamed).not.toHaveBeenCalled();
+    });
+    test('unchanged since the latest version -> 200 { deduplicated: true, version }', async () => {
+      repo.createCheckpoint.mockResolvedValue({ created: false, version: meta(2) });
+      const res = await call(listHandler, { method: 'POST', body, query: { id: 'cp-dedupe' } });
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual({ deduplicated: true, version: meta(2) });
+    });
+    test('unknown diagram -> 404; reason is required and must be session_end', async () => {
+      repo.createCheckpoint.mockResolvedValue(null);
+      expect((await call(listHandler, { method: 'POST', body, query: { id: 'cp-404' } })).statusCode).toBe(404);
+      for (const bad of [{ kind: 'auto' }, { kind: 'auto', reason: 'x' }, { kind: 'auto', reason: 'session_end', label: 'n' }]) {
+        expect((await call(listHandler, { method: 'POST', body: bad, query: { id: 'cp-bad' } })).statusCode).toBe(400);
+      }
+    });
+    test('viewer and commenter -> 403 (version.create is editor)', async () => {
+      for (const role of ['viewer', 'commenter']) {
+        mockRole = role;
+        expect((await call(listHandler, { method: 'POST', body })).statusCode).toBe(403);
+      }
+      expect(repo.createCheckpoint).not.toHaveBeenCalled();
+    });
+    test('rate limited per user and diagram -> 429 after the limit', async () => {
+      repo.createCheckpoint.mockResolvedValue({ created: false, version: meta(2) });
+      const codes = [];
+      for (let i = 0; i < 8; i += 1) codes.push((await call(listHandler, { method: 'POST', body, query: { id: 'cp-rate' } })).statusCode);
+      expect(codes.slice(0, 6).every((c) => c === 200)).toBe(true);
+      expect(codes[7]).toBe(429);
+      expect((await call(listHandler, { method: 'POST', body, query: { id: 'cp-rate-2' } })).statusCode).toBe(200);
+    });
+  });
   test.each([
-    [{ kind: 'auto', reason: 'session_end' }],
     [{ kind: 'restore', label: 'x' }],
     [{ kind: 'named' }],
     [{ kind: 'named', label: 5 }],
