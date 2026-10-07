@@ -490,6 +490,10 @@
 .ds-canvas-container {
   flex: 1;
   position: relative;
+  /* Own stacking context: selection/rotation handles and ports (z-index up to 1000)
+     must never paint above side panels, the title bar, or modals. */
+  z-index: 0;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3796,6 +3800,7 @@
 .ds-panel-wrapper {
   display: flex;
   position: relative;
+  z-index: 20;
   transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -4095,7 +4100,7 @@
   border-radius: 12px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.03);
   z-index: 300;
-  transform: translateX(-50%);
+  /* Positioned by components/diagram-studio/ui/positioning.js (no centering transform) */
   animation: ds-toolbar-appear 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -4108,11 +4113,11 @@
 @keyframes ds-toolbar-appear {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(8px) scale(0.95);
+    transform: translateY(8px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -4158,7 +4163,6 @@
   position: absolute;
   top: calc(100% + 8px);
   left: 50%;
-  transform: translateX(-50%);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -4171,11 +4175,11 @@
 @keyframes ds-popover-appear {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-4px);
+    transform: translateY(-4px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
   }
 }
 

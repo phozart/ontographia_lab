@@ -29,7 +29,7 @@ import StarterPackModal from './StarterPackModal';
 import { LogoIcon } from '../ui/Logo';
 import { ExportManager, downloadExport } from './export/ExportManager';
 import ExportDialog, { useExportDialog } from './ui/ExportDialog';
-import { VersionHistory } from './ui/VersionHistoryPanel';
+import { VersionHistory, OPEN_VERSION_HISTORY_EVENT } from './ui/VersionHistoryPanel';
 import { initializeStencilStyles } from './styling/StencilStyleManager';
 import LoadingScreen from '../ui/LoadingScreen';
 
@@ -38,7 +38,7 @@ import LoadingScreen from '../ui/LoadingScreen';
 const DEFAULT_SETTINGS = {
   toolbarPosition: 'top',
   enabledPacks: ['core', 'process-flow', 'cld', 'uml-class', 'mind-map', 'product-design', 'erd', 'togaf', 'itil', 'capability-map'],
-  showContextualToolbarOnSelect: true, // Show floating style toolbar when selecting elements
+  styleToolbarVisible: true, // Show floating style toolbar on single selection (T toggles; persisted per user)
 };
 
 // ============ MAIN COMPONENT ============
@@ -118,6 +118,7 @@ function DiagramStudioInner({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const canvasContainerRef = useRef(null); // Ref for canvas container (used by FrameNavigator)
+  const previewSelectionRef = useRef(null); // selection stashed while previewing
   const iconBarRef = useRef(null); // Ref for ShapeSidebar (used by empty canvas welcome)
 
   // User settings state - loaded from API
@@ -180,13 +181,47 @@ function DiagramStudioInner({
   }, []);
 
   // Contextual toolbar visibility setting
-  const showContextualToolbarOnSelect = userSettings.showContextualToolbarOnSelect ?? true;
+  const showContextualToolbarOnSelect = userSettings.styleToolbarVisible ?? true;
   const toggleContextualToolbar = useCallback(() => {
-    updateUserSetting('showContextualToolbarOnSelect', !showContextualToolbarOnSelect);
+    updateUserSetting('styleToolbarVisible', !showContextualToolbarOnSelect);
   }, [updateUserSetting, showContextualToolbarOnSelect]);
   const showToolbar = useCallback(() => {
-    updateUserSetting('showContextualToolbarOnSelect', true);
+    updateUserSetting('styleToolbarVisible', true);
   }, [updateUserSetting]);
+
+  // Opening a right-hand panel (Properties or History): pan just enough that it does not cover the selection
+  const selectionRef = useRef(selectedElements);
+  selectionRef.current = selectedElements;
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+  const panSelectionClearOfPanel = useCallback((selector) => {
+    const sel = selectionRef.current;
+    const vp = viewportRef.current;
+    const panel = document.querySelector(selector);
+    const container = canvasContainerRef.current;
+    if (!sel?.length || !panel || !container) return;
+    const p = panel.getBoundingClientRect();
+    const c = container.getBoundingClientRect();
+    const bounds = getContentBounds(sel);
+    if (!bounds) return;
+    const right = c.left + (bounds.x + bounds.width + vp.x) * vp.scale;
+    const left = c.left + (bounds.x + vp.x) * vp.scale;
+    if (right <= p.left - 16 || left >= p.right) return;
+    const shift = Math.min(right - (p.left - 24), Math.max(0, left - (c.left + 24)));
+    if (shift > 0) setViewport?.(prev => ({ ...prev, x: prev.x - shift / prev.scale }));
+  }, [setViewport]);
+
+  useEffect(() => {
+    if (!showPropertiesPanel) return undefined;
+    const timer = setTimeout(() => panSelectionClearOfPanel('.ds-panel-right'), 350);
+    return () => clearTimeout(timer);
+  }, [showPropertiesPanel, panSelectionClearOfPanel]);
+
+  useEffect(() => {
+    const onOpen = () => setTimeout(() => panSelectionClearOfPanel('.vh-panel'), 150);
+    window.addEventListener(OPEN_VERSION_HISTORY_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_VERSION_HISTORY_EVENT, onOpen);
+  }, [panSelectionClearOfPanel]);
 
   // Edit label request - triggers editing in DiagramCanvas
   const [editLabelRequest, setEditLabelRequest] = useState(null);
@@ -239,6 +274,22 @@ function DiagramStudioInner({
   const keyboardShortcuts = useKeyboardShortcutsOverlay();
   const exportDialog = useExportDialog();
   const { contextMenu, openContextMenu, closeContextMenu } = useContextMenu();
+
+  // Preview mode: hide selection outlines, handles and toolbars while previewing; restore after
+  useEffect(() => {
+    if (isPreviewMode) {
+      previewSelectionRef.current = { ids: selection?.nodeIds ? [...selection.nodeIds] : [], props: showPropertiesPanel };
+      closeContextMenu();
+      setShowPropertiesPanel(false);
+      clearSelection?.();
+    } else if (previewSelectionRef.current) {
+      const { ids, props } = previewSelectionRef.current;
+      previewSelectionRef.current = null;
+      if (ids.length > 0) selectElements?.(ids);
+      if (props && ids.length > 0) setShowPropertiesPanel(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPreviewMode]);
 
   // Comment system
   const {
@@ -736,7 +787,7 @@ function DiagramStudioInner({
         )}
 
         {/* Contextual Toolbar for Selection - hidden during drag and rotation operations */}
-        {hasSelection && showContextualToolbarOnSelect && !isDragging && !isRotating && (
+        {hasSelection && !isPreviewMode && showContextualToolbarOnSelect && !isDragging && !isRotating && (
           <ContextualToolbar
             viewport={viewport}
             packRegistry={packRegistry}

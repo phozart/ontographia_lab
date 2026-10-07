@@ -2,7 +2,8 @@
 // Floating toolbar that appears near selected elements
 // Includes styling controls (color, style variant, text formatting) and layout tools
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
+import { useFloatingPlacement, placePopoverElement } from './positioning';
 import { generateId } from '../utils/ids';
 import { useDiagram, useDiagramSelection } from '../DiagramContext';
 import {
@@ -423,17 +424,34 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
     const containerLeft = containerRect?.left || 0;
     const containerTop = containerRect?.top || 0;
 
-    const screenX = (minX + viewport.x) * viewport.scale + containerLeft;
-    const screenY = (minY + viewport.y) * viewport.scale + containerTop;
-    const screenWidth = (maxX - minX) * viewport.scale;
-
-    // Position toolbar centered above the selection
-    // Left: center of selection, Top: 30px above the top of the stencil (toolbar bottom)
+    // Selection bounds in viewport (screen) coordinates; the toolbar is placed against this rect
     return {
-      left: screenX + screenWidth / 2,
-      top: screenY - 30, // 30px gap above stencil (transform will shift by toolbar height)
+      left: (minX + viewport.x) * viewport.scale + containerLeft,
+      top: (minY + viewport.y) * viewport.scale + containerTop,
+      width: (maxX - minX) * viewport.scale,
+      height: (maxY - minY) * viewport.scale,
     };
   }, [selectedElements, viewport, containerRef]);
+
+  // Collision-aware placement: measured after mount so flips apply on first paint
+  const placement = useFloatingPlacement(
+    toolbarRef,
+    () => toolbarPosition,
+    { preferred: 'top', align: 'center' },
+    [toolbarPosition?.left, toolbarPosition?.top, toolbarPosition?.width, toolbarPosition?.height],
+  );
+
+  // Keep every open popover inside the viewport and clear of side panels
+  useLayoutEffect(() => {
+    const root = toolbarRef.current;
+    if (!root) return;
+    root.querySelectorAll('.ds-ct-popover, .ds-ct-overflow-menu').forEach((el) => {
+      placePopoverElement(el, {
+        preferred: 'bottom',
+        align: el.classList.contains('ds-ct-overflow-menu') ? 'end' : 'center',
+      });
+    });
+  });
 
   // Check if any selected element is locked
   const hasLockedElements = useMemo(() => {
@@ -908,9 +926,13 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
     <div
       ref={toolbarRef}
       className="ds-contextual-toolbar"
+      data-placement={placement.placement}
+      data-floating-bar
       style={{
-        left: toolbarPosition.left,
-        top: Math.max(toolbarPosition.top, 80), // Ensure toolbar stays visible (80px accounts for toolbar height + margin)
+        animation: 'none',
+        left: placement.left,
+        top: placement.top,
+        visibility: placement.ready ? 'visible' : 'hidden',
       }}
       onMouseDown={(e) => e.stopPropagation()}
       onWheel={handleWheel}
@@ -1905,7 +1927,6 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
       <style jsx>{`
         .ds-contextual-toolbar {
           position: fixed;
-          transform: translate(-50%, -100%);
           display: flex;
           align-items: center;
           gap: 2px;
@@ -1974,7 +1995,6 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
           position: absolute;
           top: 100%;
           left: 50%;
-          transform: translateX(-50%);
           margin-top: 8px;
           background: var(--panel);
           border: 1px solid var(--border);
@@ -1986,8 +2006,8 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
         }
 
         @keyframes ds-popover-in {
-          from { opacity: 0; transform: translateX(-50%) translateY(-4px); }
-          to { opacity: 1; transform: translateX(-50%) translateY(0); }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
 
         /* Color Grid */
