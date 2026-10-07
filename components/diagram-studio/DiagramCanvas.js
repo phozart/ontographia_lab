@@ -3558,7 +3558,7 @@ export default function DiagramCanvas({
 
         // Check if clicking on a node to attach the comment to it
         const nodeElement = e.target.closest('.ds-node');
-        const elementId = nodeElement?.dataset?.elementId || null;
+        const elementId = nodeElement?.dataset?.nodeId || nodeElement?.dataset?.elementId || null;
 
         onCanvasClick(x, y, elementId);
       }

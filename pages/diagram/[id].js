@@ -154,6 +154,7 @@ export default function DiagramEditorPage({ theme }) {
       <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <DiagramStudio
           diagramId={id}
+          access={diagram?.access}
           profile={profile}
           packRegistry={packRegistry}
           onExport={(format) => console.log('Export:', format)}
