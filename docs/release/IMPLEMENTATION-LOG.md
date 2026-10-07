@@ -86,3 +86,13 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Deviations from the docs:** attachment derived at read time rather than hooking version restore (documented in ADR-0002 as built); migration renumbered 0004 -> 0006; UI creates canvas/element anchors only (connection anchors supported by the API).
 - **Tests:** API role matrix (owner/editor/commenter/viewer/no-access/unauthenticated x 7 endpoints) + validation + rate limit; repository on a throwaway DB (13: identity, scoping, attach/detach/re-attach, resolve/reopen/reply, edit/delete rules, hidden threads, pagination, cascades); anchors / import plan / validators; `useComments` + rendering (text not HTML); e2e with two browser sessions (create, persist, author identity, reply, move/detach/restore, resolve/reopen, import, delete, non-owner 404).
 - **Deployment note:** migration `0006` runs automatically before the app starts (`prestart` / container `CMD`); take a `pg_dump` first as for any migration. It only creates two tables and four indexes.
+
+
+## Slice 3 — Auto checkpoints + retention
+
+- **PR title:** `feat: slice 3 auto checkpoints, session-end checkpoint and retention`
+- **Refs:** delivery-plan slice 3; ADR-0001 decisions 2 and 6 (as-built note appended); api-contracts section 3; open-questions Q-V1 and Q-V2 at their accepted defaults.
+- **Branch:** `feat/slice-3-checkpoints`
+- **What changed:** `lib/versions/policy.js` (constants), `lib/versions/retention.js` (pure planner), `lib/versionRepository.js` (`createAutoIfDue`, `pruneAuto`, `createCheckpoint`, optional `created_at`), `lib/diagramRepository.js` (content PUT is now a transaction with the checkpoint), `pages/api/diagrams/[id].js` (passes actor), `pages/api/diagrams/[id]/versions/index.js` (`kind:auto` session end + rate limit), `DiagramContext.js` + `versions/versionsClient.js` (pagehide/visibility checkpoint), `VersionHistoryPanel.js` (autosave toggle). No migration.
+- **Deviations:** none from the plan; the session-end checkpoint snapshots the saved head only (rationale in the ADR note).
+- **Tests:** retention planner (24 h / daily / 30-day / weekly / cap-100 boundaries, fake clock), DB integration (100 saves in 1 minute gives 1 auto version, identical content never twice, throttle boundary, thumbnail/metadata/CAS-failure create nothing, session-end dedupe, prune never touches named/restore/pre_restore, cap), versions API (session-end 201/200/404/400/403/429), editor checkpoint events, History toggle.

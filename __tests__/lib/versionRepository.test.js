@@ -274,4 +274,147 @@ dbDescribe('versionRepository (throwaway database)', () => {
       expect(new Set(nums).size).toBe(nums.length);
     });
   });
+
+  // ---- Slice 3: auto checkpoints, session-end checkpoint, retention (fake clock via the `now` option) ----
+  describe('auto checkpoints (slice 3)', () => {
+    let diagramRepo;
+    const MIN = 60 * 1000; const H = 60 * MIN; const D = 24 * H;
+    const T0 = new Date('2026-03-01T10:00:00Z');
+    const at = (ms) => new Date(T0.getTime() + ms);
+    const save = (id, c, now, extra = {}) =>
+      diagramRepo.updateDiagram(id, { content: c, ...extra }, { userId: userA.id, actor: actor(userA), now });
+    const kinds = async (id) => (await allVersions(id)).map((v) => v.kind);
+    beforeAll(() => { diagramRepo = require('../../lib/diagramRepository').diagramRepository; });
+
+    test('100 saves in 1 minute create at most one auto version', async () => {
+      const id = await newDiagram();
+      for (let i = 0; i < 100; i += 1) await save(id, content(['a', `n${i}`]), at(i * 600));
+      const vs = await allVersions(id);
+      expect(vs).toHaveLength(1);
+      expect(vs[0].kind).toBe('auto');
+      expect(vs[0].dr).toBe(1);
+    });
+
+    test('a save after the interval versions the new state; one just inside it does not', async () => {
+      const id = await newDiagram();
+      await save(id, content(['a', 'b']), at(0));
+      await save(id, content(['a', 'b', 'c']), at(10 * MIN - 1));
+      expect(await kinds(id)).toEqual(['auto']);
+      await save(id, content(['a', 'b', 'c', 'd']), at(10 * MIN));
+      const vs = await allVersions(id);
+      expect(vs.map((v) => v.kind)).toEqual(['auto', 'auto']);
+      expect(vs[1].content.elements).toHaveLength(4);
+    });
+
+    test('identical content is never versioned twice (viewport and key order ignored)', async () => {
+      const id = await newDiagram();
+      await save(id, content(['a', 'b']), at(0));
+      await save(id, content(['a', 'b'], { viewport: { x: 9, y: 9, zoom: 2 } }), at(30 * MIN));
+      await save(id, content(['a', 'b']), at(60 * MIN));
+      expect(await kinds(id)).toEqual(['auto']);
+    });
+
+    test('a recent named version also throttles (latest version of any kind)', async () => {
+      const id = await newDiagram();
+      await writeHead(id, content(['a', 'x']));
+      await repo.createNamed(id, { label: 'Issue' }, actor(userA));
+      await save(id, content(['a', 'y']), new Date(Date.now() + MIN));
+      expect(await kinds(id)).toEqual(['named']);
+    });
+
+    test('thumbnail / metadata-only updates never create versions', async () => {
+      const id = await newDiagram();
+      await diagramRepo.updateThumbnail(id, 'data:image/png;base64,AAAA');
+      await diagramRepo.updateDiagram(id, { name: 'Renamed' }, { userId: userA.id, now: at(0) });
+      expect(await kinds(id)).toEqual([]);
+    });
+
+    test('a failed compare-and-set creates no version', async () => {
+      const id = await newDiagram();
+      const r = await diagramRepo.updateDiagram(id, { content: content(['z']) }, { userId: userA.id, expectedRevision: 99, now: at(0) });
+      expect(r).toBeNull();
+      expect(await kinds(id)).toEqual([]);
+    });
+
+    test('createCheckpoint: snapshots a changed head, skips the throttle, dedupes by hash', async () => {
+      const id = await newDiagram();
+      await save(id, content(['a', 'b']), new Date(Date.now() - 5 * MIN));
+      await save(id, content(['a', 'b', 'c']), new Date(Date.now() - 4 * MIN)); // throttled
+      expect(await kinds(id)).toEqual(['auto']);
+      const first = await repo.createCheckpoint(id, actor(userA));
+      expect(first.created).toBe(true);
+      expect(first.version).toMatchObject({ kind: 'auto' });
+      const again = await repo.createCheckpoint(id, actor(userA));
+      expect(again.created).toBe(false);
+      expect(await kinds(id)).toEqual(['auto', 'auto']);
+      expect(await repo.createCheckpoint('00000000-0000-0000-0000-000000000000', actor(userA))).toBeNull();
+    });
+
+    describe('retention (fake clock)', () => {
+      const seedAuto = async (id, ageMs, now, n) => {
+        await pg.query(
+          `insert into diagram_versions (diagram_id, version_number, content, created_by, kind, content_hash, created_at)
+           values ($1,$2,$3,'x','auto',$4,$5)`,
+          [id, n, JSON.stringify(content([`s${n}`])), crypto.randomBytes(32).toString('hex'), new Date(now.getTime() - ageMs)]);
+      };
+
+      test('thins old auto versions on write, never touches named / restore / pre_restore, keeps the newest', async () => {
+        const id = await newDiagram();
+        const NOW = new Date('2026-06-15T12:00:00Z');
+        const mk = async (kind, ageMs, n, label = null) => pg.query(
+          `insert into diagram_versions (diagram_id, version_number, content, created_by, kind, label, content_hash, created_at)
+           values ($1,$2,$3,'x',$4,$5,$6,$7)`,
+          [id, n, JSON.stringify(content(['k' + n])), kind, label, crypto.randomBytes(32).toString('hex'), new Date(NOW.getTime() - ageMs)]);
+        // two ancient versions of each protected kind, in the same week as an auto version
+        await mk('named', 90 * D, 1, 'Keep'); await mk('named', 90 * D + H, 2, 'Keep too');
+        await mk('restore', 90 * D, 3); await mk('pre_restore', 90 * D, 4);
+        // autos: three on one day 3 days ago (keep newest), two in the last 24h (keep both)
+        await mk('auto', 3 * D, 5); await mk('auto', 3 * D + H, 6); await mk('auto', 3 * D + 2 * H, 7);
+        await mk('auto', 2 * H, 8); await mk('auto', 1 * H, 9);
+        await pg.query('update diagrams set version_seq = 9 where id=$1', [id]);
+        // a save at NOW (latest version is 1h old: throttle passes) triggers the prune
+        await save(id, content(['fresh']), new Date(NOW.getTime() + 10 * MIN));
+        const vs = await allVersions(id);
+        const nums = vs.map((v) => v.n);
+        expect(nums).toEqual(expect.arrayContaining([1, 2, 3, 4, 5, 8, 9, 10]));
+        expect(nums).not.toContain(6);
+        expect(nums).not.toContain(7);
+        expect(vs.find((v) => v.n === 10).kind).toBe('auto');
+      });
+
+      test('an auto version referenced by a restore row survives prune (old, same-week, and beyond the cap)', async () => {
+        const id = await newDiagram();
+        const NOW = new Date('2026-06-15T12:00:00Z');
+        const ins = (n, kind, ageMs, extra = null) => pg.query(
+          `insert into diagram_versions (diagram_id, version_number, content, created_by, kind, content_hash, restored_from_version_id, created_at)
+           values ($1,$2,$3,'x',$4,$5,$6,$7) returning id`,
+          [id, n, JSON.stringify(content(['r' + n])), kind, crypto.randomBytes(32).toString('hex'), extra, new Date(NOW.getTime() - ageMs)]);
+        const src = (await ins(1, 'auto', 90 * D)).rows[0].id;           // old, would be thinned
+        const twin = (await ins(2, 'auto', 90 * D + H)).rows[0].id;     // same week, unreferenced: pruned
+        await ins(3, 'restore', 80 * D, src);
+        for (let i = 4; i <= 110; i += 1) await ins(i, 'auto', (111 - i) * 5 * MIN); // pushes past the cap
+        await pg.query('update diagrams set version_seq = 110 where id=$1', [id]);
+        await save(id, content(['trigger']), new Date(NOW.getTime() + 11 * MIN));
+        const rows = (await pg.query('select id, kind, restored_from_version_id rf from diagram_versions where diagram_id=$1', [id])).rows;
+        expect(rows.find((r) => r.id === src)).toBeTruthy();
+        expect(rows.find((r) => r.id === twin)).toBeFalsy();
+        expect(rows.find((r) => r.kind === 'restore').rf).toBe(src);
+        expect(rows.filter((r) => r.kind === 'auto' && r.id !== src)).toHaveLength(100);
+      });
+
+      test('cap: 100 auto versions per diagram, oldest dropped, named untouched', async () => {
+        const id = await newDiagram();
+        const NOW = new Date('2026-06-15T12:00:00Z');
+        for (let i = 1; i <= 105; i += 1) await seedAuto(id, (106 - i) * 5 * MIN, NOW, i); // 8.8h span, all within 24h
+        await pg.query("insert into diagram_versions (diagram_id, version_number, content, created_by, kind, label, created_at) values ($1,106,'{}','x','named','N',$2)", [id, new Date(NOW.getTime() - 400 * D)]);
+        await pg.query('update diagrams set version_seq = 106 where id=$1', [id]);
+        await save(id, content(['cap']), new Date(NOW.getTime() + 11 * MIN)); // creates #107 then prunes to 100 autos
+        const vs = await allVersions(id);
+        expect(vs.filter((v) => v.kind === 'auto')).toHaveLength(100);
+        expect(vs.filter((v) => v.kind === 'named')).toHaveLength(1);
+        expect(vs.map((v) => v.n)).toContain(107);
+        expect(vs.map((v) => v.n)).not.toContain(1);
+      });
+    });
+  });
 });
