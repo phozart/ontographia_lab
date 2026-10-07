@@ -382,6 +382,26 @@ dbDescribe('versionRepository (throwaway database)', () => {
         expect(vs.find((v) => v.n === 10).kind).toBe('auto');
       });
 
+      test('an auto version referenced by a restore row survives prune (old, same-week, and beyond the cap)', async () => {
+        const id = await newDiagram();
+        const NOW = new Date('2026-06-15T12:00:00Z');
+        const ins = (n, kind, ageMs, extra = null) => pg.query(
+          `insert into diagram_versions (diagram_id, version_number, content, created_by, kind, content_hash, restored_from_version_id, created_at)
+           values ($1,$2,$3,'x',$4,$5,$6,$7) returning id`,
+          [id, n, JSON.stringify(content(['r' + n])), kind, crypto.randomBytes(32).toString('hex'), extra, new Date(NOW.getTime() - ageMs)]);
+        const src = (await ins(1, 'auto', 90 * D)).rows[0].id;           // old, would be thinned
+        const twin = (await ins(2, 'auto', 90 * D + H)).rows[0].id;     // same week, unreferenced: pruned
+        await ins(3, 'restore', 80 * D, src);
+        for (let i = 4; i <= 110; i += 1) await ins(i, 'auto', (111 - i) * 5 * MIN); // pushes past the cap
+        await pg.query('update diagrams set version_seq = 110 where id=$1', [id]);
+        await save(id, content(['trigger']), new Date(NOW.getTime() + 11 * MIN));
+        const rows = (await pg.query('select id, kind, restored_from_version_id rf from diagram_versions where diagram_id=$1', [id])).rows;
+        expect(rows.find((r) => r.id === src)).toBeTruthy();
+        expect(rows.find((r) => r.id === twin)).toBeFalsy();
+        expect(rows.find((r) => r.kind === 'restore').rf).toBe(src);
+        expect(rows.filter((r) => r.kind === 'auto' && r.id !== src)).toHaveLength(100);
+      });
+
       test('cap: 100 auto versions per diagram, oldest dropped, named untouched', async () => {
         const id = await newDiagram();
         const NOW = new Date('2026-06-15T12:00:00Z');
