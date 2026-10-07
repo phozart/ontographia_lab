@@ -6,12 +6,13 @@ import { withDiagramAuth } from '../../../../../lib/authz/next';
 import { can } from '../../../../../lib/authz/policy';
 import { commentRepository } from '../../../../../lib/commentRepository';
 import { isUuid, validateBody } from '../../../../../lib/comments/validate';
-import { badRequest, notFound, sendValidation, withCommentErrors } from '../../../../../lib/comments/http';
+import { allowEdit, badRequest, notFound, sendValidation, withCommentErrors } from '../../../../../lib/comments/http';
 
 async function handleEdit(req, res, { diagram, user }) {
   if (req.body === null || typeof req.body !== 'object' || Array.isArray(req.body)) return badRequest(res, 'Request body must be a JSON object');
   const body = validateBody(req.body.body);
   if (!body.ok) return sendValidation(res, body);
+  if (!(await allowEdit(req, res, user.id))) return undefined;
   return withCommentErrors(res, async () => {
     const comment = await commentRepository.editComment(diagram.id, req.query.c, body.value, { userId: user.id });
     if (!comment) return notFound(res, 'Comment');

@@ -5,7 +5,7 @@
 import { withDiagramAuth } from '../../../../../../lib/authz/next';
 import { commentRepository } from '../../../../../../lib/commentRepository';
 import { isUuid, validateStatusPatch } from '../../../../../../lib/comments/validate';
-import { actorFrom, notFound, sendValidation, withCommentErrors } from '../../../../../../lib/comments/http';
+import { actorFrom, allowEdit, notFound, sendValidation, withCommentErrors } from '../../../../../../lib/comments/http';
 
 async function handleGet(req, res, { diagram }) {
   return withCommentErrors(res, async () => {
@@ -19,6 +19,7 @@ async function handleGet(req, res, { diagram }) {
 async function handlePatch(req, res, { diagram, user }) {
   const status = validateStatusPatch(req.body);
   if (!status.ok) return sendValidation(res, status);
+  if (!(await allowEdit(req, res, user.id))) return undefined;
   return withCommentErrors(res, async () => {
     const thread = await commentRepository.setStatus(diagram.id, req.query.t, status.value, actorFrom(user));
     if (!thread) return notFound(res);

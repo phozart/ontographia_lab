@@ -711,12 +711,12 @@ export function DetachedComments({ comments, onSelect, activeId }) {
 }
 
 // One-time import prompt for browser-only comments (Q-C1).
-export function LegacyImportPrompt({ count, importing, onImport, onDiscard }) {
+export function LegacyImportPrompt({ count, importing, notice, onImport, onDiscard }) {
   if (!count) return null;
   return (
     <div className="ds-comment-import" role="region" aria-label="Import local comments" style={{ ...floatingBase, left: '50%', top: 16, transform: 'translateX(-50%)', padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'center' }}>
-      <span>{count} comment{count === 1 ? '' : 's'} saved only in this browser. Import {count === 1 ? 'it' : 'them'} to this diagram?</span>
-      <button type="button" onClick={onImport} disabled={importing}>{importing ? 'Importing...' : 'Import'}</button>
+      <span>{notice || `${count} comment${count === 1 ? '' : 's'} saved only in this browser. Import ${count === 1 ? 'it' : 'them'} to this diagram?`}</span>
+      <button type="button" onClick={onImport} disabled={importing}>{importing ? 'Importing...' : (notice ? 'Continue' : 'Import')}</button>
       <button type="button" onClick={onDiscard} disabled={importing}>Discard</button>
     </div>
   );
@@ -736,3 +736,13 @@ export function CommentErrorBanner({ error, onDismiss }) {
 export { useComments };
 
 export default { CommentMarker, CommentThread, NewCommentInput, useComments };
+
+// Shown when the thread list hit the client paging cap (10 x 100).
+export function TruncatedNotice({ truncated }) {
+  if (!truncated) return null;
+  return (
+    <div className="ds-comment-truncated" role="status" style={{ ...floatingBase, left: '50%', bottom: 16, transform: 'translateX(-50%)', padding: '8px 14px' }}>
+      Showing the first 1000 threads
+    </div>
+  );
+}

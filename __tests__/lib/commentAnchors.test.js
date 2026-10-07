@@ -43,7 +43,7 @@ describe('legacy localStorage import plan (Q-C1)', () => {
     ];
     const plan = planImport(legacy, els);
     expect(plan).toHaveLength(2);
-    expect(plan[0]).toEqual({ anchor: { type: 'element', targetId: 'a', x: 10, y: 5, fallbackX: 110, fallbackY: 55 }, body: 'on a', replies: ['r1', 'r2'], resolved: true });
+    expect(plan[0]).toMatchObject({ anchor: { type: 'element', targetId: 'a', x: 10, y: 5, fallbackX: 110, fallbackY: 55 }, body: 'on a', replies: ['r1', 'r2'], resolved: true });
     expect(plan[1].anchor).toEqual({ type: 'canvas', x: 1, y: 2 });
   });
   test('bodies are clamped to the server limit', () => {
@@ -64,6 +64,9 @@ describe('validate', () => {
     expect(validateBody('<script>alert(1)</script>')).toEqual({ ok: true, value: '<script>alert(1)</script>' });
     expect(validateBody('x'.repeat(10001)).status).toBe(413);
     expect(validateBody('\n\t ').ok).toBe(false);
+    // counted in characters (code points) like the DB constraint, not UTF-16 units
+    expect(validateBody('\u{1F600}'.repeat(10000)).ok).toBe(true);
+    expect(validateBody('\u{1F600}'.repeat(10001)).status).toBe(413);
   });
   test('anchor normalizes to known keys only', () => {
     const r = validateAnchor({ type: 'element', targetId: 'e', x: 1, y: 2, fallbackX: 3, fallbackY: 4, evil: 'x' });

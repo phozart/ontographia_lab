@@ -8,7 +8,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { commentsApi } from '../../../lib/comments/client';
 import { resolveMarker, elementAtPoint } from '../../../lib/comments/anchors';
-import { readLegacyComments, clearLegacyComments, planImport } from '../../../lib/comments/legacyImport';
+import { readLegacyComments, clearLegacyComments, writeLegacyComments, planImport } from '../../../lib/comments/legacyImport';
 
 const REFRESH_MS = 60 * 1000;
 const tempId = (p) => `tmp_${p}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -53,6 +53,8 @@ export function useComments(diagramId, { elements = [], connections = [], curren
   const [error, setError] = useState(null);
   const [legacyCount, setLegacyCount] = useState(0);
   const [importing, setImporting] = useState(false);
+  const [importNotice, setImportNotice] = useState(null);
+  const [truncated, setTruncated] = useState(false);
   const elementsRef = useRef(elements);
   elementsRef.current = elements;
 
@@ -60,6 +62,7 @@ export function useComments(diagramId, { elements = [], connections = [], curren
     if (!diagramId) return;
     try {
       const items = await commentsApi.listAll(diagramId);
+      setTruncated(items.truncated === true);
       // Keep optimistic rows that have not been confirmed yet; the server list is otherwise authoritative.
       setThreads((prev) => [...items, ...prev.filter((t) => t.pending)]);
     } catch (e) {
@@ -198,23 +201,52 @@ export function useComments(diagramId, { elements = [], connections = [], curren
   const cancelNewComment = useCallback(() => setNewCommentPosition(null), []);
   const clearError = useCallback(() => setError(null), []);
 
-  // Q-C1: post the browser-only comments through the normal endpoints, then clear the key.
+  // Q-C1: post the browser-only comments through the normal endpoints. Each item is removed from the stored
+  // array once fully posted, so a retry (after a 429 or an error) resumes instead of duplicating threads.
   const importLegacy = useCallback(async () => {
     if (!diagramId || !canComment || importing) return;
     setImporting(true);
     setError(null);
+    setImportNotice(null);
+    const storage = window.localStorage;
+    let remaining = readLegacyComments(storage, diagramId);
+    const plan = planImport(remaining, elementsRef.current);
+    const total = plan.length;
+    let done = 0;
+    const save = () => {
+      writeLegacyComments(storage, diagramId, remaining);
+      setLegacyCount(planImport(remaining, []).length);
+    };
     try {
-      const plan = planImport(readLegacyComments(window.localStorage, diagramId), elementsRef.current);
       for (const item of plan) {
-        const t = await commentsApi.createThread(diagramId, item.anchor, item.body);
-        for (const r of item.replies) await commentsApi.reply(diagramId, t.id, r);
-        if (item.resolved) await commentsApi.setStatus(diagramId, t.id, 'resolved');
+        const src = item.source;
+        let threadId = item.threadId;
+        let replies = item.replies;
+        try {
+          if (!threadId) threadId = (await commentsApi.createThread(diagramId, item.anchor, item.body)).id;
+          while (replies.length) {
+            await commentsApi.reply(diagramId, threadId, replies[0]);
+            replies = replies.slice(1);
+          }
+          if (item.resolved) await commentsApi.setStatus(diagramId, threadId, 'resolved');
+        } catch (e) {
+          // Remember how far this item got so the retry continues it rather than re-creating the thread.
+          if (threadId) {
+            const progressed = { ...src, _importedThreadId: threadId, replies: replies.map((text) => ({ text })) };
+            remaining = remaining.map((r) => (r === src ? progressed : r));
+            save();
+          }
+          throw e;
+        }
+        remaining = remaining.filter((r) => r !== src);
+        save();
+        done += 1;
       }
-      clearLegacyComments(window.localStorage, diagramId);
+      clearLegacyComments(storage, diagramId);
       setLegacyCount(0);
     } catch (e) {
-      // The key is kept so the user can retry; threads already posted would be duplicated on a retry.
-      fail(e);
+      if (e && e.status === 429) setImportNotice(`Imported ${done} of ${total} \u2014 continue in a minute`);
+      else fail(e);
     } finally {
       setImporting(false);
       load();
@@ -224,6 +256,7 @@ export function useComments(diagramId, { elements = [], connections = [], curren
   const discardLegacy = useCallback(() => {
     clearLegacyComments(window.localStorage, diagramId);
     setLegacyCount(0);
+    setImportNotice(null);
   }, [diagramId]);
 
   const detachedComments = useMemo(() => comments.filter((c) => c.detached), [comments]);
@@ -231,7 +264,7 @@ export function useComments(diagramId, { elements = [], connections = [], curren
   return {
     comments, detachedComments, activeComment, setActiveComment, newCommentPosition,
     addComment, addReply, resolveComment, deleteComment, startNewComment, cancelNewComment,
-    error, clearError, legacyCount, importing, importLegacy, discardLegacy, reload: load,
+    error, clearError, legacyCount, importing, importNotice, truncated, importLegacy, discardLegacy, reload: load,
   };
 }
 

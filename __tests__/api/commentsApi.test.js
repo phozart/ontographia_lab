@@ -250,6 +250,22 @@ describe('POST /threads/[t]/comments', () => {
   });
 });
 
+describe('edit / resolve rate limit', () => {
+  test('resolve rate limited -> 429 with the error shape and nothing written', async () => {
+    mockLimited = true;
+    const res = await call(threadHandler, { method: 'PATCH', query: { id: ID, t: T }, body: { status: 'resolved' } });
+    expect(res.statusCode).toBe(429);
+    expect(res.body.error).toBeTruthy();
+    expect(repo.setStatus).not.toHaveBeenCalled();
+  });
+  test('edit rate limited -> 429 and nothing written', async () => {
+    mockLimited = true;
+    const res = await call(commentHandler, { method: 'PATCH', query: { id: ID, c: C }, body: { body: 'x' } });
+    expect(res.statusCode).toBe(429);
+    expect(repo.editComment).not.toHaveBeenCalled();
+  });
+});
+
 describe('PATCH/DELETE /comments/[c]', () => {
   test('edit passes the author check to the repository', async () => {
     await call(commentHandler, { method: 'PATCH', query: { id: ID, c: C }, body: { body: 'edited' } });

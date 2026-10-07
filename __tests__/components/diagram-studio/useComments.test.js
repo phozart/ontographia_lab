@@ -10,7 +10,7 @@ jest.mock('../../../lib/comments/client', () => ({
 }));
 import { commentsApi as api } from '../../../lib/comments/client';
 import { useComments } from '../../../components/diagram-studio/ui/useComments';
-import { CommentThread, DetachedComments } from '../../../components/diagram-studio/ui/CommentSystem';
+import { CommentThread, DetachedComments, TruncatedNotice, LegacyImportPrompt } from '../../../components/diagram-studio/ui/CommentSystem';
 
 const ME = { id: 'u1', name: 'Me', image: null };
 const els = [{ id: 'a', x: 100, y: 100, width: 50, height: 50 }];
@@ -134,6 +134,63 @@ test('a failed import keeps the key so it can be retried', async () => {
   await act(async () => { await result.current.importLegacy(); });
   expect(window.localStorage.getItem('comments-d1')).not.toBeNull();
   expect(result.current.error).toBe('down');
+});
+
+test('import hitting the create limit stops gracefully; the retry resumes without duplicates', async () => {
+  window.localStorage.setItem('comments-d1', JSON.stringify([
+    { text: 'one', x: 1, y: 1 }, { text: 'two', x: 2, y: 2, replies: [{ text: 'r2' }], resolved: true },
+    { text: 'three', x: 3, y: 3 }, { text: 'four', x: 4, y: 4 },
+  ]));
+  let creates = 0;
+  let limitAfter = 2;
+  api.createThread.mockImplementation(async (d, a, body) => {
+    if (creates >= limitAfter) { const e = new Error('Too many requests'); e.status = 429; throw e; }
+    creates += 1;
+    return thread({ id: `t-${body}` });
+  });
+  api.reply.mockResolvedValue({});
+  api.setStatus.mockResolvedValue({});
+  const { result } = setup();
+  await waitFor(() => expect(result.current.legacyCount).toBe(4));
+  await act(async () => { await result.current.importLegacy(); });
+  expect(result.current.importNotice).toBe('Imported 2 of 4 \u2014 continue in a minute');
+  expect(result.current.error).toBeNull();
+  expect(result.current.legacyCount).toBe(2);
+  expect(JSON.parse(window.localStorage.getItem('comments-d1')).map((c) => c.text)).toEqual(['three', 'four']);
+  limitAfter = 99;
+  await act(async () => { await result.current.importLegacy(); });
+  const posted = api.createThread.mock.calls.map((c) => c[2]).filter((b, i, arr) => arr.indexOf(b) === i);
+  expect(api.createThread.mock.calls.filter((c) => ['one', 'two'].includes(c[2]))).toHaveLength(2);
+  expect(posted).toEqual(['one', 'two', 'three', 'four']);
+  expect(window.localStorage.getItem('comments-d1')).toBeNull();
+  expect(result.current.legacyCount).toBe(0);
+});
+
+test('a limit hit while replying resumes that thread instead of re-creating it', async () => {
+  window.localStorage.setItem('comments-d1', JSON.stringify([{ text: 'one', x: 1, y: 1, replies: [{ text: 'a' }, { text: 'b' }] }]));
+  api.createThread.mockResolvedValue(thread({ id: 'tx' }));
+  api.reply.mockResolvedValueOnce({}).mockRejectedValueOnce(Object.assign(new Error('limit'), { status: 429 })).mockResolvedValue({});
+  const { result } = setup();
+  await waitFor(() => expect(result.current.legacyCount).toBe(1));
+  await act(async () => { await result.current.importLegacy(); });
+  await act(async () => { await result.current.importLegacy(); });
+  expect(api.createThread).toHaveBeenCalledTimes(1);
+  expect(api.reply.mock.calls.map((c) => c[2])).toEqual(['a', 'b', 'b']);
+  expect(window.localStorage.getItem('comments-d1')).toBeNull();
+});
+
+test('the import prompt shows the notice and a Continue action', () => {
+  render(<LegacyImportPrompt count={2} importing={false} notice="Imported 2 of 4 — continue in a minute" onImport={() => {}} onDiscard={() => {}} />);
+  expect(screen.getByText(/Imported 2 of 4/)).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+});
+
+test('a truncated thread list sets the flag and the notice renders', async () => {
+  api.listAll.mockResolvedValue(Object.assign([thread()], { truncated: true }));
+  const { result } = setup();
+  await waitFor(() => expect(result.current.truncated).toBe(true));
+  render(<TruncatedNotice truncated />);
+  expect(screen.getByText('Showing the first 1000 threads')).toBeTruthy();
 });
 
 describe('rendering', () => {

@@ -24,7 +24,7 @@ import { useThumbnailCapture } from './hooks/useThumbnailCapture';
 import ShortcutsHelp, { useShortcutsHelp } from './ui/ShortcutsHelp';
 import KeyboardShortcutsOverlay, { useKeyboardShortcutsOverlay } from './ui/KeyboardShortcutsOverlay';
 import ContextMenu, { useContextMenu } from './ui/ContextMenu';
-import { CommentMarker, CommentThread, NewCommentInput, DetachedComments, LegacyImportPrompt, CommentErrorBanner, useComments } from './ui/CommentSystem';
+import { CommentMarker, CommentThread, NewCommentInput, DetachedComments, LegacyImportPrompt, TruncatedNotice, CommentErrorBanner, useComments } from './ui/CommentSystem';
 import StarterPackModal from './StarterPackModal';
 import { LogoIcon } from '../ui/Logo';
 import { ExportManager, downloadExport } from './export/ExportManager';
@@ -323,6 +323,8 @@ function DiagramStudioInner({
     clearError: clearCommentError,
     legacyCount,
     importing: importingComments,
+    importNotice,
+    truncated: commentsTruncated,
     importLegacy,
     discardLegacy,
   } = useComments(diagramId, { elements, connections, currentUser, canComment });
@@ -872,7 +874,8 @@ function DiagramStudioInner({
               {showComments && (
                 <DetachedComments comments={detachedComments} activeId={activeComment?.id} onSelect={(c) => setActiveComment(c)} />
               )}
-              <LegacyImportPrompt count={legacyCount} importing={importingComments} onImport={importLegacy} onDiscard={discardLegacy} />
+              {showComments && <TruncatedNotice truncated={commentsTruncated} />}
+              <LegacyImportPrompt count={legacyCount} importing={importingComments} notice={importNotice} onImport={importLegacy} onDiscard={discardLegacy} />
             </div>
 
             {/* Right Properties Panel - On-demand in floating UI mode */}
