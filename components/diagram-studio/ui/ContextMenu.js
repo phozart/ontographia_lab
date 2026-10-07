@@ -2,6 +2,7 @@
 // Right-click context menu for canvas and elements
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useFloatingPlacement } from './positioning';
 import { useDiagram, useDiagramSelection } from '../DiagramContext';
 
 // MUI Icons
@@ -48,31 +49,14 @@ export default function ContextMenu({
   } = useDiagram();
   const { selectedIds, clearSelection } = useDiagramSelection();
 
-  // Adjust menu position to stay in viewport
-  const [adjustedPosition, setAdjustedPosition] = useState(position);
-
-  useEffect(() => {
-    if (menuRef.current && position) {
-      const rect = menuRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-
-      let x = position.x;
-      let y = position.y;
-
-      // Adjust horizontal position
-      if (x + rect.width > viewportWidth - 10) {
-        x = viewportWidth - rect.width - 10;
-      }
-
-      // Adjust vertical position
-      if (y + rect.height > viewportHeight - 10) {
-        y = viewportHeight - rect.height - 10;
-      }
-
-      setAdjustedPosition({ x, y });
-    }
-  }, [position]);
+  // Collision-aware placement: flips above the click point near the bottom edge and
+  // stays clear of the title bar / side panels. Measured before first paint.
+  const placement = useFloatingPlacement(
+    menuRef,
+    () => (position ? { left: position.x, top: position.y, width: 0, height: 0 } : null),
+    { preferred: 'bottom', align: 'start', gap: 0 },
+    [position?.x, position?.y],
+  );
 
   // Close on click outside
   useEffect(() => {
@@ -220,8 +204,11 @@ export default function ContextMenu({
       ref={menuRef}
       className="ds-context-menu"
       style={{
-        left: adjustedPosition.x,
-        top: adjustedPosition.y,
+        left: placement.left,
+        top: placement.top,
+        visibility: placement.ready ? 'visible' : 'hidden',
+        maxHeight: placement.maxHeight,
+        overflowY: 'auto',
       }}
     >
       {/* Element-specific actions */}

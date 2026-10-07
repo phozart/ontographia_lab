@@ -2,6 +2,8 @@
 // State management for DiagramStudio component
 
 import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { computeFitForCanvas, FIT_PADDING } from './viewportFit';
+import { getObstacleRects, getAvoidRects } from './ui/positioning';
 import { useSession } from 'next-auth/react';
 import { generateId } from './utils/ids';
 import { normalizeDiagramContent } from './migrations/normalizeContent';
@@ -1539,44 +1541,27 @@ export function useDiagramViewport() {
     setViewport({ x: viewportX, y: viewportY, scale });
   }, [setViewport]);
 
-  // Zoom to fit all elements in view
-  const zoomToFitAll = useCallback((elements, containerWidth = 1200, containerHeight = 800, padding = 60) => {
+  // Zoom to fit all elements in view. Single fit implementation shared by the Fit button,
+  // the F / 0 shortcuts and the context menu: fits into the live canvas area minus the title
+  // bar and side panels. containerWidth/Height are only a fallback when the DOM is unavailable.
+  const zoomToFitAll = useCallback((elements, containerWidth = 1200, containerHeight = 800, padding = FIT_PADDING) => {
     if (!elements || elements.length === 0) {
       resetZoom();
       return;
     }
-
-    // Find bounding box of all elements
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    elements.forEach(el => {
-      const width = el.size?.width || 100;
-      const height = el.size?.height || 60;
-      minX = Math.min(minX, el.x);
-      minY = Math.min(minY, el.y);
-      maxX = Math.max(maxX, el.x + width);
-      maxY = Math.max(maxY, el.y + height);
+    const container = typeof document !== 'undefined' ? document.querySelector('.ds-canvas-container') : null;
+    const fit = computeFitForCanvas(elements, {
+      container,
+      obstacles: getObstacleRects(),
+      avoid: getAvoidRects(['.ds-minimap']),
+      padding,
+      fallback: { width: containerWidth, height: containerHeight },
     });
-
-    const width = maxX - minX;
-    const height = maxY - minY;
-
-    if (width <= 0 || height <= 0) {
+    if (!fit) {
       resetZoom();
       return;
     }
-
-    // Calculate scale
-    const scaleX = (containerWidth - padding * 2) / width;
-    const scaleY = (containerHeight - padding * 2) / height;
-    const scale = Math.min(Math.max(0.25, Math.min(scaleX, scaleY)), 2);
-
-    // Center
-    const centerX = minX + width / 2;
-    const centerY = minY + height / 2;
-    const viewportX = -(centerX - (containerWidth / 2) / scale);
-    const viewportY = -(centerY - (containerHeight / 2) / scale);
-
-    setViewport({ x: viewportX, y: viewportY, scale });
+    setViewport(fit);
   }, [setViewport, resetZoom]);
 
   return { viewport, setViewport, zoomIn, zoomOut, resetZoom, pan, zoomToFrame, zoomToFitAll };
