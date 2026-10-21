@@ -19,6 +19,7 @@ import PanToolIcon from '@mui/icons-material/PanTool';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import StickyNote2OutlinedIcon from '@mui/icons-material/StickyNote2Outlined';
 import CreateOutlinedIcon from '@mui/icons-material/CreateOutlined';
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
 import ZoomInIcon from '@mui/icons-material/ZoomIn';
@@ -405,6 +406,13 @@ export default function TitleBar({
                         <span className="ds-key-hint">N</span>
                       </button>
                       <button
+                        className={`ds-compact-option ${activeTool === 'table' ? 'active' : ''}`}
+                        onClick={() => { setActiveTool('table'); setShowToolsMenu(false); }}
+                      >
+                        <TableChartOutlinedIcon style={{ fontSize: 18 }} />
+                        <span>Table</span>
+                      </button>
+                      <button
                         className={`ds-compact-option ${activeTool === 'draw' ? 'active' : ''}`}
                         onClick={() => { setActiveTool('draw'); setDrawingTool?.('pen'); setShowToolsMenu(false); }}
                       >
@@ -582,6 +590,12 @@ export default function TitleBar({
                     </div>
                   )}
                 </div>
+                <ToolButton
+                  icon={<TableChartOutlinedIcon />}
+                  active={activeTool === 'table'}
+                  onClick={() => setActiveTool(activeTool === 'table' ? 'select' : 'table')}
+                  tooltip="Table (click the canvas to place)"
+                />
                 <div className="ds-tool-dropdown-wrapper" ref={drawingMenuRef}>
                   <ToolButton
                     icon={<CreateOutlinedIcon />}

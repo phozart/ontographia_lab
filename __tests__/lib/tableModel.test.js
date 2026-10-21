@@ -1,7 +1,7 @@
 import {
   createEmptyTable, setCell, addRow, removeRow, moveRow, addColumn, removeColumn, moveColumn, renameColumn,
   setColumnType, sortByColumn, setRowLink, tableFromGrid, coerceCell, cellText, tableMetrics, tableElementSize,
-  columnWidths, LAYOUT, TableError, DEFAULT_COLUMN_WIDTH,
+  columnWidths, LAYOUT, TableError, DEFAULT_COLUMN_WIDTH, pasteGrid,
 } from '../../lib/table/tableModel';
 import { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS } from '../../lib/diagramLimits';
 
@@ -161,5 +161,23 @@ describe('layout metrics', () => {
     const t = sample();
     const w = columnWidths(t, LAYOUT.gutter + 6 * DEFAULT_COLUMN_WIDTH);
     expect(w).toEqual([320, 320, 320]);
+  });
+});
+
+describe('pasteGrid (paste a range into a table)', () => {
+  test('writes from the active cell, adds rows, skips columns that do not exist and values that do not fit', () => {
+    const t = setColumnType(sample(), 'col-t2', 'number').table;
+    const r = pasteGrid(t, [['a', '1', 'x'], ['b', 'oops', 'y'], ['c', '3', 'z', 'extra']], { rowId: 'row-t4', columnId: 'col-t1' }, fresh);
+    expect(r.table.rows).toHaveLength(3);
+    expect(r.table.rows[0].cells).toEqual({ 'col-t1': 'a', 'col-t2': 1, 'col-t3': 'x' });
+    expect(r.table.rows[1].cells).toEqual({ 'col-t1': 'b', 'col-t3': 'y' });
+    expect(r.skipped).toBe(2); // "oops" and "extra"
+    expect(r.written).toBe(8);
+  });
+  test('starts mid-table and respects the row cap', () => {
+    const t = { ...sample(), rows: Array.from({ length: MAX_TABLE_ROWS }, (_, i) => ({ id: `row-${i}`, cells: {} })) };
+    const r = pasteGrid(t, [['a'], ['b']], { rowId: `row-${MAX_TABLE_ROWS - 1}`, columnId: 'col-t1' }, fresh);
+    expect(r.table.rows).toHaveLength(MAX_TABLE_ROWS);
+    expect(r.skipped).toBe(1);
   });
 });

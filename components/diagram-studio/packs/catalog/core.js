@@ -51,7 +51,7 @@ export const stencils = [
     shape: 'table',
     icon: '▦',
     color: '#4FB3CE',
-    defaultSize: { width: 508, height: 130 },
+    defaultSize: { width: 520, height: 130 },
     ports: [
       { id: 'top', position: 'top' },
       { id: 'right', position: 'right' },

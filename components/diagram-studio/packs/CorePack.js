@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { stencils, connectionTypes } from './catalog/core';
+import TableNode from '../elements/table/TableNode';
 
 // ============ STENCILS ============
 
@@ -215,6 +216,8 @@ function renderNode(element, stencil, isSelected) {
       return <FrameNode element={element} stencil={stencil} isSelected={isSelected} />;
     case 'section':
       return <SectionNode element={element} stencil={stencil} />;
+    case 'table':
+      return <TableNode element={element} stencil={stencil} isSelected={isSelected} />;
     case 'diamond':
       return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} />;
     default:
