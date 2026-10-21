@@ -27,7 +27,9 @@ export default async function handler(req, res) {
     try {
       const result = await query(
         `SELECT id, email, name, image, provider, role, status,
-                subscription_tier, created_at, approved_at, last_login
+                subscription_tier, created_at, approved_at, last_login,
+                (SELECT COUNT(*)::int FROM oauth_grants g
+                  WHERE g.user_id = users.id AND g.revoked_at IS NULL AND (g.expires_at IS NULL OR g.expires_at > NOW())) AS connected_apps
          FROM users
          ORDER BY created_at DESC`
       );

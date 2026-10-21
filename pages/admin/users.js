@@ -468,6 +468,7 @@ export default function AdminUsersPage() {
                       <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Role</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Joined</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }} title="Connected apps (OAuth), count only">Apps</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>
                         Actions
                       </TableCell>
@@ -519,6 +520,11 @@ export default function AdminUsersPage() {
                             {formatDistanceToNow(new Date(user.created_at), {
                               addSuffix: true,
                             })}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ color: 'var(--text-muted)' }}>
+                            {user.connected_apps || 0}
                           </Typography>
                         </TableCell>
                         <TableCell align="right">

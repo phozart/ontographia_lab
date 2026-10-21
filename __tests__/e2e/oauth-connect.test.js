@@ -269,6 +269,42 @@ describe('Connect Claude through OAuth (O2)', () => {
     expect(cb.searchParams.get('code')).toBeNull();
   });
 
+  test('Connected apps (O3): the Account page lists the connection and Disconnect cuts it off on the very next request', async () => {
+    const { page } = await session('user');
+    const k = pkce();
+    const cb = await connect(page, authorizeUrl(k), {
+      email: process.env.QA_USER_EMAIL, password: process.env.QA_USER_PASSWORD,
+      decide: async (p) => { await p.click('button[value="approve"]'); },
+    });
+    const tokens = await exchange(cb, k);
+    const client = await mcpClient(tokens.access_token);
+    expect((await client.listTools()).tools.length).toBeGreaterThan(0);
+    await client.close();
+
+    await page.goto(`${BASE_URL}/account`, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('[data-testid="connected-app-row"]');
+    const rows = await page.$$('[data-testid="connected-app-row"]');
+    const first = await page.evaluate((r) => r.textContent, rows[0]); // newest first: this connection
+    expect(first).toContain('127.0.0.1:3268');
+    expect(first).toMatch(/Viewer · All my diagrams/);
+    expect(first).toMatch(/last used/);
+    const section = await page.$('[data-testid="connected-apps"]');
+    expect(await page.evaluate((el) => el.textContent, section)).toMatch(/Connected apps/);
+    await shot(page, 'oauth-connected-apps.png');
+    const before = rows.length;
+    await page.evaluate(() => [...document.querySelector('[data-testid="connected-app-row"]').querySelectorAll('button')].find((b) => b.textContent === 'Disconnect').click());
+    await page.evaluate(() => [...document.querySelector('[data-testid="connected-app-row"]').querySelectorAll('button')].find((b) => b.textContent === 'Confirm disconnect').click());
+    await page.waitForFunction((n) => document.querySelectorAll('[data-testid="connected-app-row"]').length === n - 1, { timeout: 15000 }, before);
+
+    // the app's next call fails, its refresh token is dead, and it is asked to reconnect (401 with the challenge)
+    const call401 = await fetch(MCP, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${tokens.access_token}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });
+    expect(call401.status).toBe(401);
+    expect(call401.headers.get('www-authenticate')).toMatch(/invalid_token.*resource_metadata=/);
+    const r = await tokenRequest({ grant_type: 'refresh_token', client_id: CLIENT_ID, refresh_token: tokens.refresh_token });
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe('invalid_grant');
+  });
+
   test('Unknown client and a wrong redirect_uri are shown on the page and never redirected', async () => {
     const { page } = await session('user');
     const k = pkce();

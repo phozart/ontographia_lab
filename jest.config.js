@@ -34,6 +34,7 @@ const dbTests = [
   '<rootDir>/__tests__/lib/oauthConsent.test.js',
   '<rootDir>/__tests__/lib/oauthAllBoardsMcp.test.js',
   '<rootDir>/__tests__/lib/oauthEndpoints.test.js',
+  '<rootDir>/__tests__/lib/oauthConnectedApps.test.js',
   '<rootDir>/__tests__/scripts/migrate0010.test.js',
 ];
 

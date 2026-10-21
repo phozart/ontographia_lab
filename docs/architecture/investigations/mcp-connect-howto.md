@@ -159,3 +159,21 @@ Layouts: `tree` (top-down hierarchy), `mindmap`, `radial`, `flow`, `grid`, `clus
 - **Large boards:** at most 600 elements and 1,200 connections are drawn. Beyond that you get "too large" and a hint to narrow the focus.
 - **Privacy:** the picture travels inside the tool result and is shown to you only; it adds no tokens to the model's context, and the view makes no network request.
 
+## 7. Connect from claude.ai, Claude Desktop and the Claude mobile apps (OAuth)
+
+Hosted Claude apps cannot send a token header, so they sign in with OAuth instead (ADR-0005). Your lab administrator must have turned it on (`MCP_OAUTH_ENABLED=true`). Personal tokens (sections 1 to 6) keep working unchanged and are still the way to connect Claude Code, Cursor and VS Code.
+
+1. In Claude, open **Settings, Connectors, Add custom connector** (on Team and Enterprise plans an owner adds it for the organization). Give it a name and the URL `https://YOUR-HOST/api/mcp`. Leave the advanced client settings alone, or choose **Use Claude's published identity**.
+2. Claude opens a sign-in page on Ontographia Lab. Sign in if asked. The consent screen shows which app is asking (its host, for example `claude.ai`), where you will be sent back, and the account being connected. Only continue if you started the connection yourself just now.
+3. Pick the **access level**. **Viewer** (the default) reads diagrams; **Commenter** also comments; **Editor** also changes diagrams. Everything above what the app asked for is greyed out.
+   - Viewer and Commenter can cover all of your diagrams or only the ones you tick.
+   - **Editor** needs you to tick the diagrams Claude may change (1 to 50, from those you can edit), exactly like an editor personal token. Administrators additionally see **All boards I can edit**: Claude can then change any board you can edit (owned, or shared with you as Editor), including ones created later. Boards shared with you as viewer or commenter and other people's private boards stay out of reach, and an administrator who loses the admin role loses the write access at once. Every change is saved as a version you can restore from History.
+   - Optionally choose how long the connection lasts (default: until you disconnect).
+4. Press **Approve**. You are sent back to Claude, which then lists the tools. The same connection is used from Claude on the web, on desktop and on mobile (Claude syncs the connector across your devices).
+5. To upgrade or downgrade later, **disconnect** (below) and connect again with another level. Consent is always shown; there is no silent re-approval.
+
+**Connected apps.** Open **Account, API tokens** and scroll to **Connected apps**. Each row shows the app, the access level, how many diagrams it covers (expand to see them), when it was connected and when it was last used. **Disconnect** revokes the whole connection: the app's next request fails and Claude asks you to reconnect. A password reset disconnects every connected app. Access tokens last one hour and renew in the background; a connection that is not used for 30 days has to be reconnected.
+
+What the server does for you: it accepts only apps on its allowlist (`OAUTH_TRUSTED_CLIENT_IDS`, default Claude's hosted client), sends you back only to the redirect address that app registered, requires PKCE, binds the tokens to this MCP server, rotates refresh tokens and revokes the connection if a used one is replayed, and records `oauth.*` events in the audit trail. Diagram text is still treated as data, never as instructions.
+
+If the connector shows a connection error instead of the sign-in page, ask your administrator to check that `MCP_ALLOWED_ORIGINS` includes `https://claude.ai` and `https://claude.com`, that `/.well-known/oauth-protected-resource/api/mcp` and `/.well-known/oauth-authorization-server` return JSON, and that the reverse proxy forwards `/.well-known/` to the app.
