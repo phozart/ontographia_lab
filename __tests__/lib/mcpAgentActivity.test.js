@@ -145,6 +145,38 @@ describe('coverage: every tool is either a recorded single-board tool or an expl
   });
 });
 
+describe('resources are covered too', () => {
+  // Board resources must record a read; the others are static product data. A new resource must be classified here.
+  const BOARD = ['ontographia://diagrams/{id}', 'ontographia://diagrams/{id}/mermaid'];
+  const NOT_BOARD_TEMPLATES = ['ontographia://catalog/{packId}'];
+
+  test('every resource template is classified', async () => {
+    const client = await connect();
+    const t = (await client.listResourceTemplates()).resourceTemplates.map((r) => r.uriTemplate);
+    expect(t.filter((u) => !BOARD.includes(u) && !NOT_BOARD_TEMPLATES.includes(u))).toEqual([]);
+  });
+
+  test('every static resource is non-board (no board id in its uri)', async () => {
+    repo.listReadable.mockResolvedValue([]);
+    const client = await connect();
+    const uris = (await client.listResources()).resources.map((r) => r.uri);
+    expect(uris.filter((u) => /ontographia:\/\/diagrams\//.test(u))).toEqual([]);
+    for (const u of uris) await client.readResource({ uri: u }).catch(() => {});
+    expect(reg.size()).toBe(0); // reading static resources records nothing
+  });
+
+  test.each(BOARD)('%s records a read after the access check, and nothing when access is refused', async (tpl) => {
+    const uri = tpl.replace('{id}', A);
+    const client = await connect();
+    await client.readResource({ uri });
+    expect(agentsFor(OWNER)[0]).toMatchObject({ state: 'reading', tool: 'resource:diagram' });
+    reg.clear();
+    const denied = await connect(principal({ diagramScope: [B] }));
+    await denied.readResource({ uri }).catch(() => {});
+    expect(reg.size()).toBe(0);
+  });
+});
+
 describe('what is recorded', () => {
   test('writes that fail (revision conflict, rejected ops) are not recorded as edits', async () => {
     const client = await connect();

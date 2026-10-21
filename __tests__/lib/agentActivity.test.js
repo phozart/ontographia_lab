@@ -117,6 +117,24 @@ describe('separation, labels and limits', () => {
     expect(reg.agentsFor('d1', OTHER)[0].label).toBe('Agent for Peter');
   });
 
+  it('a name lookup in flight (or failed) is not retried on every call, only after a minute', () => {
+    note({ kind: 'write', userName: undefined });
+    expect(reg.needsName('d1', 'tok1')).toBe(true);
+    reg.markNameLookup('d1', 'tok1');
+    expect(reg.needsName('d1', 'tok1')).toBe(false);
+    t += 61_000;
+    note({ kind: 'write', userName: undefined });
+    expect(reg.needsName('d1', 'tok1')).toBe(true);
+  });
+
+  it('sweeps expired entries of boards nobody polls once the register grows past the threshold', () => {
+    const r2 = createAgentActivity({ now, sweepThreshold: 5 });
+    for (let i = 0; i < 6; i += 1) r2.note({ diagramId: `old${i}`, tokenId: 't', userId: ME, kind: 'write', tool: 'x' });
+    t += TTL_MS + 1;
+    r2.note({ diagramId: 'fresh', tokenId: 't', userId: ME, kind: 'write', tool: 'x' });
+    expect(r2.size()).toBe(1);
+  });
+
   it('caps the register at MAX_KEYS, evicting the least recently used', () => {
     const small = createAgentActivity({ now, maxKeys: 3 });
     for (const id of ['a', 'b', 'c']) small.note({ diagramId: 'd1', tokenId: id, userId: ME, kind: 'write', tool: 'x' });
