@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { stencils, connectionTypes } from './catalog/core';
+import DocCard from '../elements/doc/DocCard';
 
 // ============ STENCILS ============
 
@@ -217,6 +218,8 @@ function renderNode(element, stencil, isSelected) {
       return <SectionNode element={element} stencil={stencil} />;
     case 'diamond':
       return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} />;
+    case 'doc':
+      return <DocCard element={element} />;
     default:
       // Return undefined (not null) to allow default rendering for basic shapes
       // like rectangle, circle, text-block, divider
