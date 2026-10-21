@@ -455,7 +455,7 @@ export default function TableNode({ element, stencil, isSelected }) {
                 ) : (
                   <>
                     <span className="ds-tbl-hname" title={`${col.name} (${TYPE_LABEL[col.type]})`}>{col.name}</span>
-                    {col.type !== 'text' && <span className="ds-tbl-type" aria-hidden="true">{col.type === 'number' ? '#' : col.type === 'boolean' ? '✓' : '▾'}</span>}
+                    {col.type !== 'text' && <span className="ds-tbl-type" aria-hidden="true">{col.type === 'number' ? '#' : col.type === 'boolean' ? '✓' : '☰'}</span>}
                     {interactive && (
                       <>
                         <button type="button" className="ds-tbl-mini" aria-label={`Column ${col.name} options`} aria-haspopup="menu" data-testid="table-column-menu" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); openMenuAt(e.currentTarget, { kind: 'col', id: col.id }); }}>▾</button>

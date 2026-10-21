@@ -24,9 +24,10 @@ export default function CellEditor({ type, initial, options = [], onCommit, onCa
     const el = ref.current;
     if (!el) return;
     el.focus({ preventScroll: true });
-    const end = el.value.length;
-    el.setSelectionRange?.(end, end);
-  }, []);
+    // renaming a column replaces its name; editing a cell keeps the text and puts the caret at the end
+    if (type === 'name') el.select();
+    else el.setSelectionRange?.(el.value.length, el.value.length);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const finish = (nav) => {
     if (done.current) return;

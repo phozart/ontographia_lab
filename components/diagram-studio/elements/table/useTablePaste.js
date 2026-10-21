@@ -4,7 +4,7 @@
 // read-only viewers, and for text that is not a grid. Also reveals a table row's linked element (REVEAL_EVENT).
 
 import { useEffect, useRef } from 'react';
-import { useDiagram } from '../../DiagramContext';
+import { useDiagram, useDiagramSelection } from '../../DiagramContext';
 import { canWrite } from '../../sharing/accessMode';
 import { isTypingTarget } from '../../hooks/interaction/keyboardFocus';
 import { viewportCenter } from '../../export/exportUtils';
@@ -16,9 +16,10 @@ import { REVEAL_EVENT } from './TableNode';
 
 /** @param {{containerRef: {current: HTMLElement|null}}} p */
 export function useTablePaste({ containerRef }) {
-  const ctx = useDiagram();
+  const { selectElement } = useDiagramSelection();
+  const ctx = { ...useDiagram(), selectElement };
   const ref = useRef(ctx);
-  ref.current = ctx;
+  useEffect(() => { ref.current = ctx; });
 
   useEffect(() => {
     const onPaste = (e) => {
