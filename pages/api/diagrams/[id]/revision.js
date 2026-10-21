@@ -3,14 +3,17 @@
 // seconds instead of the full document. diagram.read (viewer and up: read-only viewers also see updates).
 // Reads only the authorization metadata row that withDiagramAuth already loaded; the single extra query runs only
 // when `?since=<revision>` is behind the head, to say whether an agent wrote in between.
-// Response: { revision, updatedAt, updatedBy, agentChange: null | {versionNumber, previousVersionNumber, label} }
+// Response: { revision, updatedAt, updatedBy, agentChange: null | {versionNumber, previousVersionNumber, label}, agents }
+// `agents` (LA-2, ADR-0006 5.1) comes from the in-memory agent activity register: no query. An agent's writes are
+// visible to every reader; its reads and read focus only to the user it acts for.
 // `updatedBy` is a display name (profile name, else the e-mail local part; addresses are not shared, Q-S5c) and is
 // only resolved when `since` is behind the head. Never writes anything.
 
 import { withDiagramAuth } from '../../../../lib/authz/next';
 import { versionRepository } from '../../../../lib/versionRepository';
+import { agentActivity } from '../../../../lib/live/agentActivity';
 
-export default withDiagramAuth({ GET: 'diagram.read' }, async (req, res, { diagram }) => {
+export default withDiagramAuth({ GET: 'diagram.read' }, async (req, res, { diagram, user }) => {
   const revision = Number(diagram.revision);
   let since = null;
   if (req.query.since !== undefined) {
@@ -29,12 +32,16 @@ export default withDiagramAuth({ GET: 'diagram.read' }, async (req, res, { diagr
     if (change) agentChange = { versionNumber: change.number, previousVersionNumber: change.previousNumber, label: change.label };
   }
 
+  const agents = agentActivity.agentsFor(diagram.id, user?.id);
+  const agentAt = agents.length ? agentActivity.maxAt(diagram.id, user?.id) : 0;
+
   res.setHeader('Cache-Control', 'no-store');
-  res.setHeader('ETag', `"${revision}"`);
+  res.setHeader('ETag', agentAt ? `"${revision}-a${agentAt}"` : `"${revision}"`);
   return res.status(200).json({
     revision,
     updatedAt: diagram.updated_at instanceof Date ? diagram.updated_at.toISOString() : diagram.updated_at || null,
     updatedBy,
     agentChange,
+    agents,
   });
 });

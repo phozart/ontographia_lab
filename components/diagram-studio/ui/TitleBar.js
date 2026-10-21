@@ -39,6 +39,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { AgentIndicator } from './AgentIndicator';
 
 // Grid style icons
 const GridDotsIcon = () => (
@@ -89,6 +90,7 @@ export default function TitleBar({
   onExport,
   onShowShortcuts,
   onShare,
+  onOpenActivity,
   onMenu,
   onNameChange,
   readOnly = false,
@@ -116,6 +118,9 @@ export default function TitleBar({
     elements = [],
     stickyNoteColor = '#fef08a',
     setStickyNoteColor = () => {},
+    agents = [],
+    canReviewAgentChange = false,
+    reviewAgentChange,
   } = diagramContext;
 
   // JSON import (file picker + drag-and-drop requests)
@@ -767,6 +772,9 @@ export default function TitleBar({
             {isFullscreen ? <FullscreenExitIcon fontSize="small" /> : <FullscreenIcon fontSize="small" />}
           </button>
         </div>
+
+        {/* LA-2: Claude / agents on this board (from the revision probe) */}
+        <AgentIndicator agents={agents} canReview={canReviewAgentChange} onReview={reviewAgentChange} onOpenActivity={onOpenActivity} />
 
         {/* Share button */}
         {FEATURES.sharing && onShare && (

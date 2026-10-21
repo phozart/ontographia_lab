@@ -169,6 +169,11 @@ dbDescribe('diagramRepository.applyContentChange (throwaway database)', () => {
     expect(rows[0]).toMatchObject({ actor_type: 'agent', actor_user_id: null, on_behalf_of: user.id, action: 'diagram.agent_edit' });
     expect(rows[0].target).toEqual({ tokenId, revision: 1, versionId: r.versionId, counts: { addedElements: 1 } });
     expect(JSON.stringify(rows[0].target)).not.toContain('"elements"');
+    // LA-2: the tool name rides along in the audit target when the caller passes it
+    const id2 = await newDiagram();
+    await repo.applyContentChange(id2, { expectedRevision: 0, userId: user.id, actor: { ...actor(), tokenId }, tool: 'map_structure', compute: (c) => add({ content: c }) });
+    const row2 = (await pg.query("select target from audit_events where diagram_id=$1", [id2])).rows[0];
+    expect(row2.target.tool).toBe('map_structure');
     // rejected / conflicting batches leave no audit row
     await repo.applyContentChange(id, { expectedRevision: 0, userId: user.id, actor: actor(), compute: (c) => add({ content: c }) });
     await repo.applyContentChange(id, { expectedRevision: 1, userId: user.id, actor: actor(), compute: () => ({ ok: false, errors: [] }) });
