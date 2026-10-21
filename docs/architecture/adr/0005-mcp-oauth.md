@@ -1,6 +1,6 @@
 # ADR-0005 — OAuth sign-in for the MCP server (claude.ai, Desktop, mobile)
 
-- Status: **Proposed** (design only; no code in this change)
+- Status: **Accepted** (2026-10-21). O1 implemented; see "As built" at the end
 - Supersedes: slice **M5** in [mcp-and-embedding.md](../investigations/mcp-and-embedding.md) §6 (scope sharpened here)
 - Personas: **AI/MCP agent** (primary): the same agent principal, reached from hosted Claude apps instead of only from developer hosts. Solution Architect, CX/UX and PM benefit indirectly: they can work on their maps from claude.ai or a phone.
 - Primitive exposed: **connected app** (an OAuth grant: user × client × role cap × diagram allowlist), a sibling of the personal API token. No new authorization concepts: both resolve to the existing `agent` principal.
@@ -273,3 +273,15 @@ Personal tokens (`ogl_`), their UI, limits and semantics; Claude Code, Cursor an
 - [S7] Public server change, 2026-10-13 ("Claude's custom connector sends `Origin: https://claude.ai`"; allowlist `claude.ai,claude.com`): <https://github.com/setluca/luca-mcp/pull/13>
 - [S8] TypeScript SDK v2 migration guide (AS helpers moved to `server-legacy/auth`, deprecated): <https://github.com/modelcontextprotocol/typescript-sdk/blob/main/docs/migration/upgrade-to-v2.md>; local inspection of `@modelcontextprotocol/sdk` 1.32.1 `dist/esm/server/auth/*`
 - [S9] `oidc-provider` (CIMD experimental in v9): <https://github.com/panva/node-oidc-provider>
+
+## 10. As built
+
+### O1 Discovery + resource server
+
+- **Flag and config:** `lib/oauth/config.js`. `MCP_OAUTH_ENABLED` (`true` or `1`; default off), `OAUTH_ISSUER` (default: origin of `NEXTAUTH_URL`), `MCP_PUBLIC_URL` (default `<issuer>/api/mcp`), `OAUTH_TRUSTED_CLIENT_IDS` (default Claude's hosted client; used from O2).
+- **Metadata:** `lib/oauth/metadata.js` builds both documents exactly as in section 5.1 (validated against the SDK zod schemas in tests); `pages/api/oauth/protected-resource.js` and `authorization-server.js` serve them with `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=300`, `OPTIONS` 204. With the flag off they answer 404.
+- **Rewrites (owner-approved, the only config change):** `/.well-known/oauth-protected-resource`, `/.well-known/oauth-protected-resource/api/mcp` and `/.well-known/oauth-authorization-server` in `next.config.js`. nginx must keep proxying `/.well-known/` to the app (apart from ACME).
+- **401 challenge:** `resource_metadata="<issuer>/.well-known/oauth-protected-resource/api/mcp"` is appended to the bare and the `invalid_token` challenges only when the flag is on (`createMcpHandler({ resourceMetadataUrl })`). No `scope`. Flag off: byte-identical.
+- **Origin and OPTIONS (unconditional, driven by `MCP_ALLOWED_ORIGINS`):** the Origin is normalized (trimmed, lowercased, trailing `/` removed) on both sides of the comparison; the guard now runs before the method check, so a disallowed origin gets 403 for any method. An allowed origin gets `Access-Control-Allow-Origin`, `Vary: Origin` and `Access-Control-Expose-Headers: WWW-Authenticate` on every response; `OPTIONS` from it answers 204 with the methods and headers of section 5.11. `OPTIONS` without an Origin keeps the old 405. Set `MCP_ALLOWED_ORIGINS=https://claude.ai,https://claude.com` on lab. Not verified from real claude.ai traffic yet (the ADR flagged this as "likely"): confirm from the first connection attempt.
+- **Dispatch scaffold:** `lib/oauth/verify.js` `verifyBearer` sends `oga_` to the OAuth verifier (a stub in O1 that accepts nothing, and never called with the flag off) and everything else to `lib/apiTokens`.
+- **Placeholder:** `/oauth/authorize` renders a static "not available yet" page (replaced in O2).

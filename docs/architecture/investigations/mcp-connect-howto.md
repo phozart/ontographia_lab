@@ -76,7 +76,8 @@ In the editor, right-click a selection (or a frame, or empty canvas for the visi
 
 ## 4. Behavior worth knowing
 
-- Bearer tokens only; the web session cookie is ignored. Requests with an `Origin` header must come from this app's origin or one listed in `MCP_ALLOWED_ORIGINS` (command-line clients send no `Origin`).
+- Bearer tokens only; the web session cookie is ignored. Requests with an `Origin` header must come from this app's origin or one listed in `MCP_ALLOWED_ORIGINS` (command-line clients send no `Origin`; for claude.ai set `MCP_ALLOWED_ORIGINS=https://claude.ai,https://claude.com`). Origins compare case-insensitively without a trailing slash, and `OPTIONS` preflights from an allowed origin are answered with 204.
+- With `MCP_OAUTH_ENABLED=true` the `401` challenge also carries `resource_metadata="…"` (ADR-0005) so OAuth-capable clients can sign in; clients that send a token header ignore it.
 - Limits: 120 requests per minute per token (at most 30 of them `diagram_apply_ops` writes), 256 KB request bodies (responses are capped at about 120 KB), at most 10 messages per JSON-RPC batch, 50 items per list page.
 - `401` carries `WWW-Authenticate: Bearer realm="ontographia-mcp"` (plus `error="invalid_token"` and a reason for unknown, revoked or expired tokens). A diagram outside the token's access answers "not found".
 - Protocol: the bundled SDK (`@modelcontextprotocol/sdk` 1.32.1) negotiates up to `2025-11-25`. A client asking for a newer revision is answered with `2025-11-25`. `Mcp-Method` / `Mcp-Name` headers are optional and, when sent, must match the body.

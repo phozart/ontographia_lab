@@ -178,3 +178,13 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Not verified:** rendering in claude.ai, Desktop and mobile (needs the deployed remote connector, Q-AV7, auth designed separately).
 - **Tests:** see design doc 10.11.
 
+
+
+## Slice O1 — OAuth discovery and resource-server groundwork
+
+- **PR title:** `feat: slice O1 OAuth discovery documents, Origin/OPTIONS handling and 401 resource_metadata for the MCP server`
+- **REQ refs:** `docs/architecture/adr/0005-mcp-oauth.md` sections 5.1, 5.11, 7 (O1); owner approval of the `/.well-known/*` rewrites (Q-OA8).
+- **Branch:** `feat/oauth-o1`
+- **Files changed:** `lib/oauth/config.js`, `lib/oauth/metadata.js`, `lib/oauth/wellKnown.js`, `lib/oauth/verify.js` (new), `pages/api/oauth/protected-resource.js`, `pages/api/oauth/authorization-server.js`, `pages/oauth/authorize.js` (placeholder), `pages/api/mcp.js`, `lib/mcp/http.js`, `next.config.js` (rewrites only), `.env.example`, ADR-0005 section 10, `mcp-connect-howto.md`; tests `oauthMetadata`, `mcpHttpOauth`, `oauthVerifyDispatch`.
+- **Deviations from the ADR:** none. Behavior with the flag off is unchanged apart from Origin normalization and `OPTIONS` from an allowed origin (both driven by `MCP_ALLOWED_ORIGINS`, empty by default).
+- **Tests:** metadata documents against the SDK schemas, handlers (flag off 404, CORS, 405), rewrites, 401 challenge with and without the flag, Origin normalization and refusal cases, preflight, bearer dispatch.
