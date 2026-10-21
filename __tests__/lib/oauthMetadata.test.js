@@ -145,3 +145,37 @@ describe('next.config.js rewrites', () => {
     });
   });
 });
+
+// Production evidence (2026-10-21): Claude's backend probes exactly these three URLs after the 401 and stops on a 404.
+describe('the three well-known URLs Claude probes', () => {
+  const URLS = [
+    ['/.well-known/oauth-protected-resource/api/mcp', prmHandler, protectedResourceMetadata],
+    ['/.well-known/oauth-protected-resource', prmHandler, protectedResourceMetadata],
+    ['/.well-known/oauth-authorization-server', asHandler, authorizationServerMetadata],
+  ];
+  const handlerFor = async (url) => {
+    const cfg = nodeRequire('../../next.config.js');
+    const rule = (await cfg.rewrites()).find((r) => r.source === url);
+    return rule && rule.destination;
+  };
+
+  test.each(URLS)('%s is rewritten to its handler and answers 200 JSON when enabled', async (url, handler, build) => {
+    process.env.MCP_OAUTH_ENABLED = 'true';
+    const dest = await handlerFor(url);
+    expect(dest).toBe(handler === prmHandler ? '/api/oauth/protected-resource' : '/api/oauth/authorization-server');
+    const res = await get(handler);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual(build());
+    expect(res.headers['access-control-allow-origin']).toBe('*');
+  });
+
+  test.each(URLS)('%s answers 404 while the flag is off (what Claude saw before OAuth was enabled)', async (url, handler) => {
+    expect((await get(handler)).statusCode).toBe(404);
+  });
+
+  test('the protected resource document names the exact resource Claude was given', () => {
+    process.env.MCP_PUBLIC_URL = 'https://lab.ontographia.com/api/mcp';
+    expect(protectedResourceMetadata().resource).toBe('https://lab.ontographia.com/api/mcp');
+    expect(getProtectedResourceMetadataUrl()).toBe('https://lab.ontographia.com/.well-known/oauth-protected-resource/api/mcp');
+  });
+});
