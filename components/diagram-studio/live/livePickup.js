@@ -1,6 +1,6 @@
 // components/diagram-studio/live/livePickup.js
 // Pure helpers for live pickup (AI-2): content normalization shared with setDiagram, undo-history rebasing after a
-// merge, and the wording of the "Updated by ..." notice. No React, no fetch (the provider owns those).
+// merge (lazy), and the wording of the "Updated by ..." notice. No React, no fetch (the provider owns those).
 
 import { normalizeDiagramContent } from '../migrations/normalizeContent';
 import { migrateDiagram } from '../migrations/migrateDiagram';
@@ -8,8 +8,8 @@ import { mergeContent } from '../../../lib/merge/threeWay';
 
 export const LIVE_POLL_VISIBLE_MS = 3000;
 export const LIVE_POLL_HIDDEN_MS = 30000;
-// Above this many entities across the undo/redo stacks we drop the history instead of rebasing it (cost guard).
-export const REBASE_WORK_LIMIT = 400000;
+// Remote deltas kept for lazy undo rebasing; an undo snapshot older than this many pickups is dropped when reached.
+export const REMOTE_LOG_LIMIT = 20;
 
 /**
  * The four collections of a diagram API body, exactly as setDiagram derives them (legacy shapes normalized, legacy
@@ -26,23 +26,39 @@ export function contentFromDiagram(d) {
 }
 
 /**
- * Undo/redo snapshots hold full elements + connections. After a remote merge each one is merged with the same
- * remote delta (base -> theirs), so undoing a local edit never removes an agent's elements or resurrects things the
- * agent deleted, and the stacks stay usable. Returns null when history cannot be rebased (caller clears it).
+ * Lazy undo rebasing. Undo/redo snapshots hold full elements + connections. A pickup does NOT touch them (that cost
+ * grew with snapshots x entities). It appends the remote delta (base -> theirs) to a small log and bumps an epoch;
+ * every snapshot is stamped with the epoch it was recorded at. When undo/redo reaches a snapshot, only that one is
+ * merged forward through the deltas it missed, so undoing a local edit never removes an agent's elements or
+ * resurrects things the agent deleted. A snapshot older than the retained log (REMOTE_LOG_LIMIT pickups) cannot be
+ * rebased: rebaseSnapshot returns null and the caller drops the history instead.
  */
-export function rebaseHistory(past, future, base, theirs) {
-  const snaps = [...past, ...future];
-  const work = snaps.reduce((n, s) => n + s.elements.length + s.connections.length, 0);
-  if (work > REBASE_WORK_LIMIT) return null;
-  const slim = (c) => ({ elements: c.elements, connections: c.connections });
-  const rebase = (s) => {
-    const r = mergeContent(slim(base), slim(s), slim(theirs));
+export const emptyRemoteLog = () => ({ epoch: 0, deltas: [] });
+
+const slim = (c) => ({ elements: c.elements, connections: c.connections });
+
+/** O(1): record one pickup. Returns a new log (the input is not mutated). */
+export function appendRemoteDelta(log, base, theirs) {
+  const epoch = log.epoch + 1;
+  const deltas = [...log.deltas, { epoch, base: slim(base), theirs: slim(theirs) }].slice(-REMOTE_LOG_LIMIT);
+  return { epoch, deltas };
+}
+
+export const stampSnapshot = (snap, log) => ({ ...snap, epoch: log.epoch });
+
+/** Merge one snapshot forward through every delta recorded after its epoch. Returns null when that is impossible. */
+export function rebaseSnapshot(log, snap) {
+  const from = snap.epoch || 0;
+  if (from >= log.epoch) return snap;
+  const missed = log.deltas.filter((d) => d.epoch > from);
+  if (missed.length !== log.epoch - from) return null; // the log no longer reaches back that far
+  let cur = slim(snap);
+  for (const d of missed) {
+    const r = mergeContent(d.base, cur, d.theirs);
     if (!r.ok) return null;
-    return { ...s, elements: r.content.elements, connections: r.content.connections };
-  };
-  const rebased = snaps.map(rebase);
-  if (rebased.some((s) => s === null)) return null;
-  return { past: rebased.slice(0, past.length), future: rebased.slice(past.length) };
+    cur = { elements: r.content.elements, connections: r.content.connections };
+  }
+  return { ...snap, elements: cur.elements, connections: cur.connections, epoch: log.epoch };
 }
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;

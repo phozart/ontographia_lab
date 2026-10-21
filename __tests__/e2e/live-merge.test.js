@@ -174,4 +174,120 @@ describe('Live pickup and merge (AI-2)', () => {
     await shot(A, 'conflict-notice.png');
     await A.close(); await B.close();
   });
+
+  test('typing a label while B relabels the same shape: the typed text is not overwritten, local wins on commit', async () => {
+    const A = await newPage('a');
+    const B = await newPage('b');
+    await open(A);
+    await A.click('[data-node-id="b"]', { count: 2, delay: 40 });
+    await A.waitForSelector('[data-node-id="b"] input', { timeout: 5000 });
+    await A.keyboard.type(' typed locally');
+    await writeAsB(B, (els) => els.map((e) => (e.id === 'b' ? { ...e, label: 'Relabelled by B' } : e)));
+    await sleep(5500); // longer than a poll interval: the pickup must wait for the open editor
+    const mid = await A.$eval('[data-node-id="b"] input', (i) => i.value);
+    expect(mid).toContain('typed locally');
+    expect(mid).not.toContain('Relabelled by B');
+    await A.keyboard.press('Enter');
+    let b;
+    for (let i = 0; i < 24; i += 1) {
+      await sleep(500);
+      b = (await head(B)).content.elements.find((e) => e.id === 'b');
+      if (/typed locally/.test(b.label)) break;
+    }
+    expect(b.label).toMatch(/typed locally/);
+    expect(await dialogShown(A)).toBe(false);
+    await shot(A, 'label-typing.png');
+    await A.close(); await B.close();
+  });
+
+  test('a dirty tab does not revert a rename made by B', async () => {
+    const A = await newPage('a');
+    const B = await newPage('b');
+    await delayPuts(A, 2500);
+    await open(A);
+    await drag(A, 'a', 80, 60);
+    const h = await head(B);
+    const put = await call(B, 'PUT', `/api/diagrams/${diagram.id}`, { name: 'Renamed by B', content: { ...h.content, elements: [...h.content.elements, el(`r${Date.now()}`, 700, 400, 'B add')] } }, { 'If-Match': `"${h.revision}"` });
+    expect(put.status).toBe(200);
+    let saved;
+    for (let i = 0; i < 24; i += 1) {
+      await sleep(500);
+      saved = await head(B);
+      if (saved.revision > put.body.revision) break;
+    }
+    expect(saved.revision).toBeGreaterThan(put.body.revision); // A's autosave landed on top
+    expect(saved.name).toBe('Renamed by B');
+    expect(await dialogShown(A)).toBe(false);
+    await A.close(); await B.close();
+  });
+
+  test('a save racing a slow pickup (full GET delayed 3.5 s) ends merged, never in the dialog', async () => {
+    const A = await newPage('a');
+    const B = await newPage('b');
+    await A.setRequestInterception(true);
+    A.on('request', (req) => {
+      if (req.method() === 'GET' && /\/api\/diagrams\/[^/?]+$/.test(req.url())) setTimeout(() => req.continue().catch(() => {}), 3500);
+      else req.continue().catch(() => {});
+    });
+    await open(A);
+    await drag(A, 'c', 0, 120);
+    const revB = await writeAsB(B, (els) => [...els, el(`s${Date.now()}`, 100, 500, 'B slow')]);
+    let saved;
+    for (let i = 0; i < 40; i += 1) {
+      await sleep(500);
+      saved = await head(B);
+      if (saved.revision > revB) break;
+    }
+    expect(saved.revision).toBeGreaterThan(revB);
+    expect(await dialogShown(A)).toBe(false);
+    expect(saved.content.elements.some((e) => /^s\d+$/.test(e.id))).toBe(true);
+    expect(saved.content.elements.find((e) => e.id === 'c').y).toBeGreaterThan(50000 + 100 + 50);
+    await A.close(); await B.close();
+  });
+
+  test('a real diagram_apply_ops call (editor token, allowlist) shows up in the open editor: no dialog, "Updated by an agent", Review agent change opens compare', async () => {
+    const A = await newPage('a');
+    await open(A);
+    const created = await call(A, 'POST', '/api/user/tokens', { name: 'e2e live merge', roleCap: 'editor', diagramIds: [diagram.id] });
+    expect(created.status).toBe(201);
+    const secret = created.body.token;
+    try {
+      const rpc = async (id, method, params) => {
+        const r = await fetch(`${BASE_URL}/api/mcp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${secret}` },
+          body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        });
+        const text = await r.text();
+        const data = (r.headers.get('content-type') || '').includes('event-stream')
+          ? text.split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5)))[0]
+          : JSON.parse(text);
+        return data;
+      };
+      await rpc(1, 'initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e', version: '1' } });
+      const h = (await call(A, 'GET', `/api/diagrams/${diagram.id}`)).body;
+      const nBefore = (await nodeIds(A)).length;
+      const out = await rpc(2, 'tools/call', {
+        name: 'diagram_apply_ops',
+        arguments: { id: diagram.id, baseRevision: h.revision, ops: [{ op: 'add_element', ref: '@x', type: 'process-flow/task', label: 'Agent step' }] },
+      });
+      expect(out.result?.isError).not.toBe(true);
+
+      await A.waitForFunction((n) => new Set([...document.querySelectorAll('[data-node-id]')].map((x) => x.getAttribute('data-node-id'))).size === n + 1, { timeout: 8000 }, nBefore);
+      expect(await dialogShown(A)).toBe(false);
+      await A.waitForSelector('[data-testid="remote-update-notice"]', { timeout: 3000 });
+      expect(await A.$eval('[data-testid="remote-update-notice"]', (n) => n.textContent)).toMatch(/Updated by an agent/);
+      await shot(A, 'agent-pickup.png');
+
+      const [review] = await A.$$('xpath/.//button[contains(., "Review agent change")]');
+      expect(review).toBeTruthy();
+      await review.click();
+      await A.waitForSelector('[data-compare-overlay]', { timeout: 8000 });
+      await shot(A, 'agent-review-compare.png');
+    } finally {
+      const tokens = (await call(A, 'GET', '/api/user/tokens')).body.tokens || [];
+      for (const t of tokens.filter((x) => x.name === 'e2e live merge')) await call(A, 'DELETE', `/api/user/tokens/${t.id}`);
+      await A.close();
+    }
+  });
 });

@@ -251,3 +251,39 @@ describe('unmergeable input', () => {
     expect(r.content.elements).toEqual([{ type: 'x' }]);
   });
 });
+
+describe('duplicate ids (review follow-up)', () => {
+  it.each(['base', 'ours', 'theirs'])('duplicate id in %s -> ok:false, never a corrupt merge', (side) => {
+    const clean = content([el('a'), el('b')]);
+    const dupe = content([el('a'), el('b'), el('a', { x: 9 })]);
+    const args = { base: clean, ours: clean, theirs: clean, [side]: dupe };
+    const r = mergeContent(args.base, args.ours, args.theirs);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/duplicate id/);
+  });
+  it('duplicate connection or group ids are also refused', () => {
+    const c = content([el('a'), el('b')], [cn('c1', 'a', 'b'), cn('c1', 'b', 'a')]);
+    expect(mergeContent(c, c, c).ok).toBe(false);
+    const g = content([el('a')], [], { groups: [{ id: 'g', elementIds: [] }, { id: 'g', elementIds: [] }] });
+    expect(mergeContent(g, g, g).ok).toBe(false);
+  });
+});
+
+describe('group membership consistency (review follow-up)', () => {
+  it('group.elementIds follows element.groupId after a merge', () => {
+    const grp = (ids) => ({ id: 'g1', elementIds: ids });
+    const base = content([el('a', { groupId: 'g1' }), el('b', { groupId: 'g1' }), el('c')], [], { groups: [grp(['a', 'b'])] });
+    // local: c joins the group (element and group list); remote: b leaves it (element only, as a stale writer might)
+    const ours = content([el('a', { groupId: 'g1' }), el('b', { groupId: 'g1' }), el('c', { groupId: 'g1' })], [], { groups: [grp(['a', 'b', 'c'])] });
+    const theirs = content([el('a', { groupId: 'g1' }), el('b'), el('c')], [], { groups: [grp(['a', 'b'])] });
+    const r = run(base, ours, theirs);
+    const members = r.content.elements.filter((e) => e.groupId === 'g1').map((e) => e.id).sort();
+    expect([...byId(r.content.groups, 'g1').elementIds].sort()).toEqual(members);
+  });
+  it('an element removed remotely leaves the group list', () => {
+    const base = content([el('a', { groupId: 'g1' }), el('b', { groupId: 'g1' })], [], { groups: [{ id: 'g1', elementIds: ['a', 'b'] }] });
+    const theirs = content([el('a', { groupId: 'g1' })], [], { groups: [{ id: 'g1', elementIds: ['a', 'b'] }] });
+    const r = run(base, base, theirs);
+    expect(byId(r.content.groups, 'g1').elementIds).toEqual(['a']);
+  });
+});

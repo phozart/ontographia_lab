@@ -86,3 +86,18 @@ describe('normalizeDiagramContent', () => {
     expect(out.elements.map((e) => e.id)).toEqual(ids);
   });
 });
+
+describe('duplicate ids in legacy rows (review follow-up)', () => {
+  test('later duplicates get a fresh id, nothing is dropped, result passes the server unique-id rule', () => {
+    const { validateDiagramContent } = require('../../../lib/diagramContent');
+    const out = normalizeDiagramContent({ elements: [el('a'), { ...el('a'), x: 9 }, el('b')], connections: [cn('c1'), cn('c1')] });
+    expect(out.elements.map((e) => e.id)).toEqual(['a', 'a-dup2', 'b']);
+    expect(out.elements[1].x).toBe(9);
+    expect(out.connections.map((c) => c.id)).toEqual(['c1', 'c1-dup2']);
+    expect(validateDiagramContent(out).ok).toBe(true);
+  });
+  test('content without duplicates is returned structurally unchanged', () => {
+    const input = { elements: [el('a'), el('b')], connections: [] };
+    expect(normalizeDiagramContent(input).elements.map((e) => e.id)).toEqual(['a', 'b']);
+  });
+});

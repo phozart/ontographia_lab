@@ -10,8 +10,8 @@ const res = (status, body) => ({ ok: status >= 200 && status < 300, status, json
 
 let server; let calls;
 const body = () => ({
-  id: 'd1', name: 'X', type: 'infinite-canvas', revision: server.revision, updated_at: 't', updated_by: server.updatedBy,
-  access: { role: 'editor', capabilities: ['diagram.read', 'diagram.write'] }, content: server.content,
+  id: 'd1', name: server.name ?? 'X', description: server.description, type: 'infinite-canvas', revision: server.revision, updated_at: 't', updated_by: server.updatedBy,
+  access: server.access || { role: 'editor', capabilities: ['diagram.read', 'diagram.write'] }, content: server.content,
 });
 const writeAs = (content, { agent = false, by = 'bob', previous = 4 } = {}) => {
   server.revision += 1; server.content = content; server.updatedBy = by;
@@ -27,14 +27,22 @@ beforeEach(() => {
     const method = opts.method || 'GET';
     calls.push({ method, url, opts });
     if (method === 'PUT') {
+      if (server.putDelay) await new Promise((r) => setTimeout(r, server.putDelay));
       const m = /"(\d+)"/.exec(opts.headers['If-Match'] || '');
       if (m && Number(m[1]) !== server.revision) return res(409, { code: 'REVISION_CONFLICT', current: { revision: server.revision } });
       server.revision += 1; server.content = JSON.parse(opts.body).content; server.updatedBy = 'me@x.co';
+      if (JSON.parse(opts.body).name !== undefined) server.name = JSON.parse(opts.body).name;
       return res(200, body());
+    }
+    if (/\/revision\?since=/.test(url)) {
+      if (server.onProbe) server.onProbe();
+      if (server.probeStatus) return res(server.probeStatus, {});
     }
     if (/\/revision\?since=/.test(url)) return res(200, { revision: server.revision, updatedAt: 't', updatedBy: server.updatedBy.split('@')[0], agentChange: server.agentChange });
     if (/\/diff\?/.test(url)) return res(200, { changes: [{ id: 'n', kind: 'element', change: 'added', label: 'n' }], summary: { added: 1, removed: 0, changed: 0 } });
     if (server.failHead) return res(500, {});
+    if (server.headDelay) await new Promise((r) => setTimeout(r, server.headDelay));
+    if (server.headStatus) return res(server.headStatus, {});
     return res(200, body());
   });
   jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -183,4 +191,124 @@ test('viewport and selection are kept; selection of a removed element is dropped
   await settle();
   expect(hook.result.current.viewport).toEqual({ x: 123, y: 456, scale: 2 });
   expect(hook.result.current.selection.nodeIds).toEqual(['a']);
+});
+
+// ---- PR #41 review follow-ups ----
+
+test('a 409 while a poll pickup is mid-fetch waits for it and merges, never the dialog (s13)', async () => {
+  const hook = await open();
+  await tick(2200);
+  act(() => { hook.result.current.updateElement('b', { y: 90 }); });
+  writeAs({ ...server.content, elements: [el('a'), el('b'), el('n')] }, { agent: true });
+  server.headDelay = 3500; // the full GET of the poll pickup is slow
+  for (let i = 0; i < 12; i += 1) await tick(1000);
+  server.headDelay = 0;
+  for (let i = 0; i < 4; i += 1) await tick(1500);
+  expect(screen.queryByText(/changed elsewhere/)).toBeNull();
+  expect(ids(hook)).toEqual(['a', 'b', 'n']);
+  expect(server.content.elements.map((e) => e.id)).toEqual(['a', 'b', 'n']);
+  expect(server.content.elements.find((e) => e.id === 'b').y).toBe(90);
+});
+
+test('a pickup is deferred while a label or connection endpoint is being edited; after commit the local text wins', async () => {
+  const hook = await open();
+  act(() => { hook.result.current.setEditingBusy(true); });
+  writeAs({ ...server.content, elements: [el('a', { label: 'remote relabel' }), el('b')] });
+  await settle(); await settle();
+  expect(hook.result.current.diagram.revision).toBe(3); // nothing merged under the open editor
+  expect(hook.result.current.elements.find((e) => e.id === 'a').label).toBe('a');
+  act(() => { hook.result.current.updateElement('a', { label: 'typed' }); hook.result.current.setEditingBusy(false); });
+  await tick(100);
+  await settle();
+  expect(hook.result.current.diagram.revision).toBeGreaterThanOrEqual(4);
+  expect(hook.result.current.elements.find((e) => e.id === 'a').label).toBe('typed');
+});
+
+test('a remote rename is adopted by a dirty tab and the save carries the merged name, not the stale one', async () => {
+  const hook = await open();
+  await editThenRemote(hook, (c) => c.updateElement('a', { x: 200 }), () => { server.name = 'Renamed remotely'; server.description = 'new d'; writeAs({ ...server.content, elements: [el('a'), el('b'), el('n')] }); });
+  expect(hook.result.current.diagram.name).toBe('Renamed remotely');
+  await tick(1100); await tick(0);
+  expect(puts()).toHaveLength(1);
+  expect(JSON.parse(puts()[0].opts.body)).toMatchObject({ name: 'Renamed remotely', description: 'new d' });
+  expect(server.name).toBe('Renamed remotely');
+});
+
+test('a clean tab adopts a rename-only change', async () => {
+  const hook = await open();
+  server.name = 'Only a rename';
+  writeAs(server.content);
+  await settle();
+  expect(hook.result.current.diagram.name).toBe('Only a rename');
+  expect(puts()).toHaveLength(0);
+});
+
+test('undo across several pickups rebases lazily and keeps every agent element', async () => {
+  const hook = await open();
+  await editThenRemote(hook, (c) => c.updateElement('a', { x: 200 }), () => writeAs({ ...server.content, elements: [el('a'), el('b'), el('n')] }));
+  await tick(1100); await tick(0); // autosave of the local edit
+  act(() => { hook.result.current.updateElement('b', { y: 70 }); });
+  writeAs({ ...server.content, elements: [...server.content.elements, el('m')] });
+  await settle(); await tick(0);
+  act(() => { hook.result.current.undo(); });
+  expect(ids(hook)).toEqual(['a', 'b', 'n', 'm']);
+  expect(hook.result.current.elements.find((e) => e.id === 'b').y).toBe(0);
+  act(() => { hook.result.current.undo(); });
+  expect(ids(hook)).toEqual(['a', 'b', 'n', 'm']);
+  expect(hook.result.current.elements.find((e) => e.id === 'a').x).toBe(0);
+});
+
+test('a revoked probe (403) switches the editor to read-only and stops polling', async () => {
+  const hook = await open();
+  server.probeStatus = 403; server.headStatus = 403;
+  await tick(3100); await tick(0); await tick(0);
+  expect(screen.getByText(/no longer have access|removed|denied|permission/i)).toBeTruthy();
+  const probes = () => calls.filter((c) => /\/revision\?since=/.test(c.url)).length;
+  const n = probes();
+  for (let i = 0; i < 4; i += 1) await tick(5000);
+  expect(probes()).toBe(n);
+  expect(hook.result.current.diagram.access.role).toBeNull();
+});
+
+test('a probe 403 for an editor downgraded to viewer re-reads access and becomes read-only', async () => {
+  const hook = await open();
+  server.probeStatus = 403;
+  server.access = { role: 'viewer', capabilities: ['diagram.read'] }; // the re-read still succeeds
+  await tick(3100); await tick(0); await tick(0);
+  expect(hook.result.current.diagram.access.role).toBe('viewer');
+  act(() => { hook.result.current.updateElement('a', { x: 5 }); });
+  await tick(1500);
+  expect(puts()).toHaveLength(0);
+});
+
+test('an edit made while a successful PUT is in flight stays dirty and is saved next', async () => {
+  const hook = await open();
+  server.putDelay = 1500;
+  act(() => { hook.result.current.updateElement('a', { x: 11 }); });
+  await tick(1100); // autosave starts, the PUT takes 1.5 s
+  expect(puts()).toHaveLength(1);
+  act(() => { hook.result.current.updateElement('b', { y: 22 }); });
+  server.putDelay = 0;
+  await tick(1500); await tick(0); await tick(0);
+  expect(hook.result.current.saveStatus.dirty).toBe(true);
+  await tick(1100); await tick(0); await tick(0);
+  expect(puts()).toHaveLength(2);
+  expect(server.content.elements.find((e) => e.id === 'b').y).toBe(22);
+  expect(server.content.elements.find((e) => e.id === 'a').x).toBe(11);
+  await tick(1500);
+  expect(hook.result.current.saveStatus.dirty).toBe(false);
+});
+
+test('an edit queued in the same tick as the merge is not overwritten by it', async () => {
+  const hook = await open();
+  act(() => { hook.result.current.updateElement('b', { y: 90 }); });
+  writeAs({ ...server.content, elements: [el('a'), el('b'), el('n')] });
+  // the 409 pickup reads the revision probe; an edit lands right then, before React has rendered it
+  server.onProbe = () => { server.onProbe = null; hook.result.current.updateElement('a', { x: 300 }); };
+  await tick(1100); await tick(0); await tick(0);
+  await tick(1100); await tick(0); await tick(0);
+  await tick(1100); await tick(0); await tick(0);
+  expect(hook.result.current.elements.find((e) => e.id === 'a').x).toBe(300);
+  expect(server.content.elements.find((e) => e.id === 'a').x).toBe(300);
+  expect(ids(hook)).toEqual(['a', 'b', 'n']);
 });

@@ -9,7 +9,9 @@
 //    dropping `viewport`. The nested copy is discarded; its viewport (and any collection missing
 //    at the top level) is recovered from it.
 //
-// Never mutates its input. Ids are preserved exactly.
+// Never mutates its input. Ids are preserved exactly, except later duplicates within one collection (renamed id-dupN).
+
+import { dedupeContentIds } from '../../../lib/dedupeIds';
 
 export const DEFAULT_VIEWPORT = Object.freeze({ x: 0, y: 0, zoom: 1 });
 export const DEFAULT_LAYER = Object.freeze({ id: 'default', name: 'Default', visible: true, locked: false, order: 0 });
@@ -58,13 +60,14 @@ export function normalizeDiagramContent(content) {
   const groups = firstArray(chain, 'groups') || [];
   const viewport = firstViewport(chain);
 
-  return {
+  // Duplicate ids (legacy rows) are renamed so merge and the server's unique-id rule hold; nothing is dropped.
+  return dedupeContentIds({
     elements: [...elements],
     connections: [...connections],
     layers: layers && layers.length > 0 ? [...layers] : [{ ...DEFAULT_LAYER }],
     groups: [...groups],
     viewport: viewport ? { ...viewport } : { ...DEFAULT_VIEWPORT },
-  };
+  });
 }
 
 export default normalizeDiagramContent;
