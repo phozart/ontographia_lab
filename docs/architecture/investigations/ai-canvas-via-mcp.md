@@ -553,4 +553,5 @@ The spike, hardened. No new dependency, no migration, no feature flag, no auth c
   - `mcpServer.test.js` and the other budget tests use the 120 KB budget.
 - **Verified in the MCP Apps reference host** (`basic-host`) again: render, zoom, Fit, Changes, Full screen, Open in lab, and no network request from the view. Still **not** verified in claude.ai, Desktop or mobile (needs the deployed connector, Q-AV7).
 - **How-to:** "See the board in Claude" in `mcp-connect-howto.md` section 7.
+- **Review fixes (PR 45):** `structuredContent` ids are validated, capped at 100 characters and 200 per list, with a 16 KB backstop that drops the id lists (`idsOmitted`); `notFound` is capped the same way (`notFoundCount` keeps the total). `validateDiagramContent` rejects ids over 128 characters on writes (elements, connections, layers, groups; existing stored content still loads). `curveAmount` is clamped to ±1e4, the SVG carries no `data-id`, the highlight box reuses `boundsOf`, quotes in the diagram name are neutralized in the model text, and the view opens links only under the server-named lab origin.
 

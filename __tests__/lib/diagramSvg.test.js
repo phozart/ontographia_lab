@@ -29,8 +29,9 @@ describe('renderDiagramSvg', () => {
     const r = renderDiagramSvg(CONTENT);
     expect(r.svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"')).toBe(true);
     expect(r.counts).toMatchObject({ elements: 4, connections: 2 }); // nox has no coordinates; k3 has a missing endpoint
-    const order = [...r.svg.matchAll(/<g data-id="([^"]+)"/g)].map((m) => m[1]);
-    expect(order).toEqual(['fr', 'a', 'b', 'd', 'k1', 'k2']);
+    expect(r.svg.match(/<g>/g)).toHaveLength(2 + 6); // body + overlay groups, 4 elements, 2 connections
+    expect(r.svg).not.toContain('data-id');
+    expect(r.svg.indexOf('Frame title')).toBeLessThan(r.svg.indexOf('>A<'));
     expect(r.svg).toContain('Frame title');
     expect(r.svg).toContain('>then<');
     // no external references of any kind, and no NaN/undefined from the geometry
@@ -41,7 +42,7 @@ describe('renderDiagramSvg', () => {
   test('restricts to elementIds and keeps only connections inside', () => {
     const r = renderDiagramSvg(CONTENT, { elementIds: ['a', 'b'] });
     expect(r.counts).toMatchObject({ elements: 2, connections: 1 });
-    expect(r.svg).not.toContain('data-id="d"');
+    expect(r.svg).not.toContain('>D<');
   });
 
   test('user text is escaped and colours cannot inject attributes or external fetches', () => {
@@ -187,5 +188,16 @@ describe('renderDiagramSvg hardening (AI-9a)', () => {
     const r = renderDiagramSvg(big);
     if (r.svg) expect(Buffer.byteLength(r.svg)).toBeLessThanOrEqual(96 * 1024);
     else expect(r.tooLarge).toBe(true);
+  });
+});
+
+describe('renderDiagramSvg review fixes (AI-9a)', () => {
+  test('curveAmount is clamped so it cannot blow up path numbers', () => {
+    for (const lineStyle of ['curved', 'arc']) {
+      const r = renderDiagramSvg({ elements: [el('a', 0, 0), el('b', 300, 0)], connections: [{ id: 'k', sourceId: 'a', targetId: 'b', lineStyle, curveAmount: 1e300 }] });
+      expect(r.svg).not.toMatch(/NaN|Infinity|\de[+-]\d/);
+      const nums = [...r.svg.matchAll(/ d="([^"]+)"/g)].flatMap((m) => m[1].match(/-?\d+(\.\d+)?/g).map(Number));
+      expect(Math.max(...nums.map(Math.abs))).toBeLessThan(1e5);
+    }
   });
 });

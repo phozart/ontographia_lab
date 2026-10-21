@@ -153,3 +153,18 @@ describe('unique ids (review follow-up)', () => {
     expect(validateDiagramContent({ elements: [{ id: 'x' }], connections: [{ id: 'x' }], groups: [{}, {}] }).ok).toBe(true);
   });
 });
+
+describe('id length cap (AI-9a review M1)', () => {
+  const longId = 'x'.repeat(129);
+  test.each(['elements', 'connections', 'layers', 'groups'])('a %s id over 128 characters is rejected, 128 is accepted', (key) => {
+    const bad = validateDiagramContent({ [key]: [{ id: longId }] });
+    expect(bad).toMatchObject({ ok: false, status: 400 });
+    expect(bad.error).toMatch(new RegExp(`content\\.${key}.*128`));
+    expect(validateDiagramContent({ [key]: [{ id: 'x'.repeat(128) }] }).ok).toBe(true);
+  });
+  test('editor-generated ids (prefix-uuid) pass', () => {
+    const id = 'conn-3e220af6-b3a9-4c3a-9a7e-8a0d335caf67';
+    expect(validateDiagramContent({ elements: [{ id }], connections: [{ id }] }).ok).toBe(true);
+  });
+});
+
