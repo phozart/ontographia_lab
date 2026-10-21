@@ -183,6 +183,49 @@ describe('Doc card (AI-5)', () => {
     await A.close(); await B.close();
   });
 
+  test('Claude writes a summary through the REAL MCP endpoint (doc_create, linked to 3 elements); the open editor picks it up and the links work', async () => {
+    const A = await newPage('a');
+    await open(A);
+    // an editor token for this board, then the MCP client exactly as Claude Code / claude.ai would connect
+    const created = await call(A, 'POST', '/api/user/tokens', { name: 'e2e doc', roleCap: 'editor', diagramIds: [diagram.id], expiresInDays: 1 });
+    expect(created.status).toBe(201);
+    const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
+    const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
+    const client = new Client({ name: 'claude-e2e', version: '1' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${BASE_URL}/api/mcp`), { requestInit: { headers: { Authorization: `Bearer ${created.body.token}` } } }));
+    try {
+      const tools = (await client.listTools()).tools.map((t) => t.name);
+      expect(tools).toEqual(expect.arrayContaining(['doc_create', 'doc_update', 'doc_get']));
+      const g = await client.callTool({ name: 'diagram_get', arguments: { id: diagram.id } });
+      const revision = g.structuredContent.diagram.revision;
+      const r = await client.callTool({ name: 'doc_create', arguments: {
+        id: diagram.id, baseRevision: revision, title: 'Summary by Claude', anchor: { near: 'queue' },
+        markdown: '## Summary\n\nThe flow is [auth](#el=auth) to [db](#el=db) via the [queue](#el=queue).\n\n- [ ] review <script>window.__pwned=1</script>\n',
+      } });
+      expect(r.isError).toBeFalsy();
+      const docId = r.structuredContent.elementId;
+      expect(r.structuredContent.elementLinks).toEqual([{ id: 'auth', exists: true }, { id: 'db', exists: true }, { id: 'queue', exists: true }]);
+      // live pickup in the open editor (within the AI-2 polling window)
+      await A.waitForFunction((id) => document.querySelector(`[data-node-id="${id}"]`), { timeout: 12000 }, docId);
+      expect(await A.$$eval(`[data-node-id="${docId}"] a`, (as) => as.map((a) => a.getAttribute('href')))).toEqual(['#el=auth', '#el=db', '#el=queue']);
+      expect(await A.evaluate(() => window.__pwned)).toBeUndefined();
+      await A.click(`[data-node-id="${docId}"] a[data-element-id="db"]`);
+      await waitFor(() => isSelected(A, 'db'), 4000);
+      await shot(A, 'doc-mcp-summary.png');
+      // doc_update append + the editor shows it
+      const after = await client.callTool({ name: 'diagram_get', arguments: { id: diagram.id } });
+      const u = await client.callTool({ name: 'doc_update', arguments: { id: diagram.id, baseRevision: after.structuredContent.diagram.revision, elementId: docId, append: '## Next\n\nTalk to [the queue owners](#el=queue).' } });
+      expect(u.isError).toBeFalsy();
+      await waitFor(async () => /Next/.test(await A.$eval(`[data-node-id="${docId}"]`, (n) => n.textContent).catch(() => '')), 12000);
+      const read = await client.callTool({ name: 'doc_get', arguments: { id: diagram.id, elementId: docId } });
+      expect(read.structuredContent.markdown).toContain('## Next');
+      expect(read.structuredContent.markdown).not.toMatch(/(^|[^\\])<script/);
+    } finally {
+      await client.close().catch(() => {});
+      await A.close();
+    }
+  });
+
   test('hostile markdown stored via the API is neutralized by the server and inert in the editor', async () => {
     const B = await newPage('b');
     const h = await head(B);
@@ -245,6 +288,11 @@ describe('Doc card (AI-5)', () => {
 
   test('exports show the card: the PNG preview renders and the SVG file contains the doc title and text; no script or handler in the SVG', async () => {
     const A = await newPage('a');
+    const h = await head(A);
+    if (!h.content.elements.some((e) => e.id === 'export-doc')) {
+      const exportDoc = { id: 'export-doc', type: 'doc', packId: 'core', name: 'Doc', label: 'Architecture summary', layerId: 'default', x: 50000 + 100, y: 50000 + 900, size: { width: 360, height: 220 }, properties: {}, data: { doc: { title: 'Architecture summary', markdown: '## Findings\n\nThe hub is [Auth service](#el=auth).' } } };
+      expect((await call(A, 'PUT', `/api/diagrams/${diagram.id}`, { content: { ...h.content, elements: [...h.content.elements, exportDoc] } }, { 'If-Match': `"${h.revision}"` })).status).toBe(200);
+    }
     await open(A);
     const dl = fs.mkdtempSync(path.join(os.tmpdir(), 'ai5-svg-'));
     await allowDownloads('a', dl);
@@ -263,10 +311,20 @@ describe('Doc card (AI-5)', () => {
     const svg = fs.readFileSync(path.join(dl, file), 'utf8');
     expect(svg).toContain('Architecture summary');
     expect(svg).toContain('Findings');
-    const markup = svg.replace(/url\(data:[^)]*\)/g, 'url()'); // embedded fonts are base64, not markup
-    expect(markup).not.toMatch(/<script/i);
-    expect(markup).not.toMatch(/<[a-z][^<>]*\son[a-z]+\s*=/i);
-    expect(markup).not.toMatch(/javascript:/i);
+    // parse the exported SVG: no script-like element, no on* attribute, no javascript: value anywhere
+    const bad = await A.evaluate((src) => {
+      const doc = new DOMParser().parseFromString(src, 'image/svg+xml');
+      const out = [];
+      doc.querySelectorAll('*').forEach((n) => {
+        if (/^(script|iframe|object|embed|img|image)$/i.test(n.localName)) out.push(`element:${n.localName}`);
+        for (const a of n.attributes) {
+          if (/^on/i.test(a.name)) out.push(`handler:${a.name}`);
+          if (/^\s*javascript:/i.test(a.value)) out.push(`js-url:${a.name}`);
+        }
+      });
+      return out;
+    }, svg);
+    expect(bad).toEqual([]);
     fs.rmSync(dl, { recursive: true, force: true });
     await A.close();
   });
