@@ -40,6 +40,17 @@ const SINGLE_BOARD = {
   diagram_apply_ops: { kind: 'write', args: { id: A, baseRevision: 7, ops: [{ op: 'add_element', ref: '@a', type: 'process-flow/task', label: 'New' }] } },
   map_structure: { kind: 'write', args: { id: A, baseRevision: 7, structure: MIND, layout: 'mindmap' } },
   layout_apply: { kind: 'write', args: { id: A, baseRevision: 7, target: { elementIds: ['n1', 'n2', 'n3'] }, layout: 'grid' } },
+  doc_create: { kind: 'write', args: { id: A, baseRevision: 7, title: 'Notes', markdown: '# Notes\n\nHello' } },
+  table_create: { kind: 'write', args: { id: A, baseRevision: 7, title: 'Inventory', columns: ['Name', { name: 'Count', type: 'number' }], rows: [{ cells: ['Auth', 1] }] } },
+  // these need an element on the board first (created through the matching create tool, then the register is emptied)
+  doc_update: { kind: 'write', setup: 'doc', args: (doc) => ({ id: A, baseRevision: 8, elementId: doc, append: '## More\n\ntext' }) },
+  doc_get: { kind: 'read', setup: 'doc', args: (doc) => ({ id: A, elementId: doc }) },
+  table_update: { kind: 'write', setup: 'table', args: (tbl) => ({ id: A, baseRevision: 8, elementId: tbl, key: 'Name', upsertRows: [{ cells: { Name: 'Mail', Count: 2 } }] }) },
+  table_get: { kind: 'read', setup: 'table', args: (tbl) => ({ id: A, elementId: tbl }) },
+};
+const SETUP = {
+  doc: ['doc_create', { id: A, baseRevision: 7, title: 'Notes', markdown: '# Notes\n\nHello' }],
+  table: ['table_create', { id: A, baseRevision: 7, title: 'Inventory', columns: ['Name', { name: 'Count', type: 'number' }], rows: [{ cells: ['Auth', 1] }] }],
 };
 // Tools that touch no particular board (or create a brand-new one nobody can be watching yet).
 const NOT_BOARD = ['diagram_list', 'diagram_search', 'stencil_catalog', 'guide_get', 'diagram_create'];
@@ -99,8 +110,15 @@ describe('coverage: every tool is either a recorded single-board tool or an expl
   });
 
   test.each(Object.keys(SINGLE_BOARD))('%s records exactly one entry for (board, token), after the call succeeded', async (tool) => {
-    const { kind, args } = SINGLE_BOARD[tool];
+    const { kind, setup, args: rawArgs } = SINGLE_BOARD[tool];
     const client = await connect();
+    let args = rawArgs;
+    if (setup) {
+      const made = await call(client, SETUP[setup][0], SETUP[setup][1]);
+      expect(made.isError).toBeFalsy();
+      args = rawArgs(made.structuredContent.elementId);
+      reg.clear();
+    }
     expect(agentsFor(OWNER)).toEqual([]);
     const r = await call(client, tool, args);
     expect(r.isError).toBeFalsy();
@@ -118,7 +136,8 @@ describe('coverage: every tool is either a recorded single-board tool or an expl
   });
 
   test.each(Object.keys(SINGLE_BOARD))('%s records nothing when the board is not accessible (access check first)', async (tool) => {
-    const { args } = SINGLE_BOARD[tool];
+    const { args: rawArgs } = SINGLE_BOARD[tool];
+    const args = typeof rawArgs === 'function' ? rawArgs('el-x') : rawArgs;
     const client = await connect(principal({ diagramScope: [B] })); // A is outside the allowlist
     const r = await call(client, tool, args);
     expect(r.isError).toBe(true);

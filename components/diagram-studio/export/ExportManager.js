@@ -4,6 +4,8 @@
 
 import { buildExportEnvelope, sanitizeFilename } from './diagramJson';
 import { exportFromCanvas } from './exportRenderer';
+import { renderTableSvg } from '../../../lib/table/tableSvg';
+import { tableOf } from '../../../lib/table/tableModel';
 
 function hasLiveCanvas() {
   return typeof document !== 'undefined' && !!document.querySelector('.ds-canvas-inner');
@@ -386,6 +388,19 @@ export class ExportManager {
 
     let svg = `${indent}<g${dataAttrs} transform="translate(${x}, ${y})">\n`;
 
+    // A table draws its columns, rows and cells (lib/table/tableSvg.js), not a box with a label
+    const table = tableOf(el);
+    if (table) {
+      const drawn = renderTableSvg(table, { x: 0, y: 0, width: w }, {
+        esc: (v) => this.escapeXml(v),
+        r1: (n) => Math.round(n * 10) / 10,
+        safeColor: (v, fallback) => (typeof v === 'string' && /^#[0-9a-f]{3,8}$/i.test(v) ? v : fallback),
+        maxRows: 500,
+      });
+      const title = label ? `${indent}  <text x="2" y="-8" font-family="sans-serif" font-size="14" font-weight="600" fill="#334155">${this.escapeXml(label)}</text>\n` : '';
+      return `${svg}${title}${indent}  ${drawn.svg}\n${indent}</g>\n`;
+    }
+
     // Shape
     switch (shape) {
       case 'circle':
@@ -501,6 +516,9 @@ export class ExportManager {
   escapeXml(str) {
     if (!str) return '';
     return String(str)
+      // C0 controls (except tab, LF, CR) and U+FFFE/U+FFFF are not allowed in XML 1.0
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')

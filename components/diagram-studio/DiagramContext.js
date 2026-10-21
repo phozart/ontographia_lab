@@ -20,6 +20,7 @@ import {
   LIVE_POLL_VISIBLE_MS, LIVE_POLL_HIDDEN_MS,
 } from './live/livePickup';
 import { assignFrameOnCreate, remapDuplicateParent } from './utils/frameMembership';
+import { ensureTableData } from './elements/table/newTableElement';
 
 // ============ CONTEXT ============
 
@@ -345,11 +346,11 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   const addElement = useCallback((element) => {
     if (!canEditRef.current) return element; // view/comment-only: no local edits
     recordHistory();
-    const newElement = {
+    const newElement = ensureTableData({
       id: element.id || generateId('el'),
       createdAt: new Date().toISOString(),
       ...element,
-    };
+    });
     // Explicit frame membership: frames are flagged, shapes created inside a
     // frame join it (a `parentFrameId` key, even null, opts out)
     setElementsState(prev => [...prev, assignFrameOnCreate(newElement, prev)]);

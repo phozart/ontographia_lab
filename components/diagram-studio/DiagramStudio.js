@@ -15,9 +15,12 @@ import DrawingLayer from './DrawingLayer';
 import DrawingToolbar from './ui/DrawingToolbar';
 import LeftPalette from './LeftPalette';
 import PropertiesPanel from './PropertiesPanel';
+import DocPanelHost from './elements/doc/DocPanelHost';
+import { useOpenDocId, registerElementLinkHandler } from './elements/doc/docStore';
 import CommandPalette, { useCommandPalette } from './ui/CommandPalette';
 import FrameNavigator from './ui/FrameNavigator';
 import TitleBar from './ui/TitleBar';
+import { useTablePaste } from './elements/table/useTablePaste';
 import ShapeSidebar from './ui/ShapeSidebar';
 import ContextualToolbar from './ui/ContextualToolbar';
 import { useThumbnailCapture } from './hooks/useThumbnailCapture';
@@ -131,6 +134,7 @@ function DiagramStudioInner({
   const canvasContainerRef = useRef(null); // Ref for canvas container (used by FrameNavigator)
   const previewSelectionRef = useRef(null); // selection stashed while previewing
   const iconBarRef = useRef(null); // Ref for ShapeSidebar (used by empty canvas welcome)
+  useTablePaste({ containerRef: canvasContainerRef }); // paste a spreadsheet range as a table; table row links reveal elements
 
   // User settings state - loaded from API
   const [userSettings, setUserSettings] = useState(DEFAULT_SETTINGS);
@@ -231,6 +235,16 @@ function DiagramStudioInner({
   const compare = useCompare();
   const revealStateRef = useRef({});
   revealStateRef.current = { elements, connections, selectElements, selectConnection, setViewport };
+  const openDocId = useOpenDocId();
+  // Element links inside docs (#el=<id>) select and zoom to the element (AI-5)
+  useEffect(() => registerElementLinkHandler((id) => {
+    const st = revealStateRef.current;
+    const target = st.elements.find((e) => e.id === id);
+    if (!target) return;
+    st.selectElements([id]);
+    const fit = computeFitForCanvas([target], { container: canvasContainerRef.current, padding: 140, maxScale: 1 });
+    if (fit) st.setViewport(fit);
+  }), []);
   useEffect(() => onReveal((change) => {
     const st = revealStateRef.current;
     let box = null;
@@ -1043,7 +1057,7 @@ function DiagramStudioInner({
             </div>
 
             {/* Right Properties Panel - On-demand in floating UI mode */}
-            {showRightPanel && hasSelection && showPropertiesPanel && (
+            {showRightPanel && hasSelection && showPropertiesPanel && !openDocId && (
               <div className={`ds-panel-wrapper ds-panel-right ds-panel-slide-in`}>
                 <ResizablePanel
                   position="right"
@@ -1060,6 +1074,8 @@ function DiagramStudioInner({
                 </ResizablePanel>
               </div>
             )}
+            {/* Doc editor (AI-5): takes the right-hand slot while a doc is open */}
+            <DocPanelHost />
           </PanelGroup>
         </div>
 

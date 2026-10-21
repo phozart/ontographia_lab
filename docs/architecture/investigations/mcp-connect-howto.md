@@ -55,6 +55,9 @@ Cursor (`~/.cursor/mcp.json` or `.cursor/mcp.json`):
 | `map_structure`     | Build a mind map, tree, flow, cluster or grid from nodes, edges and groups (editor tokens only; section 6). |
 | `layout_apply`      | Re-arrange elements that are already on the board, positions only (editor tokens only; section 6).          |
 | `diagram_create`    | Create a new, empty, private board owned by you (editor connections only; section 5a).                      |
+| `table_create`      | Put a table on the board: typed columns, rows, optional links from rows to elements (editor tokens only; section 6a). |
+| `table_update`      | Upsert rows by a key column, remove rows, add / rename / retype / remove columns (editor tokens only; section 6a). |
+| `table_get`         | The rows of one table, paged (section 6a). |
 | `guide_get`         | The canvas guide (workflow, shapes, limits); the same text as the resource below.                           |
 
 | `board_read_region` | Part of a diagram in reading order: a frame, a selection, a rectangle or the area around one element. |
@@ -161,6 +164,51 @@ The hub goes in the middle with branches on both sides, in free space to the rig
 **"Tidy this frame."** `layout_apply` with `target: {"frameId": "..."}` and `layout: "grid"` re-arranges the frame's members without touching their text, sizes or connections. `target: {"elementIds": [...]}` arranges a selection; connections between the elements drive `tree`, `mindmap`, `radial` and `flow`.
 
 Layouts: `tree` (top-down hierarchy), `mindmap`, `radial`, `flow`, `grid`, `cluster`. Limits per call: 200 nodes, 400 edges, 40 groups. New content never overlaps existing content and nothing you did not name is moved. If the board changed since Claude read it, nothing is written and Claude is told to read again. Open editors pick the change up within a few seconds (slice AI-2).
+
+## 6b. Write the summary on the board (doc_create and doc_update)
+
+A doc is a text card on the board (Markdown). Ask Claude for the whole run in one instruction, for example: "Read this text, map the architecture on board LAB-12, then write a short summary doc next to the map that links to the parts it mentions."
+
+- Claude maps the structure (`map_structure`), then calls `doc_create` anchored next to it. The summary cites elements with `[text](#el=<id>)` links; **clicking a link in the card selects and zooms to that element**. A link to something that was deleted shows as struck-through text.
+- Open a doc with a double-click (or Enter on a selected card): the editor opens in the right panel with Write and Preview tabs, a formatting toolbar, **Link element** (pick any element by name) and **Link selected** (links for the elements you selected on the board). `.md` downloads the doc as a Markdown file; dropping a `.md` file on the canvas creates a doc card.
+- You can keep typing while Claude edits: the editor picks Claude's change up within a few seconds. If you both changed the same text, your text is kept and the panel says so; change history shows it as "doc (+3 / -1 lines)".
+- Docs hold Markdown only: headings, lists, task lists, tables, code, links to `https`, `mailto`, elements and other boards. Raw HTML and images are not supported and are shown as text. Up to 100 KB per doc and 200 docs per board.
+- Claude can also read a doc (`doc_get`) and edit it in place (`doc_update` with `append` or `replaceSection`). Each change is one saved version you can restore from History; "Review agent change" shows what changed.
+
+## 6a. Tables (table_create, table_update, table_get)
+
+A table is a typed matrix on the board, for inventories, comparisons, backlogs and findings. Claude decides the columns and rows; Ontographia stores them, keeps them editable by people and versions every change.
+
+**In the editor.**
+- **Place one:** the Table button in the toolbar (or Tools, Table), then click the canvas. You get a 3 x 3 table.
+- **Edit:** double-click a cell (or select it and press Enter, or just start typing). Enter commits and moves down, Tab moves right (Tab in the last cell adds a row), Shift reverses both, Escape leaves without saving, Alt+Enter is a new line inside a cell. A number column refuses text and says why.
+- **Rows and columns:** the arrow in a column header and the dots in a row's margin open menus (insert, move, delete, sort once, change the column type: text, number, select, yes/no). The buttons under and beside a selected table add a row or column. Drag the right edge of a header to resize a column; resizing the whole table scales the columns.
+- **Paste from a spreadsheet:** copy a range in Sheets or Excel and paste on the canvas (Cmd/Ctrl+V). It becomes a table, first row as the header; numbers and yes/no columns are detected. Pasting into an open cell fills cells from there.
+- **Export:** the three dots in the table's top-left corner: Export as CSV or JSON, Copy as TSV. In CSV, text that a spreadsheet could read as a formula (it starts with `=`, `+`, `-`, `@`) gets a leading `'` so it opens as text. PNG, PDF and SVG exports include tables.
+- **Links to elements:** a row can point at an element on the board. The arrow in the row's margin selects that element and zooms to it. To link by hand, select the table and the element together (Shift+click), then Link in the row menu. If the element is deleted the row keeps its text and the arrow becomes plain text.
+- Viewers and commenters see tables but cannot edit them; a locked table is read-only for everyone.
+
+**With Claude: from a map to a table to a summary.** Typical flow ("make a graph of the architecture in this text, then put it in a table, then summarize"): Claude calls `map_structure` for the graph, then `diagram_get` for the element ids, then one `table_create`:
+
+```json
+{
+  "id": "LAB-12",
+  "baseRevision": 42,
+  "title": "Component inventory",
+  "columns": ["Component", { "name": "Tier", "type": "select" }, { "name": "Instances", "type": "number" }, { "name": "Critical", "type": "boolean" }],
+  "rows": [
+    { "cells": ["API gateway", "edge", 3, true], "elementId": "el-3f9c..." },
+    { "cells": ["Billing service", "core", 2, false], "elementId": "el-77ab..." }
+  ],
+  "anchor": { "near": "el-3f9c..." }
+}
+```
+
+Each row links to its element, so the owner clicks from the table to the shape. Cells are plain text, numbers or booleans (no formulas, no HTML); a value that does not fit its column ("many" in a number column) rejects the whole call with the row and column named, and nothing is written. Limits: 50 columns, 500 rows, 2,000 characters per cell.
+
+To refresh the table after the board or the analysis changed, Claude calls `table_update` with `key: "Component"` and `upsertRows`: matching rows are updated (other cells are kept), new ones are added, and running it twice adds nothing. `removeRowIds`, `removeKeys`, `addColumns`, `renameColumns`, `setColumnTypes` and `removeColumns` cover the rest. `table_get` reads the rows back, paged (`diagram_get` only says how many rows a table has). The prompt `tabulate_region` pre-fills "read this link, then build a table with one row per element".
+
+Same rules as the other write tools: editor token, the diagram on its allowlist, `baseRevision`, one version per call, locks respected, rate limited. An open editor shows the new table within a few seconds (slice AI-2).
 
 ## 7. See the board in Claude (diagram_show)
 
