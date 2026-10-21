@@ -22,6 +22,12 @@ const CHROME_SELECTORS = [
   '.ds-segment-handle',
   '.ds-curve-handle',
   '.ds-grid',
+  // table element controls (row / column menus, add buttons, resize grips, notices); the table itself is exported
+  '.ds-tbl-mini',
+  '.ds-tbl-add',
+  '.ds-tbl-menu',
+  '.ds-tbl-resize',
+  '.ds-tbl-notice',
   'textarea',
   'input',
 ].join(',');
