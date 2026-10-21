@@ -27,7 +27,7 @@ jest.mock('../../lib/versionRepository', () => {
   const actual = jest.requireActual('../../lib/versionRepository');
   return {
     ...actual,
-    versionRepository: { list: jest.fn(), get: jest.fn(), createNamed: jest.fn(), update: jest.fn(), restore: jest.fn(), createCheckpoint: jest.fn() },
+    versionRepository: { list: jest.fn(), get: jest.fn(), createNamed: jest.fn(), update: jest.fn(), restore: jest.fn(), createCheckpoint: jest.fn(), getHeadContent: jest.fn() },
   };
 });
 jest.mock('../../lib/audit', () => ({ recordAuditEvent: jest.fn() }));
@@ -37,6 +37,7 @@ import { recordAuditEvent } from '../../lib/audit';
 import listHandler from '../../pages/api/diagrams/[id]/versions/index';
 import oneHandler from '../../pages/api/diagrams/[id]/versions/[v]/index';
 import restoreHandler from '../../pages/api/diagrams/[id]/versions/[v]/restore';
+import diffHandler from '../../pages/api/diagrams/[id]/versions/[v]/diff';
 
 const ID = '123e4567-e89b-12d3-a456-426614174000';
 const USER = { id: '11111111-1111-4111-8111-111111111111', email: 'a@b.co', role: 'user', status: 'active' };
@@ -61,6 +62,7 @@ beforeEach(() => {
   mockRole = 'owner';
   repo.list.mockResolvedValue({ items: [meta(2), meta(1)], nextCursor: null });
   repo.get.mockResolvedValue({ ...meta(1), content: { elements: [] } });
+  repo.getHeadContent.mockResolvedValue({ elements: [] });
   repo.createNamed.mockResolvedValue({ created: true, version: meta(3) });
   repo.update.mockResolvedValue(meta(1, { label: 'New' }));
   repo.restore.mockResolvedValue({
@@ -77,6 +79,7 @@ const MATRIX = {
   get:     { owner: 200, editor: 200, commenter: 200, viewer: 200, none: 404 },
   patch:   { owner: 200, editor: 200, commenter: 403, viewer: 403, none: 404 },
   restore: { owner: 200, editor: 200, commenter: 403, viewer: 403, none: 404 },
+  diff:    { owner: 200, editor: 200, commenter: 200, viewer: 200, none: 404 },
 };
 const REQS = {
   list: () => call(listHandler, { method: 'GET' }),
@@ -84,8 +87,9 @@ const REQS = {
   get: () => call(oneHandler, { method: 'GET', query: { id: ID, v: '1' } }),
   patch: () => call(oneHandler, { method: 'PATCH', query: { id: ID, v: '1' }, body: { label: 'New' } }),
   restore: () => call(restoreHandler, { method: 'POST', query: { id: ID, v: '1' } }),
+  diff: () => call(diffHandler, { method: 'GET', query: { id: ID, v: '1', against: 'head' } }),
 };
-const repoFn = { list: 'list', create: 'createNamed', get: 'get', patch: 'update', restore: 'restore' };
+const repoFn = { list: 'list', create: 'createNamed', get: 'get', patch: 'update', restore: 'restore', diff: 'get' };
 
 describe('role matrix', () => {
   for (const [endpoint, byRole] of Object.entries(MATRIX)) {
@@ -118,6 +122,7 @@ describe('role matrix', () => {
     expect((await call(oneHandler, { method: 'PUT', query: { id: ID, v: '1' } })).statusCode).toBe(405);
     expect((await call(oneHandler, { method: 'DELETE', query: { id: ID, v: '1' } })).statusCode).toBe(405); // versions are immutable (Q-V3)
     expect((await call(restoreHandler, { method: 'GET', query: { id: ID, v: '1' } })).statusCode).toBe(405);
+    expect((await call(diffHandler, { method: 'POST', query: { id: ID, v: '1' } })).statusCode).toBe(405);
   });
 });
 
@@ -336,5 +341,61 @@ describe('POST /versions/[v]/restore', () => {
   test.each(['0', 'x', '-3'])('malformed version number %s -> 400', async (v) => {
     expect((await call(restoreHandler, { method: 'POST', query: { id: ID, v } })).statusCode).toBe(400);
     expect(repo.restore).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /versions/[v]/diff', () => {
+  const withContent = (n, content) => ({ ...meta(n), content });
+  const A = { elements: [{ id: 'a', x: 0, y: 0 }, { id: 'gone', x: 1, y: 1 }] };
+  const B = { elements: [{ id: 'a', x: 50, y: 0 }, { id: 'new', x: 9, y: 9 }] };
+
+  test('against=head diffs the version against the stored head content', async () => {
+    repo.get.mockResolvedValue(withContent(1, A));
+    repo.getHeadContent.mockResolvedValue(B);
+    const res = await call(diffHandler, { method: 'GET', query: { id: ID, v: '1', against: 'head' } });
+    expect(res.statusCode).toBe(200);
+    expect(res.body.from).toEqual({ id: 'v-1', number: 1 });
+    expect(res.body.to).toBe('head');
+    expect(res.body.summary).toEqual({ added: 1, removed: 1, changed: 1 });
+    expect(res.body.changes.map((c) => `${c.id}:${c.change}`)).toEqual(['a:changed', 'gone:removed', 'new:added']);
+    expect(res.body.changes[0].fields).toEqual(['position']);
+    expect(res.headers['cache-control']).toBe('no-store');
+    expect(repo.get).toHaveBeenCalledWith(ID, 1);
+    expect(repo.getHeadContent).toHaveBeenCalledWith(ID);
+  });
+
+  test('against defaults to head; against=<n> compares two versions and returns its meta', async () => {
+    repo.get.mockImplementation(async (d, n) => withContent(n, n === 1 ? A : B));
+    const def = await call(diffHandler, { method: 'GET', query: { id: ID, v: '1' } });
+    expect(def.body.to).toBe('head');
+    const two = await call(diffHandler, { method: 'GET', query: { id: ID, v: '1', against: '3' } });
+    expect(two.body.to).toEqual({ id: 'v-3', number: 3 });
+    expect(two.body.summary.added).toBe(1);
+    expect(repo.getHeadContent).toHaveBeenCalledTimes(1); // only the defaulted call needed the head
+  });
+
+  test('IDOR: both versions are looked up scoped to the authorized diagram; a foreign version is 404', async () => {
+    repo.get.mockImplementation(async (d, n) => (d === ID && n === 1 ? withContent(1, A) : null)); // version 7 belongs to another diagram
+    const res = await call(diffHandler, { method: 'GET', query: { id: ID, v: '1', against: '7' } });
+    expect(res.statusCode).toBe(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+    const res2 = await call(diffHandler, { method: 'GET', query: { id: ID, v: '7', against: '1' } });
+    expect(res2.statusCode).toBe(404);
+    for (const [d] of repo.get.mock.calls) expect(d).toBe(ID);
+  });
+
+  test('missing diagram head -> 404', async () => {
+    repo.getHeadContent.mockResolvedValue(null);
+    expect((await call(diffHandler, { method: 'GET', query: { id: ID, v: '1', against: 'head' } })).statusCode).toBe(404);
+  });
+
+  test.each(['0', 'abc', '-2', '1.5', 'HEAD', '', ['1', '2']])('malformed against %p -> 400', async (against) => {
+    const res = await call(diffHandler, { method: 'GET', query: { id: ID, v: '1', against } });
+    expect(res.statusCode).toBe(400);
+    expect(repo.get).not.toHaveBeenCalled();
+  });
+
+  test('malformed v -> 400', async () => {
+    expect((await call(diffHandler, { method: 'GET', query: { id: ID, v: 'x' } })).statusCode).toBe(400);
   });
 });

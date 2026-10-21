@@ -27,6 +27,11 @@ export async function getVersion(diagramId, number) {
   return (await request(`${base(diagramId)}/${number}`)).body;
 }
 
+/** Structural diff of version `number` against `against` ('head' or another version number). Read-only. */
+export async function getVersionDiff(diagramId, number, against = 'head') {
+  return (await request(`${base(diagramId)}/${number}/diff?against=${encodeURIComponent(String(against))}`)).body;
+}
+
 /** @returns {Promise<{created: boolean, version: object}>} */
 export async function nameCurrentVersion(diagramId, { label, description }) {
   const payload = { kind: 'named', label };

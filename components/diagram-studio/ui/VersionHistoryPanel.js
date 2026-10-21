@@ -2,6 +2,8 @@
 // History panel (ADR-0001, slice 2): list of versions, "Name current version", static preview, rename and
 // restore (with a confirm dialog). Props-driven (no context) so it is easy to test; DiagramStudio mounts it
 // through VersionHistory (below) which wires it to the editor.
+// Slice 8: "Compare with current" / compare any two versions -> structural diff summary here, plus a read-only
+// canvas highlight overlay (compareStore -> CompareOverlay in DiagramStudio). Compare never writes anything.
 // Opened from the title-bar menu via OPEN_VERSION_HISTORY_EVENT (same pattern as the export dialog).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -9,7 +11,9 @@ import { createPortal } from 'react-dom';
 import { Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useDiagram } from '../DiagramContext';
-import { getVersion, listVersions, nameCurrentVersion, renameVersion } from '../versions/versionsClient';
+import { getVersion, getVersionDiff, listVersions, nameCurrentVersion, renameVersion } from '../versions/versionsClient';
+import CompareSummary from './CompareSummary';
+import { requestReveal, setCompare, useCompare } from '../versions/compareStore';
 import { buildVersionPreview, formatKind, formatRelative, versionTitle } from '../versions/versionUtils';
 
 export const OPEN_VERSION_HISTORY_EVENT = 'ds:open-version-history';
@@ -36,6 +40,10 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
   const [confirmTitle, setConfirmTitle] = useState(''); // kept separately so the dialog text survives its close transition
   const [restoring, setRestoring] = useState(false);
   const [restoreError, setRestoreError] = useState(null);
+
+  const [cmp, setCmp] = useState({ status: 'idle', against: null, diff: null, error: null });
+  const overlay = useCompare();
+  const cmpSeq = useRef(0);
 
   const panelRef = useRef(null);
   const detailSeq = useRef(0);
@@ -87,6 +95,8 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
   };
 
   const select = async (v) => {
+    cmpSeq.current += 1; // drop any compare still in flight for the previous selection
+    setCmp({ status: 'idle', against: null, diff: null, error: null });
     setSelected(v);
     setRenaming(false);
     setNotice(null);
@@ -99,6 +109,33 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
     } catch (e) {
       if (seq !== detailSeq.current) return;
       setDetail({ status: 'error', preview: null, error: e.message || 'Could not load this version' });
+    }
+  };
+
+  const runCompare = async (against) => {
+    if (!selected) return;
+    const seq = ++cmpSeq.current;
+    setCmp({ status: 'loading', against, diff: null, error: null });
+    try {
+      // "Current" is the saved head on the server: flush unsaved edits first so the comparison covers what the user sees.
+      if (against === 'head' && flushSave && !(await flushSave())) {
+        if (seq === cmpSeq.current) setCmp({ status: 'error', against, diff: null, error: 'Your latest edits could not be saved, so the comparison was not run.' });
+        return;
+      }
+      const diff = await getVersionDiff(diagramId, selected.number, against);
+      if (seq !== cmpSeq.current) return;
+      setCmp({ status: 'ready', against, diff, error: null });
+      // Only a comparison against the current diagram can be drawn on the canvas (positions are the current ones).
+      setCompare(against === 'head' ? { from: { number: selected.number, title: versionTitle(selected) }, to: 'head', changes: diff.changes, summary: diff.summary } : null);
+    } catch (e) {
+      if (seq === cmpSeq.current) setCmp({ status: 'error', against, diff: null, error: e.message || 'Could not compare these versions' });
+    }
+  };
+
+  const toggleOverlay = () => {
+    if (overlay) { setCompare(null); return; }
+    if (cmp.status === 'ready' && cmp.against === 'head') {
+      setCompare({ from: { number: selected.number, title: versionTitle(selected) }, to: 'head', changes: cmp.diff.changes, summary: cmp.diff.summary });
     }
   };
 
@@ -236,6 +273,35 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
             </div>
             <p className="vh-hint">Simplified preview (shapes and labels). Restore to see the exact diagram.</p>
 
+            <div className="vh-compare">
+              <button type="button" className="vh-secondary" onClick={() => runCompare('head')} disabled={cmp.status === 'loading'}>
+                Compare with current
+              </button>
+              <select
+                aria-label="Compare with another version"
+                value=""
+                disabled={cmp.status === 'loading'}
+                onChange={(e) => e.target.value && runCompare(e.target.value)}
+              >
+                <option value="">Compare with...</option>
+                {items.filter((v) => v.number !== selected.number).map((v) => (
+                  <option key={v.id} value={v.number}>#{v.number} {versionTitle(v)}</option>
+                ))}
+              </select>
+            </div>
+            {cmp.status === 'loading' && <p className="vh-muted" role="status">Comparing...</p>}
+            {cmp.status === 'error' && <p role="alert" className="vh-error">{cmp.error}</p>}
+            {cmp.status === 'ready' && (
+              <CompareSummary
+                diff={cmp.diff}
+                against={cmp.against}
+                fromTitle={selectedTitle}
+                overlayOn={!!overlay}
+                onToggleOverlay={toggleOverlay}
+                onReveal={cmp.against === 'head' ? requestReveal : null}
+              />
+            )}
+
             {canWrite && (
               <div className="vh-actions">
                 {renaming ? (
@@ -365,6 +431,8 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
         .vh-rename { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
         .vh-rename input { flex: 1 1 140px; }
         .vh-more { align-self: center; margin-top: 8px; }
+        .vh-compare { display: flex; flex-wrap: wrap; gap: 8px; }
+        .vh-compare select { flex: 1 1 160px; min-width: 0; padding: 7px 8px; border: 1px solid var(--border, #d1d5db); border-radius: 8px; font: inherit; background: var(--bg, #fff); color: inherit; }
       `}</style>
     </aside>
   );
