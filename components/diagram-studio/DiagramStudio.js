@@ -33,6 +33,9 @@ import { FEATURES } from '../../lib/features';
 import { accessMode as getAccessMode, canCommentWith } from './sharing/accessMode';
 import { ShareDialog, OPEN_SHARE_DIALOG_EVENT } from './ui/ShareDialog';
 import { VersionHistory, OPEN_VERSION_HISTORY_EVENT } from './ui/VersionHistoryPanel';
+import CompareOverlay from './ui/CompareOverlay';
+import { onReveal, setCompare, useCompare } from './versions/compareStore';
+import { computeFitForCanvas } from './viewportFit';
 import { initializeStencilStyles } from './styling/StencilStyleManager';
 import LoadingScreen from '../ui/LoadingScreen';
 
@@ -114,7 +117,7 @@ function DiagramStudioInner({
     connections,
     readOnly: profile?.editingPolicy?.readOnly,
   });
-  const { selection, selectedElements, selectElements } = useDiagramSelection();
+  const { selection, selectedElements, selectElements, selectConnection } = useDiagramSelection();
   const [draggingStencil, setDraggingStencil] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
@@ -216,6 +219,39 @@ function DiagramStudioInner({
     const shift = Math.min(right - (p.left - 24), Math.max(0, left - (c.left + 24)));
     if (shift > 0) setViewport?.(prev => ({ ...prev, x: prev.x - shift / prev.scale }));
   }, [setViewport]);
+
+  // Version compare (slice 8): the History panel asks the canvas to select / zoom to one changed entity. Pure view
+  // state (selection + viewport); removed entities have no live element, so only the ghost position is shown.
+  const compare = useCompare();
+  const revealStateRef = useRef({});
+  revealStateRef.current = { elements, connections, selectElements, selectConnection, setViewport };
+  useEffect(() => onReveal((change) => {
+    const st = revealStateRef.current;
+    let box = null;
+    if (change.kind === 'element') {
+      const el = change.change === 'removed' ? null : st.elements.find((e) => e.id === change.id);
+      if (el) st.selectElements([el.id]);
+      box = el || (change.bounds && { x: change.bounds.x, y: change.bounds.y, size: { width: change.bounds.width, height: change.bounds.height } });
+    } else if (change.kind === 'connection' && change.change !== 'removed') {
+      const conn = st.connections.find((c) => c.id === change.id);
+      if (conn) {
+        st.selectConnection(conn.id);
+        const ends = [conn.sourceId, conn.targetId].map((id) => st.elements.find((e) => e.id === id)).filter(Boolean);
+        if (ends.length) box = { ends };
+      }
+    }
+    if (!box) return;
+    const targets = box.ends || [box];
+    const panel = document.querySelector('.vh-panel');
+    const fit = computeFitForCanvas(targets, {
+      container: canvasContainerRef.current,
+      obstacles: panel ? [panel.getBoundingClientRect()] : [],
+      padding: 120,
+      maxScale: 1,
+    });
+    if (fit) st.setViewport(fit);
+  }), []);
+  useEffect(() => () => setCompare(null), [diagram?.id]); // leaving a diagram never leaves a stale overlay behind
 
   useEffect(() => {
     if (!showPropertiesPanel) return undefined;
@@ -878,6 +914,9 @@ function DiagramStudioInner({
                 packRegistry={packRegistry}
                 containerRef={canvasContainerRef}
               />
+
+              {/* Version compare highlight (read-only; dismissible) */}
+              <CompareOverlay compare={compare} elements={elements} connections={connections} viewport={viewport} onDismiss={() => setCompare(null)} />
 
               {/* Comment Markers Overlay */}
               {showComments && viewport && comments.map(comment => (

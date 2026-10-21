@@ -147,6 +147,12 @@ dbDescribe('versionRepository (throwaway database)', () => {
       expect(await repo.get(id, 99)).toBeNull();
       expect(await repo.get(other, 1)).toBeNull();
     });
+
+    test('getHeadContent returns the stored head content (slice 8 compare); unknown diagram -> null', async () => {
+      const id = await newDiagram();
+      expect((await repo.getHeadContent(id)).elements).toHaveLength(1);
+      expect(await repo.getHeadContent('00000000-0000-4000-8000-000000000000')).toBeNull();
+    });
   });
 
   describe('update (rename / describe)', () => {
