@@ -22,6 +22,7 @@ import { docToMarkdownFile, docFileName } from '../../../../lib/doc/docText';
 import { elementLink } from '../../../../lib/doc/docHref';
 
 const FLUSH_MS = 400;
+const PREVIEW_MAX_BLOCKS = 400;
 const utf8Bytes = utf8Length;
 const linkText = (label) => String(label || 'element').replace(/[[\]\\\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'element';
 
@@ -295,7 +296,7 @@ export default function DocPanel({ elementId, onClose }) {
         />
       ) : (
         <div style={S.preview} data-testid="doc-preview">
-          {text.trim() ? <DocMarkdown markdown={text} knownIds={knownIds} onElementLink={followElementLink} /> : <div style={{ color: 'var(--text-light, #94a3b8)', fontStyle: 'italic' }}>Empty doc.</div>}
+          {text.trim() ? <DocMarkdown markdown={text} knownIds={knownIds} onElementLink={followElementLink} maxBlocks={PREVIEW_MAX_BLOCKS} truncationNotice /> : <div style={{ color: 'var(--text-light, #94a3b8)', fontStyle: 'italic' }}>Empty doc.</div>}
         </div>
       )}
 

@@ -152,16 +152,17 @@ function Blocks({ blocks, ctx }) {
 /**
  * @param {{markdown: string, knownIds?: Set<string>, onElementLink?: (id: string) => void, maxBlocks?: number, maxChars?: number}} props
  */
-export default function DocMarkdown({ markdown, knownIds, onElementLink, maxBlocks, maxChars }) {
-  const blocks = useMemo(() => {
+export default function DocMarkdown({ markdown, knownIds, onElementLink, maxBlocks, maxChars, truncationNotice }) {
+  const { blocks, hidden } = useMemo(() => {
     const src = typeof markdown === 'string' ? (maxChars ? markdown.slice(0, maxChars) : markdown) : '';
     const all = parseMarkdown(src);
-    return maxBlocks ? all.slice(0, maxBlocks) : all;
+    return maxBlocks && all.length > maxBlocks ? { blocks: all.slice(0, maxBlocks), hidden: all.length - maxBlocks } : { blocks: all, hidden: 0 };
   }, [markdown, maxBlocks, maxChars]);
   const ctx = useMemo(() => ({ knownIds, onElementLink }), [knownIds, onElementLink]);
   return (
     <div style={S.root} data-doc-markdown>
       <Blocks blocks={blocks} ctx={ctx} />
+      {truncationNotice && hidden > 0 && <p data-testid="doc-preview-truncated" style={{ ...S.p, color: C.muted, fontStyle: 'italic' }}>Preview truncated: {hidden} more blocks. Editing is not affected.</p>}
     </div>
   );
 }

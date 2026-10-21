@@ -232,6 +232,16 @@ describe('DocPanel', () => {
     assertInert(screen.getByTestId('doc-preview'));
   });
 
+  test('a very large doc previews only the first blocks, with a notice; the text itself is untouched', () => {
+    const big = Array.from({ length: 900 }, (_, i) => `Paragraph ${i}`).join('\n\n');
+    open(mkDoc(big));
+    fireEvent.click(screen.getByTestId('doc-tab-preview'));
+    expect(screen.getByTestId('doc-preview').querySelectorAll('p').length).toBeLessThan(450);
+    expect(screen.getByTestId('doc-preview-truncated')).toHaveTextContent(/more blocks/);
+    fireEvent.click(screen.getByTestId('doc-tab-write'));
+    expect(screen.getByTestId('doc-textarea').value).toBe(big);
+  });
+
   test('over the size cap the input is refused with a message', () => {
     open(mkDoc(''));
     fireEvent.change(screen.getByTestId('doc-textarea'), { target: { value: 'a'.repeat(MAX_DOC_BYTES + 1) } });

@@ -55,7 +55,7 @@ Every write needs `id` and `baseRevision` (from your last read). Each call is on
 A doc is a Markdown text card on the board (title and first lines on the card, full text in the side panel). Up to 100 KB each.
 
 - `doc_create {id, baseRevision, title, markdown, anchor?, width?, height?}`: `anchor` as in `map_structure` (`near`, `at`, `inFrame`; default free space right of content). Returns `elementId`, `revision`, `versionId`, `elementLinks` (each `#el=` target and whether it exists) and `warnings`.
-- `doc_update {id, baseRevision, elementId, title?, markdown | append | replaceSection {heading, markdown}}`: exactly one of the three text modes. `replaceSection` needs a unique heading (matched ignoring case); the error lists the headings. Locked docs are refused.
+- `doc_update {id, baseRevision, elementId, title?, markdown | append | replaceSection {heading, markdown}}`: exactly one of the three text modes. `replaceSection` needs a unique heading (matched ignoring case); the error lists the headings. The new body stays inside its section: headings in it at the section's level or higher are demoted one level below it, and an unterminated code fence is closed. Locked docs are refused.
 - `doc_get {id, elementId, offset?, limit?}`: the stored text, paged on heading boundaries (`next` is the following offset; limit up to 12000 characters), plus `headings` and `elementLinks`.
 - Markdown: headings, bold, italic, strike, code, bullet, numbered and task lists, quotes, fenced code, tables, `---`, links. Allowed link targets: `https`, `mailto`, `#el=<elementId>` (selects and zooms to the element), `/diagram/LAB-12`. Raw HTML and images are not supported and are neutralized (the result `warnings` say so).
 
