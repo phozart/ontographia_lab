@@ -52,10 +52,13 @@ Cursor (`~/.cursor/mcp.json` or `.cursor/mcp.json`):
 | `diagram_thumbnail` | The stored preview image, when one exists.                                         |
 | `stencil_catalog`   | The stencil packs and what each shape type means.                                  |
 | `diagram_apply_ops` | Change a diagram with a batch of operations (editor tokens only; see below).       |
+| `map_structure`     | Build a mind map, tree, flow, cluster or grid from nodes, edges and groups (editor tokens only; section 6). |
+| `layout_apply`      | Re-arrange elements that are already on the board, positions only (editor tokens only; section 6). |
+| `guide_get`         | The canvas guide (workflow, shapes, limits); the same text as the resource below. |
 
 | `board_read_region` | Part of a diagram in reading order: a frame, a selection, a rectangle or the area around one element. |
 
-Resources: `ontographia://diagrams/{id}` (compact JSON), `ontographia://diagrams/{id}/mermaid`, `ontographia://catalog/{packId}`.
+Resources: `ontographia://diagrams/{id}` (compact JSON), `ontographia://diagrams/{id}/mermaid`, `ontographia://catalog/{packId}`, `ontographia://guide/canvas` (how to read a board, think and build). Prompts (slash commands in hosts that show them): `cluster_region` (group the notes of a region by theme) and `map_from_text`.
 
 Diagram names, labels and descriptions are user-authored data. The tool descriptions tell the model not to treat them as instructions; hosts should still ask for confirmation before acting on anything derived from them.
 
@@ -109,3 +112,35 @@ How an edit works:
 - **History**: every successful call creates a version attributed to you, created via the agent, plus a version of the state just before it when that state was not already saved, so restoring "the version before" undoes the whole batch (Version history in the editor).
 - **If you have the diagram open**: the editor does not live-update. Your next save is rejected with the usual "changed by someone else" conflict (409); reload to see the agent's work. Real-time sync is not part of this slice.
 - Agents cannot delete diagrams, change sharing or create share links. Diagram text is treated as data, never as instructions, but an editor token is still a write credential: keep the allowlist small and revoke it when you are done.
+
+## 6. Summarize, then map it (map_structure and layout_apply)
+
+Claude does the thinking (summarizing, grouping, naming); Ontographia only builds what Claude decides, deterministically. There is no AI inside the app. Everything below needs the editor token from section 5 and the diagram on its allowlist. Each call is one version in History, so one click restores the board from before it.
+
+**"Summarize this and map it as a mind map."** Paste the text, or a "Copy link for Claude" link to a frame. Claude reads it (`board_read_region` for a link), writes the summary, then calls `map_structure` once:
+
+```json
+{
+  "id": "LAB-12",
+  "baseRevision": 31,
+  "layout": "mindmap",
+  "structure": {
+    "nodes": [
+      { "key": "hub", "label": "Q3 customer feedback" },
+      { "key": "onb", "label": "Onboarding is slow" },
+      { "key": "price", "label": "Pricing page is unclear" }
+    ],
+    "edges": [ { "from": "hub", "to": "onb" }, { "from": "hub", "to": "price" } ]
+  }
+}
+```
+
+The hub goes in the middle with branches on both sides, in free space to the right of what is already on the board. The result lists the new element ids by `key`.
+
+**"Cluster the notes in this frame by theme."** Claude reads the frame, names the themes, then calls `map_structure` with `layout: "cluster"`, one entry in `groups` per theme, and every existing note as a node with `existingId` and its `group`. The notes are moved, not copied; each theme becomes a frame sized to its notes. Add `"anchor": {"inFrame": "<frameId>"}` to build inside a frame (it grows if it must), or `{"near": "<elementId>"}` / `{"at": {"x": 0, "y": 0}}` to choose where.
+
+**"Turn these steps into a flow."** `layout: "flow"` lays nodes left to right along the edges (cycles are fine); leave `stencil` out and each step is a Task, or name one such as `process-flow/exclusive-gateway`.
+
+**"Tidy this frame."** `layout_apply` with `target: {"frameId": "..."}` and `layout: "grid"` re-arranges the frame's members without touching their text, sizes or connections. `target: {"elementIds": [...]}` arranges a selection; connections between the elements drive `tree`, `mindmap`, `radial` and `flow`.
+
+Layouts: `tree` (top-down hierarchy), `mindmap`, `radial`, `flow`, `grid`, `cluster`. Limits per call: 200 nodes, 400 edges, 40 groups. New content never overlaps existing content and nothing you did not name is moved. If the board changed since Claude read it, nothing is written and Claude is told to read again. Open editors pick the change up within a few seconds (slice AI-2).
