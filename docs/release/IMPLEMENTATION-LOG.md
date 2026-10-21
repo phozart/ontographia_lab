@@ -207,6 +207,16 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Deviations from the ADR:** none. Turning the flag on in production and the owner's walk-through on claude.ai and mobile are deployment steps (see the PR's Deployment section), not code.
 - **Tests:** list shapes and privacy (no secrets, names only for readable diagrams), Disconnect effect on access and refresh tokens, foreign and malformed ids, cross-origin refusal, audit row, UI (hidden when off, empty state, rows, expand, confirm, failure), browser e2e of Disconnect from the Account page.
 
+## Slice AI-C — diagram_create (new private board from an agent)
+
+- **PR title:** `feat(mcp): diagram_create tool (new private board owned by the user, allowlist updated atomically)`
+- **Refs:** owner request 2026-10-21; `docs/architecture/investigations/mcp-and-embedding.md` ("As-built notes (diagram_create)"), ADR-0005 (all_diagrams, per-request admin re-check), Q-AI1 (agents do not manage sharing).
+- **Branch:** `feat/mcp-diagram-create`
+- **Files changed:** `lib/mcp/createTool.js` (new), `lib/mcp/server.js` (one registration line, instructions), `lib/mcp/guide.js`, `lib/diagramRepository.js` (`createDiagram` takes an optional transaction client; behavior unchanged without it), `jest.config.js` (db suite list), skill `skills/ontographia-lab/` (SKILL.md "new board" workflow, reference/tools, troubleshooting, examples), `mcp-connect-howto.md` (section 5a), `mcp-and-embedding.md` (as-built); tests `mcpDiagramCreate` (db), `mcpServer` (tool list).
+- **Decisions:** editor-capped principals only; same creation path as `POST /api/diagrams` (no per-user quota exists, so none applies); private board; the creating credential's own allowlist gets the id in the same transaction (`ALLOWLIST_FULL` at 50, nothing created); 10 creates per hour per credential plus the shared write limit; audit `diagram.agent_create`; no initial version (the normal create path makes none).
+- **Deviations from the doc sketch:** input is `{name, description?}` only (board type fixed to `infinite-canvas`, no `ops`/`layout`).
+- **Tests:** role denial (viewer/commenter, personal and OAuth), allowlist append for this token/grant only, follow-up `map_structure`, admin `all_diagrams` create and edit, revoked/disconnected/suspended/demoted mid-request, rate limit, name and description validation, audit row without content, dashboard listing, atomicity.
+
 ## Slice AI-4 — Table element (editor, export, diff and merge, MCP tools)
 
 - **PR title:** `feat: slice AI-4 table element (typed columns, inline editing, paste, CSV/JSON export, diff and merge) and table_create / table_update / table_get`
