@@ -4,6 +4,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle, useCallback } from 'react';
 import { useDiagram } from '../DiagramContext';
 import { quickShapeAction, isStencilArmed } from './shapeSidebarLogic';
+import { stencils as CORE_STENCILS } from '../packs/catalog/core';
 
 // Icons
 import SquareOutlinedIcon from '@mui/icons-material/SquareOutlined';
@@ -24,6 +25,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import ViewQuiltOutlinedIcon from '@mui/icons-material/ViewQuiltOutlined';
 import SupportAgentOutlinedIcon from '@mui/icons-material/SupportAgentOutlined';
 import GridViewOutlinedIcon from '@mui/icons-material/GridViewOutlined';
+import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined';
 
 // Map pack IDs to icons
 export const PACK_ICONS = {
@@ -136,6 +138,15 @@ const QUICK_SHAPES = [
       isFrame: true,
       noConnections: true,
     }
+  },
+  {
+    // Doc card (AI-5): a Markdown document on the board; the stencil comes from the core catalog
+    id: 'doc',
+    icon: <ArticleOutlinedIcon />,
+    name: 'Doc',
+    stencilId: 'doc',
+    packId: 'core',
+    stencilData: CORE_STENCILS.find((st) => st.id === 'doc'),
   },
 ];
 

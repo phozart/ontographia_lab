@@ -46,7 +46,11 @@ import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOption
 import { shouldHandleShortcut, isOverlayOpen } from './hooks/interaction/keyboardFocus';
 import { resolveFKey } from './hooks/interaction/editorShortcuts';
 import { findFreePlacement, placeAtPoint, DEFAULT_STICKY_SIZE, DEFAULT_STENCIL_SIZE } from './hooks/interaction/placement';
+import { newTableElement } from './elements/table/newTableElement';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
+import { docDefaults } from '../../lib/doc/docElement';
+import { openDoc } from './elements/doc/docStore';
+import { requestDocImportFromDrop } from './elements/doc/useDocImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
 import FloatingBox from './ui/FloatingBox';
 import { RemoteHighlightLayer, RemoteHighlightChip, useHighlightLifecycle } from './ui/RemoteHighlight';
@@ -572,6 +576,11 @@ function Node({
 
   const handleDoubleClick = (e) => {
     e.stopPropagation();
+    if (element.type === 'doc') {
+      // A doc card opens its side-panel editor (read-only viewers get the same panel without editing controls)
+      openDoc(element.id);
+      return;
+    }
     if (!readOnly && !isConnectMode) {
       // Double-click enters label editing mode
       onEditingLabelDone?.(element.id, true);
@@ -3055,6 +3064,15 @@ export default function DiagramCanvas({
     return newElement;
   }, [addElement, selectElement, setActiveTool, stickyNoteColor]);
 
+  // Table tool: a click places a 3 x 3 table (header row, empty cells) centered on the click point.
+  const placeTable = useCallback((x, y) => {
+    const element = newTableElement({ x, y, place: (point, size) => placeAtPoint(point, size, GRID_SIZE) });
+    addElement(element);
+    selectElement(element.id);
+    setActiveTool('select');
+    return element;
+  }, [addElement, selectElement, setActiveTool]);
+
   const handleMouseUp = useCallback((e) => {
     // Complete draw-to-size (requires actual drag, not just click)
     if (drawing) {
@@ -3094,10 +3112,12 @@ export default function DiagramCanvas({
             color: selectedStencil.color,
             layerId: 'default',
             properties: {},
+            ...docDefaults(selectedStencil),
           };
 
           addElement(newElement);
           selectElement(newElement.id);
+          if (newElement.type === 'doc') openDoc(newElement.id);
           // Return to select mode after creating element
           setActiveTool('select');
           setSelectedStencil(null);
@@ -3127,9 +3147,11 @@ export default function DiagramCanvas({
           color: selectedStencil.color,
           layerId: 'default',
           properties: {},
+          ...docDefaults(selectedStencil),
         };
         addElement(newElement);
         selectElement(newElement.id);
+        if (newElement.type === 'doc') openDoc(newElement.id);
         setActiveTool('select');
         setSelectedStencil(null);
         if (isTextLikeStencil(newElement.type)) {
@@ -3632,6 +3654,11 @@ export default function DiagramCanvas({
           setDrawing({ startX: x, startY: y, currentX: x, currentY: y });
           clearSelection();
         }
+      } else if (!readOnly && activeTool === 'table') {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (rect) {
+          placeTable((e.clientX - rect.left) / viewport.scale - viewport.x, (e.clientY - rect.top) / viewport.scale - viewport.y);
+        }
       } else if (!readOnly && activeTool === 'sticky') {
         // Sticky tool: drag to size, or a plain click to place at the default size
         // (the decision is made on mouse-up).
@@ -3660,7 +3687,7 @@ export default function DiagramCanvas({
         clearSelection();
       }
     }
-  }, [activeTool, clearSelection, elements, viewport, readOnly, packRegistry, isSpacePressed, commentMode, onCanvasClick, selectedStencil, selection, setSelectedStencil, setActiveTool, stickyNoteColor, addElement, recordHistory, selectElement]);
+  }, [activeTool, clearSelection, elements, viewport, readOnly, packRegistry, isSpacePressed, commentMode, onCanvasClick, selectedStencil, selection, setSelectedStencil, setActiveTool, stickyNoteColor, addElement, recordHistory, selectElement, placeTable]);
 
   // ============ ZOOM HANDLING ============
 
@@ -3771,6 +3798,9 @@ export default function DiagramCanvas({
     const x = (e.clientX - rect.left) / viewport.scale - viewport.x;
     const y = (e.clientY - rect.top) / viewport.scale - viewport.y;
 
+    // A dropped .md file becomes a doc card at the drop point
+    if (requestDocImportFromDrop(e.dataTransfer, { x, y })) return;
+
     // Try to parse dropped data - try application/json first, then fallback to text/plain
     let rawData = e.dataTransfer.getData('application/json');
     if (!rawData) {
@@ -3802,8 +3832,10 @@ export default function DiagramCanvas({
             y: snappedY,
             size: stencil.defaultSize || { width: 120, height: 60 },
             color: stencil.color,
+            ...docDefaults(stencil),
           });
           selectElement(dropped.id);
+          if (dropped.type === 'doc') openDoc(dropped.id);
           if (isTextLikeStencil(stencil.id)) {
             freshNodeIdsRef.current.add(dropped.id);
             setEditingLabelId(dropped.id);
@@ -5183,7 +5215,7 @@ export default function DiagramCanvas({
         onMouseDown={handleCanvasMouseDown}
         onClick={handlePortClick}
         style={{
-          cursor: isPanning ? 'grabbing' : isConnecting ? 'crosshair' : commentMode ? 'crosshair' : activeTool === 'pan' ? 'grab' : activeTool === 'draw' ? 'crosshair' : activeTool === 'sticky' ? 'crosshair' : 'default',
+          cursor: isPanning ? 'grabbing' : isConnecting ? 'crosshair' : commentMode ? 'crosshair' : activeTool === 'pan' ? 'grab' : activeTool === 'draw' ? 'crosshair' : activeTool === 'sticky' || activeTool === 'table' ? 'crosshair' : 'default',
         }}
       >
         <div

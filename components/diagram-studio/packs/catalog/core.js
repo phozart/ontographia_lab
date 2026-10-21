@@ -24,6 +24,28 @@ export const stencils = [
     ],
   },
 
+  // Doc card (AI-5): a Markdown document that lives on the board. Content is data.doc = {title, markdown, ...};
+  // the card shows the title and the first lines, the side panel edits it (components/diagram-studio/elements/doc).
+  {
+    id: 'doc',
+    name: 'Doc',
+    description: 'A text document on the board (Markdown). Link to elements with #el= links; write summaries next to the map.',
+    group: 'Basic',
+    shape: 'doc',
+    icon: '\uD83D\uDCC4',
+    color: '#4FB3CE',
+    defaultSize: { width: 320, height: 220 },
+    defaultLabel: 'Untitled doc',
+    defaultData: { doc: { title: 'Untitled doc', markdown: '' } },
+    ports: [
+      { id: 'top', position: 'top' },
+      { id: 'right', position: 'right' },
+      { id: 'bottom', position: 'bottom' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+  },
+
   // Section - A lighter container for grouping
   {
     id: 'section',
@@ -39,6 +61,27 @@ export const stencils = [
     properties: [
       { id: 'sectionTitle', label: 'Title', type: 'text' },
     ],
+  },
+
+  // Table (AI-4): a typed matrix. Rows, columns and cells live in `element.data.table` (lib/table/tableModel.js);
+  // the size follows the content (height grows with rows), so it is kept in sync by the table editor and the MCP tools.
+  {
+    id: 'table',
+    name: 'Table',
+    description: 'A table with typed columns (text, number, select, boolean). Rows can link to elements on the board.',
+    group: 'Basic',
+    shape: 'table',
+    icon: '▦',
+    color: '#4FB3CE',
+    defaultSize: { width: 520, height: 130 },
+    ports: [
+      { id: 'top', position: 'top' },
+      { id: 'right', position: 'right' },
+      { id: 'bottom', position: 'bottom' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+    properties: [],
   },
 
   // Text Block

@@ -3,6 +3,8 @@
 
 import React from 'react';
 import { stencils, connectionTypes } from './catalog/core';
+import TableNode from '../elements/table/TableNode';
+import DocCard from '../elements/doc/DocCard';
 
 // ============ STENCILS ============
 
@@ -215,8 +217,12 @@ function renderNode(element, stencil, isSelected) {
       return <FrameNode element={element} stencil={stencil} isSelected={isSelected} />;
     case 'section':
       return <SectionNode element={element} stencil={stencil} />;
+    case 'table':
+      return <TableNode element={element} stencil={stencil} isSelected={isSelected} />;
     case 'diamond':
       return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} />;
+    case 'doc':
+      return <DocCard element={element} />;
     default:
       // Return undefined (not null) to allow default rendering for basic shapes
       // like rectangle, circle, text-block, divider

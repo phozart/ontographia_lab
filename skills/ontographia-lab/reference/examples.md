@@ -31,3 +31,8 @@ The lab is a substrate: you choose the structure; the tools place it. These are 
 ## Text to map ("map this summary")
 
 User pastes meeting notes. Pick `mindmap` for themes or `flow` for steps, root first, short labels, details in `data`. `diagram_get` for the revision, `map_structure`, `diagram_show`, then list what you built.
+
+## From a map to a table to a summary
+
+"Draw the architecture in this text, put it in a table, then summarize it." `map_structure` (`cluster` by domain) for the graph; `diagram_get` (`format: "outline"` is cheap, `compact` has the ids) for the element ids; one `table_create` with a row per component (`Component`, `Tier` as select, `Instances` as number, `Critical` as boolean), each row's `elementId` set to the component's element id and `anchor: {near: <a component id>}`; `diagram_show`; then write the summary in your reply. After the board changes, `table_update` with `key: "Component"` refreshes the rows instead of duplicating them.
+
