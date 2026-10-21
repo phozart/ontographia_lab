@@ -220,6 +220,7 @@ describe('Table element (AI-4)', () => {
     await page.keyboard.press('Delete');
     await page.waitForSelector('[data-testid="table-row-link-gone"]', { timeout: 5000 });
     expect(await page.$$eval('[data-testid="table-row-link"]', (n) => n.length)).toBe(4);
+    for (let i = 0; i < 30 && (await head(page, d)).content.elements.some((e) => e.id === 'n-search'); i += 1) await sleep(500); // the deletion is saved
     const after = await waitSaved(page, d, (t) => t.rows.some((r) => r.elementId === 'n-search'));
     expect(after.table.rows.find((r) => r.elementId === 'n-search')).toBeTruthy(); // dangling link kept, still valid
     await shot(page, 'table-dangling.png');
