@@ -10,6 +10,7 @@ Proposed work is in the ADRs and companion docs below; nothing here is implement
 | [adr/0003-sharing-and-permissions.md](adr/0003-sharing-and-permissions.md) | Group C — roles, grants, invitations, links, single authorization function, audit |
 | [adr/0004-realtime-collaboration.md](adr/0004-realtime-collaboration.md) | Group D — decision record + prerequisites only |
 | [adr/0005-mcp-oauth.md](adr/0005-mcp-oauth.md) | MCP sign-in from claude.ai / Desktop / mobile: minimal OAuth AS, connected apps (slices O1–O4) |
+| [adr/0006-live-activity-and-presence.md](adr/0006-live-activity-and-presence.md) | Live activity panel, Claude activity indicator, change highlight (Step 1); presence, live cursors and follow over a WebSocket sidecar (Step 2) |
 | [data-model.md](data-model.md) | Proposed DDL, indexes, migration mechanism, retention |
 | [api-contracts.md](api-contracts.md) | REST contracts for B and C, authorization signature, MCP tool sketch |
 | [open-questions.md](open-questions.md) | Decisions that belong to the product owner, each with a recommended default |
