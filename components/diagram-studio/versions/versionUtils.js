@@ -30,6 +30,7 @@ export function versionTitle(v) {
   if (v.label) return v.label;
   if (v.kind === 'restore') return v.restoredFrom ? `Restored from #${v.restoredFrom.number}` : 'Restore';
   if (v.kind === 'pre_restore') return 'Before restore';
+  if (v.kind === 'auto' && v.createdVia === 'system') return 'Before AI change'; // the restore point taken before an agent batch
   if (v.kind === 'auto') return 'Autosave';
   return `Version ${v.number}`;
 }
@@ -99,4 +100,10 @@ export function buildVersionPreview(content) {
     // drop the export timestamp: the preview is derived data, keep it deterministic
     .replace(/\sdata-exported-at="[^"]*"/, '');
   return { url: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, elementCount: clean.elements.length };
+}
+
+/** Author line: AI agent versions name the person whose token made them ("AI agent (via Ada)"). */
+export function versionAuthor(v) {
+  if (v.createdVia === 'agent') return v.createdBy?.name ? `AI agent (via ${v.createdBy.name})` : 'AI agent';
+  return v.createdBy?.name || 'System';
 }

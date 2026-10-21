@@ -54,11 +54,22 @@ describe('validateTokenInput', () => {
     expect(r.value).toMatchObject({ name: 'CI bot', roleCap: 'viewer', diagramIds: null });
   });
 
-  test('role cap is viewer or commenter only; editor/owner/unknown are refused', () => {
+  test('role cap is viewer, commenter or editor; owner/unknown are refused', () => {
     expect(validateTokenInput({ name: 'a', roleCap: 'commenter' }, NOW).ok).toBe(true);
-    for (const roleCap of ['editor', 'owner', 'admin', '', 5]) {
+    for (const roleCap of ['owner', 'admin', '', 5]) {
       expect(validateTokenInput({ name: 'a', roleCap }, NOW).ok).toBe(false);
     }
+  });
+
+  test('editor cap requires a non-empty diagram allowlist (Q-MCP2)', () => {
+    const noList = validateTokenInput({ name: 'a', roleCap: 'editor' }, NOW);
+    expect(noList.ok).toBe(false);
+    expect(noList.error).toMatch(/Editor tokens require/);
+    expect(validateTokenInput({ name: 'a', roleCap: 'editor', diagramIds: [] }, NOW).ok).toBe(false);
+    expect(validateTokenInput({ name: 'a', roleCap: 'editor', diagramIds: null }, NOW).ok).toBe(false);
+    const ok = validateTokenInput({ name: 'a', roleCap: 'editor', diagramIds: ['123e4567-e89b-12d3-a456-426614174000'] }, NOW);
+    expect(ok.ok).toBe(true);
+    expect(ok.value.roleCap).toBe('editor');
   });
 
   test('name is required, trimmed and length-limited', () => {
@@ -219,7 +230,21 @@ describe('verifyToken', () => {
     expect(await verifyToken(secret, NOW)).toEqual({ ok: false, reason: 'inactive' });
   });
 
-  test('a stored role cap outside viewer/commenter fails closed', async () => {
+  test('a stored editor cap without an allowlist fails closed (defense in depth behind the DB check)', async () => {
+    query.mockResolvedValueOnce({ rows: [row({ role_cap: 'editor', diagram_ids: null })] });
+    expect(await verifyToken(secret, NOW)).toEqual({ ok: false, reason: 'invalid' });
+    query.mockResolvedValueOnce({ rows: [row({ role_cap: 'editor', diagram_ids: [] })] });
+    expect(await verifyToken(secret, NOW)).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  test('an editor token with an allowlist resolves to an editor-capped agent principal', async () => {
+    query.mockResolvedValueOnce({ rows: [row({ role_cap: 'editor', diagram_ids: [D1] })] });
+    const r = await verifyToken(secret, NOW);
+    expect(r.ok).toBe(true);
+    expect(r.principal).toMatchObject({ roleCap: 'editor', diagramScope: [D1] });
+  });
+
+  test('a stored role cap outside viewer/commenter/editor fails closed', async () => {
     query.mockResolvedValueOnce({ rows: [row({ role_cap: 'owner' })] });
     expect(await verifyToken(secret, NOW)).toEqual({ ok: false, reason: 'invalid' });
   });

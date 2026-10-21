@@ -58,22 +58,25 @@ export default function ApiTokensSection() {
     }
   }, []);
 
+  const isEditor = roleCap === 'editor';
+  const restrict = isEditor || limitDiagrams; // an editor token always needs an allowlist (Q-MCP2)
+
   useEffect(() => {
     load();
   }, [load]);
 
   useEffect(() => {
-    if (!limitDiagrams || diagrams.length) return;
+    if (!restrict || diagrams.length) return;
     fetch('/api/diagrams')
       .then((r) => (r.ok ? r.json() : []))
       .then((list) => setDiagrams(Array.isArray(list) ? list : []))
       .catch(() => setDiagrams([]));
-  }, [limitDiagrams, diagrams.length]);
+  }, [restrict, diagrams.length]);
 
   const create = async (e) => {
     e.preventDefault();
     setError('');
-    if (limitDiagrams && selected.length === 0) {
+    if (restrict && selected.length === 0) {
       setError('Pick at least one diagram, or turn the restriction off.');
       return;
     }
@@ -83,7 +86,7 @@ export default function ApiTokensSection() {
         name,
         roleCap,
         expiresInDays: expiry === 'never' ? null : Number(expiry),
-        diagramIds: limitDiagrams ? selected.map((d) => d.id) : null,
+        diagramIds: restrict ? selected.map((d) => d.id) : null,
       };
       const res = await fetch('/api/user/tokens', {
         method: 'POST',
@@ -139,7 +142,7 @@ export default function ApiTokensSection() {
         </Typography>
       </Box>
       <Typography variant="body2" sx={{ color: 'var(--text-muted)', mb: 2 }}>
-        Let tools such as Claude Code or Cursor read your diagrams over MCP. A token acts as you, never with more than
+        Let tools such as Claude Code or Cursor read your diagrams over MCP, or edit chosen diagrams with an editor token. A token acts as you, never with more than
         the role you choose, and can be limited to specific diagrams. Treat it like a password.
       </Typography>
 
@@ -185,6 +188,7 @@ export default function ApiTokensSection() {
           <TextField select label="Role" size="small" value={roleCap} onChange={(e) => setRoleCap(e.target.value)} sx={{ minWidth: 160 }}>
             <MenuItem value="viewer">Viewer (read only)</MenuItem>
             <MenuItem value="commenter">Commenter</MenuItem>
+            <MenuItem value="editor">Editor (requires choosing diagrams)</MenuItem>
           </TextField>
           <TextField select label="Expires" size="small" value={expiry} onChange={(e) => setExpiry(e.target.value)} sx={{ minWidth: 140 }}>
             {EXPIRY_OPTIONS.map((o) => (
@@ -195,10 +199,16 @@ export default function ApiTokensSection() {
           </TextField>
         </Box>
         <FormControlLabel
-          control={<Checkbox checked={limitDiagrams} onChange={(e) => setLimitDiagrams(e.target.checked)} />}
+          control={<Checkbox checked={restrict} disabled={isEditor} onChange={(e) => setLimitDiagrams(e.target.checked)} />}
           label="Limit to specific diagrams"
         />
-        {limitDiagrams && (
+        {isEditor && (
+          <Typography variant="caption" color="text.secondary">
+            An editor token lets an AI agent change these diagrams (every change is saved as a version you can restore). It can
+            only reach the diagrams you pick, and only while you can edit them.
+          </Typography>
+        )}
+        {restrict && (
           <Autocomplete
             multiple
             size="small"

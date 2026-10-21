@@ -108,6 +108,29 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Tests:** sharing rules (grant/modify matrix); member source in `authorize`; sharing API behavior (grant, role change, revoke, leave, owner immutable, Q-S3, rate limit, validation, conflicts); endpoint x role matrix over every diagram route (owner/editor/commenter/viewer/no-access/admin non-member/unauthenticated, denied calls must not reach the handler); repository, authorization, audit and NOTIFY against a throwaway database; migrations 0007/0008; MCP shared pre-filter; access-mode mapping; opt-in e2e with five browser contexts (`E2E_SHARING_USERS=1`).
 - **Deployment note:** migrations `0007` and `0008` run automatically before the app starts (`prestart` / container `CMD`); take a `pg_dump` first as for any migration. They only add two tables and three indexes (idempotent, no data touched). From this release a diagram can be shared with existing active users by e-mail; platform admins still get no implicit access.
 
+
+## Slice M2 — MCP agent edits (`diagram_apply_ops`)
+
+- **PR title:** `feat(mcp): agent edits with diagram_apply_ops, editor tokens and server-side placement`
+- **Refs:** docs/architecture/investigations/mcp-and-embedding.md sections 4.1, 4.5, 6 (M2), 7 (Q-MCP2, Q-MCP4, Q-MCP5, Q-AI1); delivery-plan M2; ADR-0001 / ADR-0003 as built.
+- **Branch:** `feat/m2-mcp-edits`
+- **What changed**
+  - **Migration `0009_editor_api_tokens`** (idempotent, guarded): `api_tokens.role_cap` accepts `editor`; CHECK `api_tokens_editor_requires_allowlist` (editor => non-empty `diagram_ids`).
+  - **Tokens**: `lib/apiTokens.js` (editor needs an allowlist at validation and at verification), `/api/user/tokens` (editor allowlist entries must be diagrams the user can edit), Account UI option "Editor (requires choosing diagrams)" with the restriction locked on.
+  - **`lib/mcp/ops.js`** (pure atomic applier, closed op schemas, catalog-checked types, refs, limits, content validation), **`lib/mcp/placement.js`** (server-side placement; reuses `findFreePlacement`, `computeTemplatePlacement`, `LayoutEngine.hierarchicalLayout`).
+  - **`diagramRepository.applyContentChange`**: one transaction with the revision check, the shared UPDATE, a pre-change version and an agent-attributed version (`created_via = 'agent'`).
+  - **`diagram_apply_ops`** tool in `lib/mcp/server.js` (authorize `diagram.write`, editor + allowlist defense in depth, structured conflict / invalid-ops / rate-limit errors); 30 writes per minute per token (`rateLimit().consume`); `diagram_get` also reads element `properties` as `data`.
+  - Docs: how-to "Let Claude edit a diagram" (`docs/architecture/investigations/mcp-connect-howto.md`), as-built section in the investigation doc, data-model note.
+- **Deviations from the doc:** input field is `baseRevision` (not `ifRevision`); `diagram_create`, `layout_apply` and `version_*` tools are deferred; no realtime refresh of an open editor (its next save gets the existing 409 flow).
+- **Tests:** layout engine, placement (no overlaps, frames, grid, 200 elements), ops (validation, atomicity, refs, limits), migration 0009 on a throwaway database, repository on a throwaway database (CAS, concurrent writers, versions, restore undoes the batch), tool through the MCP protocol with the real authz (viewer, commenter, editor without allowlist, outside allowlist, share revoked or downgraded, rate limit, budget), token validation / API / UI. Live check (port 3252, throwaway database): editor token created through the API, read, apply 3 elements + 2 connections without coordinates (rendered in the editor, no overlap), stale revision -> conflict, viewer and commenter and outside-allowlist denied, History lists the agent version.
+- **Deployment note:** migration `0009` runs automatically before the app starts (`prestart` / container `CMD`); take a `pg_dump` first as for any migration. It swaps one CHECK constraint on the small `api_tokens` table and adds another; existing rows satisfy both. Roll out the migration before (or with) the new code: new code with an old schema cannot create editor tokens. Old code with the new schema is safe.
+
+### Slice M2 review follow-ups (PR #39)
+
+- **Branch:** `feat/m2-mcp-edits`. **Files:** `lib/mcp/placement.js` (spatial index, one occupied set, bounded search, overflow rows; hub-and-spoke layout), `lib/mcp/ops.js` (frame `membershipExplicit`, adopt on x/y inside a frame), `lib/diagramRepository.js` (`applyContentChange` computes before the transaction; audit row), `lib/versions/{policy,retention}.js`, `lib/versionRepository.js` (agent retention budget), `lib/mcp/server.js` (token id in actor), History panel and `versionUtils.js`, ADR-0001 as-built.
+- **Behavior notes:** placement no longer runs under the row lock (revision re-checked under the lock); a child that does not fit its frame goes into rows below it instead of searching 61x61 cells per child. A shape added with x/y inside a frame and no `parent` joins that frame (editor `assignFrameOnCreate` rule); an explicit `parent` wins.
+- **Tests:** placement time budget (200 children in a frame on 5000 elements) and hub-and-spoke layouts, agent retention budget and audit row on a throwaway database, ops frame membership, History panel labels and filter.
+
 ## Slice 8 — Compare versions
 
 - **PR title:** `feat: slice 8 compare versions (structural diff, API, History panel summary, canvas overlay)`
