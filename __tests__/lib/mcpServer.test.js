@@ -73,7 +73,7 @@ describe('tool surface', () => {
     const client = await connect();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['board_read_region', 'diagram_apply_ops', 'diagram_get', 'diagram_list', 'diagram_search', 'diagram_thumbnail', 'guide_get', 'layout_apply', 'map_structure', 'stencil_catalog'].sort()
+      ['board_read_region', 'diagram_apply_ops', 'diagram_get', 'diagram_list', 'diagram_search', 'diagram_show', 'diagram_thumbnail', 'guide_get', 'layout_apply', 'map_structure', 'stencil_catalog'].sort()
     );
     for (const t of tools) {
       expect(t.inputSchema.type).toBe('object');
@@ -311,7 +311,7 @@ describe('response size budget', () => {
     connections: Array.from({ length: 5000 }, (_, i) => ({ id: `c${i}`, sourceId: `e${i % 1000}`, targetId: `e${(i + 1) % 1000}`, label: 'C'.repeat(5000) })),
   };
   const wire = (r) => Buffer.byteLength(JSON.stringify(r), 'utf8');
-  const LIMIT = 256 * 1024 + 16 * 1024; // budget plus JSON-RPC framing
+  const LIMIT = 120 * 1024 + 16 * 1024; // budget plus JSON-RPC framing
 
   beforeEach(() => repo.getContent.mockResolvedValue({ content: HUGE, description: 'D'.repeat(5000) }));
 
@@ -328,10 +328,10 @@ describe('response size budget', () => {
   test('resources/read for compact and mermaid stay within the budget', async () => {
     const client = await connect();
     const c = await client.readResource({ uri: `ontographia://diagrams/${A}` });
-    expect(Buffer.byteLength(c.contents[0].text)).toBeLessThanOrEqual(256 * 1024);
+    expect(Buffer.byteLength(c.contents[0].text)).toBeLessThanOrEqual(120 * 1024);
     expect(JSON.parse(c.contents[0].text).truncated).toBe(true);
     const m = await client.readResource({ uri: `ontographia://diagrams/${A}/mermaid` });
-    expect(Buffer.byteLength(m.contents[0].text)).toBeLessThanOrEqual(256 * 1024);
+    expect(Buffer.byteLength(m.contents[0].text)).toBeLessThanOrEqual(120 * 1024);
   });
 
   test('list and search descriptions note that shared diagrams come with sharing', async () => {

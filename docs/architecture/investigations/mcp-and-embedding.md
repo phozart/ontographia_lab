@@ -346,7 +346,7 @@ Each slice follows the repo rules: TDD, append to `docs/release/IMPLEMENTATION-L
 ## As-built notes (M1, read-only MCP)
 
 - **Visibility**: `diagram_list`, `diagram_search` and the resource list include only diagrams with `owner_id = userId` (then filtered through `authorize`). Diagrams shared with the user appear once sharing ships (slice 5); the tool descriptions say so.
-- **Output budget**: every tool result and resource body is capped at 256 KB serialized (`MAX_RESPONSE_BYTES` in `lib/mcp/projections.js`). Tool results carry the payload twice (text and `structuredContent`), so each copy gets about half. Elements, then connections between kept elements, are taken in order until the budget is spent; data keys (64 chars), data values (500 chars) and per-element data (4 KB) are capped. When anything is cut, `truncated: true`, `omitted: {elements, connections}` and a hint to use `frameId` / `elementIds` are returned (mermaid and outline end with a notice line).
+- **Output budget**: every tool result and resource body is capped at 120 KB serialized (`MAX_RESPONSE_BYTES` in `lib/mcp/projections.js`; lowered from 256 KB on 2026-10-21 so a result with both copies stays under claude.ai's ~150,000-character tool-result limit). Tool results carry the payload twice (text and `structuredContent`), so each copy gets about half. Elements, then connections between kept elements, are taken in order until the budget is spent; data keys (64 chars), data values (500 chars) and per-element data (4 KB) are capped. When anything is cut, `truncated: true`, `omitted: {elements, connections}` and a hint to use `frameId` / `elementIds` are returned (mermaid and outline end with a notice line).
 - **Request bodies**: `/api/mcp` disables Next's body parser and reads the body itself (256 KB), so invalid JSON is a JSON-RPC `-32700` (HTTP 400) and an oversize body `-32600` (HTTP 413).
 - **Token creation**: the 20-active-token limit is enforced inside one transaction under `pg_advisory_xact_lock(hashtext(user_id))`. Session-authenticated token routes reject a foreign `Origin` on POST/DELETE (`lib/sameOrigin.js`).
 
@@ -380,3 +380,7 @@ Each slice follows the repo rules: TDD, append to `docs/release/IMPLEMENTATION-L
   - tldraw MCP App (create/edit/delete shapes on an interactive canvas): <https://tldraw.dev/blog/tldraw-mcp-app>
   - Lucid MCP server (create-from-specification, export PNG, `create_embed`; released 2026-03-19, tool list per directory listing): <https://www.pulsemcp.com/servers/lucidsoftware>, <https://help.lucid.co/hc/en-us/articles/42578801807508-Integrate-Lucid-with-AI-tools-using-the-Lucid-MCP-server>
 - Embedding targets: Notion embeds via Iframely: <https://www.notion.com/help/embed-and-connect-other-apps>; Confluence iframe macro and XFO blocking: <https://support.atlassian.com/confluence/kb/how-to-put-an-iframe-into-confluence/>
+
+## As-built notes (M4, MCP App spike)
+
+- 2026-10-21: `diagram_show` and `ui://ontographia/diagram-view.html` were spiked with a **server-side SVG** renderer instead of the inlined E1 bundle assumed in B2/M4 above. Design, research, limits and open questions: [ai-canvas-via-mcp.md section 10](ai-canvas-via-mcp.md#10-addendum-2026-10-21-show-the-board-inside-claude-diagram_show-slice-ai-9).

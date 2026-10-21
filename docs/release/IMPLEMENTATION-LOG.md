@@ -168,3 +168,13 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Deviations from the doc:** input names (`key`, `baseRevision`, `anchor`, layout `flow` instead of `layered`) and caps (200 nodes, 400 edges, 40 groups per call) are recorded in section 9 of the design doc. No migration, no new dependency, no LLM call.
 - **Tests:** see section 9 (layout geometry on random structures, validation, compile-to-ops, anchors, `layout_apply`, performance, MCP protocol and authz, database version/audit/restore).
 
+## Slice AI-9a — diagram_show MCP App (server-drawn SVG view)
+
+- **PR title:** `feat: slice AI-9a diagram_show MCP App with a server-drawn board view, and a 120 KB MCP output budget`
+- **Refs:** `docs/architecture/investigations/ai-canvas-via-mcp.md` section 10 (approved 2026-10-21, defaults Q-AV1 to Q-AV6); supersedes the draft spike PR 43.
+- **Branch:** `feat/ai-9a-diagram-show`
+- **Files changed:** `lib/render/diagramSvg.js` (renderer, coordinate clamps), `lib/mcp/app/diagramView.js` (static view HTML), `lib/mcp/showTool.js` (tool and `ui://` resource), `lib/mcp/server.js` (registration, instructions, text), `lib/mcp/regionTool.js` (focus shape export, budget text), `lib/mcp/projections.js` (`MAX_RESPONSE_BYTES` 256 to 120 KB, `oneLine` export), tests `diagramSvg`, `mcpDiagramShow`, `mcpServer`, docs (design doc 10.11, how-to section 7, mcp-and-embedding budget).
+- **Deviations from the doc:** none in behavior; the shared output budget was lowered as the doc's own follow-up (10.5).
+- **Not verified:** rendering in claude.ai, Desktop and mobile (needs the deployed remote connector, Q-AV7, auth designed separately).
+- **Tests:** see design doc 10.11.
+

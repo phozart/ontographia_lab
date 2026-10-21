@@ -77,7 +77,7 @@ In the editor, right-click a selection (or a frame, or empty canvas for the visi
 ## 4. Behavior worth knowing
 
 - Bearer tokens only; the web session cookie is ignored. Requests with an `Origin` header must come from this app's origin or one listed in `MCP_ALLOWED_ORIGINS` (command-line clients send no `Origin`).
-- Limits: 120 requests per minute per token (at most 30 of them `diagram_apply_ops` writes), 256 KB request bodies, at most 10 messages per JSON-RPC batch, 50 items per list page.
+- Limits: 120 requests per minute per token (at most 30 of them `diagram_apply_ops` writes), 256 KB request bodies (responses are capped at about 120 KB), at most 10 messages per JSON-RPC batch, 50 items per list page.
 - `401` carries `WWW-Authenticate: Bearer realm="ontographia-mcp"` (plus `error="invalid_token"` and a reason for unknown, revoked or expired tokens). A diagram outside the token's access answers "not found".
 - Protocol: the bundled SDK (`@modelcontextprotocol/sdk` 1.32.1) negotiates up to `2025-11-25`. A client asking for a newer revision is answered with `2025-11-25`. `Mcp-Method` / `Mcp-Name` headers are optional and, when sent, must match the body.
 - The rate limiter is in-process; with several app instances the effective limit is per instance.
@@ -144,3 +144,17 @@ The hub goes in the middle with branches on both sides, in free space to the rig
 **"Tidy this frame."** `layout_apply` with `target: {"frameId": "..."}` and `layout: "grid"` re-arranges the frame's members without touching their text, sizes or connections. `target: {"elementIds": [...]}` arranges a selection; connections between the elements drive `tree`, `mindmap`, `radial` and `flow`.
 
 Layouts: `tree` (top-down hierarchy), `mindmap`, `radial`, `flow`, `grid`, `cluster`. Limits per call: 200 nodes, 400 edges, 40 groups. New content never overlaps existing content and nothing you did not name is moved. If the board changed since Claude read it, nothing is written and Claude is told to read again. Open editors pick the change up within a few seconds (slice AI-2).
+
+## 7. See the board in Claude (diagram_show)
+
+`diagram_show` draws a diagram, or a region of it, as a picture inside the conversation.
+
+- **Ask for it:** "show me the checkout journey", or after an edit "show me what you changed". Give a diagram id, or paste a "Copy link for Claude" link to show just that region (the same `focus` as `board_read_region`).
+- **What you see:** the board with the title and revision, zoom (buttons, Ctrl/Cmd + wheel, pinch), drag to pan, **Fit**, **Changes** (zoom to the last agent change), **Full screen** where the host offers it, and **Open in lab**, which opens the diagram (selecting the region when you showed one).
+- **Highlight:** by default (`highlight: "auto"`) the last agent edit is marked while it is still the latest state: added green, changed amber, removed as a red dashed ghost. After anyone edits the board, it is no longer marked. `"last-agent-change"` marks it anyway; `"none"` turns it off.
+- **Where it renders:** hosts that support MCP Apps (claude.ai, Claude Desktop, Claude mobile once the connector is added, the MCP Apps reference host). Claude Code does not draw it: it shows a text summary with the Open in lab link, so click the link instead.
+- **Permissions:** the same as the read tools. A viewer token is enough; a diagram outside the token's allowlist is "not found".
+- **What it is not:** a read-only picture, not the editor. It uses the board's own light colours and approximates pack decorations (UML compartments, ERD fields, icons are not drawn). Edit in the lab, or ask Claude to change it with `diagram_apply_ops` or `map_structure`.
+- **Large boards:** at most 600 elements and 1,200 connections are drawn. Beyond that you get "too large" and a hint to narrow the focus.
+- **Privacy:** the picture travels inside the tool result and is shown to you only; it adds no tokens to the model's context, and the view makes no network request.
+
