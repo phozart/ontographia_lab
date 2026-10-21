@@ -19,6 +19,11 @@ Resources: `ontographia://diagrams/{id}`, `ontographia://diagrams/{id}/mermaid`,
 
 ## Write tools (editor connection, board allowed)
 
+### `diagram_create`
+
+`name` (required, 1-255 characters; an existing board of the same owner with that name gets "(1)", "(2)"), `description?` (up to 2000 characters). Makes an empty, private board owned by the user and adds it to this connection's allowed boards (only this connection). Returns `id`, `shortId`, `name`, `revision`, `url`, `next`. Editor connections only (viewer or commenter: "role does not permit"); 10 per hour per connection (`RATE_LIMITED` with `retryAfterSeconds`); `ALLOWLIST_FULL` when the connection already lists 50 boards (nothing is created; the user reconnects with fewer boards, or for a personal token removes boards or creates a new token). Then `map_structure` or `diagram_apply_ops` with `baseRevision` = the returned `revision`.
+
+
 Every write needs `id` and `baseRevision` (from your last read). Each call is one saved version; a failed call writes nothing.
 
 ### `map_structure`

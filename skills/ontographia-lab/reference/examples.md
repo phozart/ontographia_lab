@@ -24,6 +24,10 @@ The lab is a substrate: you choose the structure; the tools place it. These are 
 3. Status changes later: `diagram_apply_ops` `update_element` with `data: {status: "done"}` on ids you read.
 4. Stakeholder summary: answer in chat from the read, and `diagram_show` the region.
 
+## New board from scratch
+
+"Start a board for the onboarding journey." `diagram_create` (`name: "Onboarding journey"`), then `map_structure` with `baseRevision` = the returned `revision` (flow: steps as nodes, one group per phase), then `diagram_show` and share the `url`. The board is private to the user.
+
 ## Text to map ("map this summary")
 
 User pastes meeting notes. Pick `mindmap` for themes or `flow` for steps, root first, short labels, details in `data`. `diagram_get` for the revision, `map_structure`, `diagram_show`, then list what you built.
