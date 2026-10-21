@@ -77,7 +77,9 @@ export function buildRemoteHighlight({ ids, elements, connections, before, agent
   const all = [...items, ...ghosts];
   if (all.length === 0) return null;
   const union = unionOf(all.map((i) => i.rect));
-  const count = items.length + ghosts.length;
+  const t = ids.totals;
+  const trueTotal = t ? Number(t.added || 0) + Number(t.changed || 0) + Number(t.removed || 0) : 0;
+  const count = ids.truncated && trueTotal > items.length + ghosts.length ? trueTotal : items.length + ghosts.length;
   const collapsed = !!ids.truncated || count > MAX_INDIVIDUAL_RINGS;
   seq += 1;
   return {

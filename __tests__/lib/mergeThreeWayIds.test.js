@@ -25,7 +25,7 @@ describe('summary.remote.ids', () => {
     const ours = content([el('a', { x: 30 }), el('b', { y: 9 })]);
     const theirs = content([el('a', { x: 30 }), el('b')]);
     const r = run(base, ours, theirs);
-    expect(r.summary.remote.ids).toEqual({ added: [], changed: [], removed: [], truncated: false });
+    expect(r.summary.remote.ids).toEqual({ added: [], changed: [], removed: [], truncated: false, totals: { added: 0, changed: 0, removed: 0 } });
   });
   it('a remote delete that a local edit kept alive is not reported as removed', () => {
     const base = content([el('a'), el('b')]);
@@ -45,6 +45,11 @@ describe('summary.remote.ids', () => {
     expect(r.summary.remote.added).toBe(620);
     expect(r.summary.remote.ids.added).toHaveLength(500);
     expect(r.summary.remote.ids.truncated).toBe(true);
+  });
+  it('reports the true totals per list even when the id lists are truncated', () => {
+    const many = Array.from({ length: 620 }, (_, i) => el(`n${i}`));
+    const r = run(content([]), content([]), content(many));
+    expect(r.summary.remote.ids.totals).toEqual({ added: 620, changed: 0, removed: 0 });
   });
   it('layers and groups are counted but never listed as highlightable ids', () => {
     const base = content([el('a')]);
