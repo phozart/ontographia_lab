@@ -294,6 +294,8 @@ What it would take (ADR-0004 D1): a Y.Doc per board (`elements`/`connections`/..
 
 ## 15. Open questions (recommended defaults)
 
+> **Decision (2026-10-21):** the product owner approved this ADR with all recommended defaults, including the Step 2 infrastructure changes (nginx `/live/` location with upgrade headers, the `live` compose service on 127.0.0.1:3041, Dockerfile copying `live/`, the `ws` dependency, env vars `LIVE_ENABLED`, `LIVE_TICKET_SECRET`, `APP_ORIGIN`). Build order: Step 1 (LA-1..LA-3), then Step 2 (LP-1..LP-3).
+
 | ID    | Question                                                                   | Default                                                                                                                              |
 | ----- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Q-LA1 | Show Claude's **reads** to other viewers?                                  | **No.** Reads are visible to the person the agent acts for; writes to everyone. Opt-in "Show my agents' reading to others" in Step 2 |
