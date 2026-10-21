@@ -1,6 +1,6 @@
 # ADR-0006 — Live activity and presence (Step 1: activity + agent indicator; Step 2: presence + live cursors)
 
-- Status: **Proposed** (2026-10-21). Design only; nothing here is built until the slices in §9 ship.
+- Status: **Accepted** (2026-10-21). Step 1 is built slice by slice (see §17 As built); Step 2 is not started.
 - Builds on: [ADR-0004](0004-realtime-collaboration.md) (Group D direction: Yjs + Hocuspocus sidecar, collab ticket, `authz_changed`), AI-2 live pickup ([ai-canvas-via-mcp.md](../investigations/ai-canvas-via-mcp.md) "AI-2 as built"), slice 8 Compare, audit (`0008`), MCP `agentWrite`. It changes no accepted decision; Step 2 is the transport half of ADR-0004, built before the CRDT half.
 - Owner request (2026-10-21): "can one user see the activity live from another user, or can I see on a board the live Claude activity directly in the tool?"
 - Personas: **CX/UX** running live mapping sessions; **Solution Architect** and **PM** co-working on a board; **AI/MCP agent** made visible as a participant.
@@ -324,3 +324,13 @@ What it would take (ADR-0004 D1): a Y.Doc per board (`elements`/`connections`/..
 - - Step 2 adds presence with an isolated, cheap process that Group D reuses; the 3 s poll load drops by about 10×.
 - − A second service to deploy and monitor; nginx config lives outside the repo and must be changed by hand.
 - − The agent indicator is per process and best-effort (empty after a restart); it reports tool calls, not Claude's intent.
+
+## 17. As built
+
+### LA-1 change highlight (built)
+
+- `mergeContent` returns `summary.remote.ids = {added, changed, removed, truncated}` (elements and connections only, 500 per list). A remote delete that a local edit kept alive is not listed as removed.
+- `pickupRemote` builds `remoteHighlight` (`live/remoteHighlight.js`, pure) and exposes it with `clearRemoteHighlight` from `DiagramContext`. Ghosts come from the local elements before the merge. More than 150 items (or a truncated list) collapse into one ring around the union bbox.
+- `ui/RemoteHighlight.js`: `RemoteHighlightLayer` (rings inside the scaled canvas layer, constant 2 px on screen, `aria-hidden`, no pointer events), `RemoteHighlightChip` ("N changes ↗" at the nearest edge, click pans there and replays the rings), `useHighlightLifecycle` (rings 1.7 s, or a static 3 s hold under `prefers-reduced-motion`; the chip and state live 10 s). CSS animation only (`styles/diagram-studio.css`).
+- Setting: flat `user_settings` key `highlightRemoteChanges` (default on), toggled in the canvas context menu. The ADR sketched `live.highlightChanges`; the existing settings are flat, so no nesting was introduced.
+- Not built (by design): the dashed "Claude is reading" focus box belongs to LA-2.

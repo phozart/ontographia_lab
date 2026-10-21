@@ -13,6 +13,7 @@ import { sendSessionEndCheckpoint, getVersionDiff } from './versions/versionsCli
 import { setCompare } from './versions/compareStore';
 import RemoteUpdateNotice from './ui/RemoteUpdateNotice';
 import { mergeContent } from '../../lib/merge/threeWay';
+import { buildRemoteHighlight } from './live/remoteHighlight';
 import { diffContent } from '../../lib/versions/diff';
 import {
   contentFromDiagram, emptyRemoteLog, appendRemoteDelta, rebaseSnapshot, stampSnapshot,
@@ -198,6 +199,9 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   const setEditingBusy = useCallback((v) => { editingBusyRef.current = !!v; }, []);
   const pollStoppedRef = useRef(false);
   const [remoteUpdate, setRemoteUpdate] = useState(null);
+  // LA-1: what the last pickup changed (ids -> rings/ghosts), shown briefly by the canvas. Never persisted.
+  const [remoteHighlight, setRemoteHighlight] = useState(null);
+  const clearRemoteHighlight = useCallback(() => setRemoteHighlight(null), []);
 
   // Loading state
   const [loading, setLoading] = useState(false);
@@ -691,6 +695,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       remoteLogRef.current = emptyRemoteLog();
       pollStoppedRef.current = false;
       setRemoteUpdate(null);
+      setRemoteHighlight(null);
 
       setElementsState(elements);
       setConnectionsState(connections);
@@ -861,6 +866,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       if (!merged.ok) return { status: 'unmergeable' };
 
       const m = merged.content;
+      const localBefore = Array.isArray(ours.elements) ? ours.elements : [];
       // Undo/redo keep working across the merge, lazily: record the delta, each snapshot is rebased when reached
       if (base) remoteLogRef.current = appendRemoteDelta(remoteLogRef.current, base, theirs);
       else {
@@ -900,6 +906,10 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       const s = merged.summary.remote;
       if (s.added + s.removed + s.changed > 0 || merged.conflicts.length > 0) {
         const agentChange = info?.agentChange || null;
+        setRemoteHighlight(buildRemoteHighlight({
+          ids: s.ids, elements: m.elements, connections: m.connections, before: localBefore,
+          agent: !!agentChange, who: info?.updatedBy || null,
+        }));
         setRemoteUpdate({
           who: info?.updatedBy || null,
           agent: !!agentChange,
@@ -1331,6 +1341,10 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     redo,
     recordHistory,
 
+    // Live pickup highlight (LA-1)
+    remoteHighlight,
+    clearRemoteHighlight,
+
     // Persistence
     saveDiagram,
     loadDiagram,
@@ -1339,6 +1353,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }), [
     diagram, elements, connections, layers, groups,
     viewport, selection, activePack, activeTool, showGrid, gridStyle, selectedStencil, stickyNoteColor, drawingTool, drawingColor, drawingStrokeWidth,
+    remoteHighlight, clearRemoteHighlight,
     historyPast.length, historyFuture.length,
     saveStatus, loading, error,
     deleteSelected, duplicateSelected, selectAll, clearSelection,

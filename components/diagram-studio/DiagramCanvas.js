@@ -49,6 +49,8 @@ import { findFreePlacement, placeAtPoint, DEFAULT_STICKY_SIZE, DEFAULT_STENCIL_S
 import { requestJsonImportFromDrop } from './export/useJsonImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
 import FloatingBox from './ui/FloatingBox';
+import { RemoteHighlightLayer, RemoteHighlightChip, useHighlightLifecycle } from './ui/RemoteHighlight';
+import { offscreenSummary, panToViewport, viewRect } from './live/remoteHighlight';
 import { getObstacleRects } from './ui/positioning';
 
 // Extracted utilities (refactored 2025-12-29)
@@ -1171,6 +1173,7 @@ export default function DiagramCanvas({
   onDragStart,
   onShowProperties,
   onShowToolbar,
+  highlightRemoteChanges = true,
   editLabelRequest,
   onOpenStencilPanel,
   onOpenTemplates,
@@ -1209,6 +1212,8 @@ export default function DiagramCanvas({
     setIsDragging,
     setIsRotating,
     setEditingBusy,
+    remoteHighlight,
+    clearRemoteHighlight,
   } = useDiagram();
 
   // Connections flagged `autoPorts` follow the facing sides of their shapes; resolve
@@ -1233,6 +1238,15 @@ export default function DiagramCanvas({
   const layoutSettings = diagram?.settings || {};
 
   const { viewport, setViewport, pan, zoomToFitAll, resetZoom } = useDiagramViewport();
+
+  // LA-1 change highlight: rings on what another writer just changed, an edge chip for what is off-screen
+  const hlLife = useHighlightLifecycle(remoteHighlight, highlightRemoteChanges, clearRemoteHighlight);
+  const hlContainer = { width: containerRef.current?.clientWidth || 1200, height: containerRef.current?.clientHeight || 800 };
+  const hlSummary = hlLife.chipOn && remoteHighlight ? offscreenSummary(remoteHighlight, viewRect(viewport, hlContainer)) : null;
+  const revealHighlight = (bbox) => {
+    setViewport((prev) => panToViewport(bbox, prev, hlContainer));
+    hlLife.replay();
+  };
   const {
     selection,
     selectElement,
@@ -5184,6 +5198,11 @@ export default function DiagramCanvas({
           {/* Grid */}
           <Grid showGrid={showGrid && profile?.uiPolicy?.showGrid !== false} gridStyle={gridStyle} viewport={viewport} />
 
+          {/* LA-1: change highlight (cyan = person, lavender = agent) */}
+          {hlLife.ringsOn && (
+            <RemoteHighlightLayer highlight={remoteHighlight} scale={viewport.scale} reduced={hlLife.reduced} replayCount={hlLife.replayCount} />
+          )}
+
           {/* Marquee Selection Rectangle */}
           {marquee && (
             <div
@@ -5810,6 +5829,8 @@ export default function DiagramCanvas({
           </FloatingBox>
         );
       })()}
+
+      <RemoteHighlightChip summary={hlSummary} agent={!!remoteHighlight?.agent} onReveal={revealHighlight} />
 
       {/* Minimap Navigator */}
       {showMinimap && (

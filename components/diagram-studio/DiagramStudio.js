@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS = {
   toolbarPosition: 'top',
   enabledPacks: ['core', 'process-flow', 'cld', 'uml-class', 'mind-map', 'product-design', 'erd', 'togaf', 'itil', 'capability-map'],
   styleToolbarVisible: true, // Show floating style toolbar on single selection (T toggles; persisted per user)
+  highlightRemoteChanges: true, // LA-1: ring what others (people, agents) just changed; per user, default on
 };
 
 // ============ MAIN COMPONENT ============
@@ -195,6 +196,10 @@ function DiagramStudioInner({
   const toggleContextualToolbar = useCallback(() => {
     updateUserSetting('styleToolbarVisible', !showContextualToolbarOnSelect);
   }, [updateUserSetting, showContextualToolbarOnSelect]);
+  const highlightRemoteChanges = userSettings.highlightRemoteChanges ?? true;
+  const toggleHighlightRemoteChanges = useCallback(() => {
+    updateUserSetting('highlightRemoteChanges', !highlightRemoteChanges);
+  }, [updateUserSetting, highlightRemoteChanges]);
   const showToolbar = useCallback(() => {
     updateUserSetting('styleToolbarVisible', true);
   }, [updateUserSetting]);
@@ -961,6 +966,8 @@ function DiagramStudioInner({
             onToggleContextualToolbar={toggleContextualToolbar}
             showStencilPanel={!leftPanelCollapsed}
             onToggleStencilPanel={toggleLeftPanel}
+            highlightRemoteChanges={highlightRemoteChanges}
+            onToggleHighlightRemoteChanges={toggleHighlightRemoteChanges}
           />
         )}
 
@@ -995,6 +1002,7 @@ function DiagramStudioInner({
                 onDragStart={() => setShowPropertiesPanel(false)}
                 onShowProperties={() => setShowPropertiesPanel(true)}
                 onShowToolbar={showToolbar}
+                highlightRemoteChanges={highlightRemoteChanges}
                 editLabelRequest={editLabelRequest}
                 onOpenStencilPanel={handleOpenStencilPanel}
                 onOpenTemplates={handleOpenTemplates}

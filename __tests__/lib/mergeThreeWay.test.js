@@ -233,7 +233,7 @@ describe('order (z-order) and other keys', () => {
     const ours = content([el('a', { x: 3 })]);
     const r = run(base, ours, base);
     expect(r.content).toEqual(ours);
-    expect(r.summary.remote).toEqual({ added: 0, removed: 0, changed: 0 });
+    expect(r.summary.remote).toMatchObject({ added: 0, removed: 0, changed: 0 });
   });
 });
 
