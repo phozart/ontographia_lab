@@ -165,6 +165,16 @@ The hub goes in the middle with branches on both sides, in free space to the rig
 
 Layouts: `tree` (top-down hierarchy), `mindmap`, `radial`, `flow`, `grid`, `cluster`. Limits per call: 200 nodes, 400 edges, 40 groups. New content never overlaps existing content and nothing you did not name is moved. If the board changed since Claude read it, nothing is written and Claude is told to read again. Open editors pick the change up within a few seconds (slice AI-2).
 
+## 6b. Write the summary on the board (doc_create and doc_update)
+
+A doc is a text card on the board (Markdown). Ask Claude for the whole run in one instruction, for example: "Read this text, map the architecture on board LAB-12, then write a short summary doc next to the map that links to the parts it mentions."
+
+- Claude maps the structure (`map_structure`), then calls `doc_create` anchored next to it. The summary cites elements with `[text](#el=<id>)` links; **clicking a link in the card selects and zooms to that element**. A link to something that was deleted shows as struck-through text.
+- Open a doc with a double-click (or Enter on a selected card): the editor opens in the right panel with Write and Preview tabs, a formatting toolbar, **Link element** (pick any element by name) and **Link selected** (links for the elements you selected on the board). `.md` downloads the doc as a Markdown file; dropping a `.md` file on the canvas creates a doc card.
+- You can keep typing while Claude edits: the editor picks Claude's change up within a few seconds. If you both changed the same text, your text is kept and the panel says so; change history shows it as "doc (+3 / -1 lines)".
+- Docs hold Markdown only: headings, lists, task lists, tables, code, links to `https`, `mailto`, elements and other boards. Raw HTML and images are not supported and are shown as text. Up to 100 KB per doc and 200 docs per board.
+- Claude can also read a doc (`doc_get`) and edit it in place (`doc_update` with `append` or `replaceSection`). Each change is one saved version you can restore from History; "Review agent change" shows what changed.
+
 ## 6a. Tables (table_create, table_update, table_get)
 
 A table is a typed matrix on the board, for inventories, comparisons, backlogs and findings. Claude decides the columns and rows; Ontographia stores them, keeps them editable by people and versions every change.

@@ -198,6 +198,10 @@ Application code only INSERTs into `audit_events` (no UPDATE/DELETE outside the 
 - `diagram_yupdates(diagram_id, seq, update BYTEA)` for Group D.
 - `workspaces`, `workspace_members`, `project_members` — become additional grant sources.
 
+### Content element: doc (AI-5; no migration)
+
+A doc lives inside `diagrams.content` as an element with `type: 'doc'`, `packId: 'core'` and `data.doc = {title, markdown, collapsed?, restoreHeight?, excerptLines?}` (markdown up to 100 KB, 200 docs per diagram, validated and rewritten by `lib/doc/docElement.js` on every write path). Because it is part of `content`, versions, restore, compare, sharing roles, comments (element anchors) and the agent compare-and-set cover it for free. A move to a side table stays possible later (design section 3.3).
+
 ## 3. Entity overview (after B + C)
 
 ```mermaid

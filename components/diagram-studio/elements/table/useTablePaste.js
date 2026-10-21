@@ -14,6 +14,18 @@ import { TableError } from '../../../../lib/table/tableModel';
 import { newTableElement } from './newTableElement';
 import { REVEAL_EVENT } from './TableNode';
 
+/** A transient status message (the editor has no toast system): bottom center, gone after 6 s. */
+export function showPasteNotice(message) {
+  if (typeof document === 'undefined') return;
+  const n = document.createElement('div');
+  n.setAttribute('role', 'status');
+  n.setAttribute('data-testid', 'table-paste-notice');
+  n.textContent = message;
+  n.style.cssText = 'position:fixed;left:50%;bottom:72px;transform:translateX(-50%);z-index:3000;max-width:480px;padding:8px 14px;border-radius:8px;background:#1e293b;color:#fff;font:13px system-ui,sans-serif;box-shadow:0 8px 24px rgba(15,23,42,.3)';
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 6000);
+}
+
 /** @param {{containerRef: {current: HTMLElement|null}}} p */
 export function useTablePaste({ containerRef }) {
   const { selectElement } = useDiagramSelection();
@@ -31,7 +43,11 @@ export function useTablePaste({ containerRef }) {
       try {
         table = tableFromText(text);
       } catch (err) {
-        if (err instanceof TableError) return;
+        if (err instanceof TableError) {
+          e.preventDefault();
+          showPasteNotice(`Not pasted as a table: ${err.message}`);
+          return;
+        }
         throw err;
       }
       e.preventDefault();

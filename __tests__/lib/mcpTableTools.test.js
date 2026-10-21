@@ -250,6 +250,19 @@ describe('table_get and the compact projections', () => {
     expect(seen).toBe(500);
     expect(pages).toBeGreaterThan(1);
   });
+  test('a table with 50 columns of 50 long options each still reads within the budget (options are capped in the head)', async () => {
+    const opt = (i, c) => ({ value: `option-${c}-${i}-${'x'.repeat(150)}` });
+    const columns = Array.from({ length: 50 }, (_, c) => ({ name: `Column ${c} ${'n'.repeat(150)}`, type: 'select', options: Array.from({ length: 50 }, (_, i) => opt(i, c).value) }));
+    const rows = [Array.from({ length: 50 }, (_, c) => opt(0, c).value)];
+    const made = await call(await connect(), 'table_create', { id: A, baseRevision: 7, columns, rows });
+    expect(made.isError).toBeFalsy();
+    const r = await call(await connect(), 'table_get', { id: A, elementId: made.structuredContent.elementId });
+    expect(r.isError).toBeFalsy();
+    expect(JSON.stringify(r.structuredContent).length + text(r).length).toBeLessThan(120 * 1024);
+    expect(r.structuredContent.columns[0].options).toHaveLength(10);
+    expect(r.structuredContent.columns[0].optionCount).toBe(50);
+    expect(r.structuredContent.rows).toHaveLength(1);
+  });
   test('diagram_get summarises a table (columns and row count) instead of truncating its data', async () => {
     const { elementId } = (await call(await connect(), 'table_create', CREATE())).structuredContent;
     const r = await call(await connect(), 'diagram_get', { id: A });

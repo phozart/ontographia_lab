@@ -24,6 +24,28 @@ export const stencils = [
     ],
   },
 
+  // Doc card (AI-5): a Markdown document that lives on the board. Content is data.doc = {title, markdown, ...};
+  // the card shows the title and the first lines, the side panel edits it (components/diagram-studio/elements/doc).
+  {
+    id: 'doc',
+    name: 'Doc',
+    description: 'A text document on the board (Markdown). Link to elements with #el= links; write summaries next to the map.',
+    group: 'Basic',
+    shape: 'doc',
+    icon: '\uD83D\uDCC4',
+    color: '#4FB3CE',
+    defaultSize: { width: 320, height: 220 },
+    defaultLabel: 'Untitled doc',
+    defaultData: { doc: { title: 'Untitled doc', markdown: '' } },
+    ports: [
+      { id: 'top', position: 'top' },
+      { id: 'right', position: 'right' },
+      { id: 'bottom', position: 'bottom' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+  },
+
   // Section - A lighter container for grouping
   {
     id: 'section',

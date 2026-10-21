@@ -37,7 +37,7 @@ export default function CompareSummary({ diff, against, fromTitle, overlayOn, on
                       <>
                         <span className={`vh-dot vh-dot-${c.change}`} aria-hidden="true" />
                         <span className="vh-change-name">{c.label || c.id}</span>
-                        <span className="vh-change-meta">{c.change}{c.fields?.length ? `: ${c.fields.join(', ')}` : ''}{c.table ? ` (${tableSummary(c.table)})` : ''}</span>
+                        <span className="vh-change-meta">{c.change}{c.fields?.length ? `: ${c.fields.join(', ')}` : ''}{c.table ? ` (${tableSummary(c.table)})` : ''}{c.docText ? ` (${[c.docText.linesAdded ? `+${c.docText.linesAdded}` : '', c.docText.linesRemoved ? `-${c.docText.linesRemoved}` : ''].filter(Boolean).join(' / ') || 'title'} lines)` : ''}</span>
                       </>
                     );
                     return (

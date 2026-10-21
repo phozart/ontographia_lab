@@ -82,11 +82,23 @@ describe('table validation through validateDiagramContent', () => {
     expect(r.content.elements[0].data.table.rows[0].cells['col-a']).toBe('<script>alert(1)</script>');
   });
 
-  test('a javascript: cell value is stripped by the shared URL rule, and the table stays valid', () => {
-    const r = check(table({ rows: [{ id: 'row-1', cells: { 'col-a': 'javascript:alert(1)', 'col-c': 1 } }] }));
+  test('table text is plain text, never a URL: javascript: in a cell, column name or select option is kept and the table stays valid', () => {
+    const t = table({
+      columns: [{ id: 'col-a', name: 'javascript:foo', type: 'text' }, { id: 'col-b', name: 'S', type: 'select', options: [{ value: 'javascript:bar' }, { value: 'data:text/html,x' }] }],
+      rows: [{ id: 'row-1', cells: { 'col-a': 'javascript:alert(1)', 'col-b': 'javascript:bar' } }],
+    });
+    const r = check(t);
     expect(r.ok).toBe(true);
-    expect(r.content.elements[0].data.table.rows[0].cells).toEqual({ 'col-c': 1 });
-    expect(r.warnings.join(' ')).toMatch(/unsafe URL/);
+    expect(r.content.elements[0].data.table.columns[0].name).toBe('javascript:foo');
+    expect(r.content.elements[0].data.table.columns[1].options[0].value).toBe('javascript:bar');
+    expect(r.content.elements[0].data.table.rows[0].cells['col-a']).toBe('javascript:alert(1)');
+    expect(r.warnings.join(' ')).not.toMatch(/unsafe URL/);
+  });
+
+  test('other element data is still URL-stripped next to a table', () => {
+    const r = validateDiagramContent({ elements: [el(table()), { id: 'el-x', type: 'rectangle', label: 'x', x: 0, y: 0, data: { href: 'javascript:alert(1)' } }] });
+    expect(r.ok).toBe(true);
+    expect(r.content.elements[1].data.href).toBeUndefined();
   });
 
   test('__proto__ keys in a table are refused by the shared structure check', () => {

@@ -130,6 +130,17 @@ describe('tableFromGrid (paste)', () => {
     expect(t.rows[0].cells).toEqual({ 'col-t1': 'a', 'col-t2': 1, 'col-t3': true });
     expect(t.rows[1].cells).toEqual({ 'col-t1': 'b', 'col-t3': false });
   });
+  test('identifier-like values stay text: leading zeros, plus signs, phone numbers, zip codes, trailing zeros', () => {
+    for (const v of ['007', '+1', '+4915112345', '01234', '1.50', '1,000']) {
+      const t = tableFromGrid([['H'], [v], ['5']], { newId: seq() });
+      expect(t.columns[0].type).toBe('text');
+      expect(t.rows[0].cells['col-t1']).toBe(v);
+    }
+    for (const col of [['0', '12', '-3', '0.5', '3.25'], [' 42 ']]) {
+      const t = tableFromGrid([['H'], ...col.map((v) => [v])], { newId: seq() });
+      expect(t.columns[0].type).toBe('number');
+    }
+  });
   test('ragged rows and no header', () => {
     const t = tableFromGrid([['a', 'b'], ['c']], { header: false, newId: seq() });
     expect(t.headerRow).toBe(false);

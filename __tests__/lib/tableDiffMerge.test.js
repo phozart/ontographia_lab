@@ -63,6 +63,35 @@ describe('diff: tables at cell granularity', () => {
   });
 });
 
+describe('merge: remote changes that could not be applied are reported', () => {
+  const { describeRemoteUpdate } = require('../../components/diagram-studio/live/livePickup');
+  const run = (b, o, t) => mergeContent(content(b), content(o), content(t));
+  test('local column type change vs remote cell edit that no longer fits', () => {
+    const b = baseTable();
+    const o = edit(b, (t) => { t.columns[0].type = 'number'; });
+    const t = edit(b, (x) => { x.rows[0].cells['col-a'] = 'not a number'; });
+    const r = run(b, o, t);
+    expect(r.conflicts[0].fields).toEqual(['data.table.lost:cell:row-1:col-a']);
+    const text = describeRemoteUpdate({ who: 'x', agent: true, summary: { added: 0, changed: 1, removed: 0 }, conflicts: r.conflicts }).conflictText;
+    expect(text).toMatch(/1 remote table change could not be applied/);
+  });
+  test('local column delete drops remote cell edits', () => {
+    const b = baseTable();
+    const o = edit(b, (t) => { t.columns = t.columns.filter((c) => c.id !== 'col-b'); t.rows.forEach((r) => delete r.cells['col-b']); });
+    const t = edit(b, (x) => { x.rows[0].cells['col-b'] = 99; x.rows[1].cells['col-b'] = 98; });
+    const r = run(b, o, t);
+    expect(r.conflicts[0].fields.filter((f) => f.includes('lost:')).sort()).toEqual(['data.table.lost:cell:row-1:col-b', 'data.table.lost:cell:row-2:col-b']);
+    expect(describeRemoteUpdate({ who: null, agent: true, summary: { added: 0, changed: 1, removed: 0 }, conflicts: r.conflicts }).conflictText).toMatch(/2 remote table changes could not be applied/);
+  });
+  test('the cap fallback says how many remote changes were not applied', () => {
+    const b = baseTable();
+    const many = (p) => Array.from({ length: 300 }, (_, i) => ({ id: `row-${p}${i}`, cells: {} }));
+    const r = run(b, edit(b, (t) => { t.rows.push(...many('L')); }), edit(b, (x) => { x.rows.push(...many('R')); }));
+    expect(r.conflicts[0].fields).toEqual(['data.table.lost:table:300']);
+    expect(describeRemoteUpdate({ who: null, agent: false, summary: { added: 0, changed: 1, removed: 0 }, conflicts: r.conflicts }).conflictText).toMatch(/300 remote table changes/);
+  });
+});
+
 describe('merge: two people edit different cells, rows and columns of one table', () => {
   const run = (b, o, t) => mergeContent(content(b), content(o), content(t));
 
@@ -146,7 +175,7 @@ describe('merge: two people edit different cells, rows and columns of one table'
     const t = edit(b, (x) => { x.rows.push(...many('R')); });
     const r = mergeTables(b, o, t);
     expect(r.value).toEqual(o);
-    expect(r.fields).toContain('table');
+    expect(r.fields).toEqual(['lost:table:300']);
   });
   test('only one side changed the table: that side is taken without table-level work', () => {
     const b = baseTable();

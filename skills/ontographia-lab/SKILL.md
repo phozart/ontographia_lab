@@ -71,6 +71,16 @@ The user right-clicked a selection, frame or canvas area in the editor. Links lo
 3. Re-running an analysis: `table_update` with `key` (the identifying column) and `upsertRows`, not a second `table_create`; repeating the call adds no rows. Rows can be removed with `removeKeys` / `removeRowIds`, columns added, renamed or retyped. `table_get` reads the rows back (`diagram_get` only gives column names and `rowCount`).
 4. `diagram_show`, then say what the table holds. A written summary of the table goes in your reply (there is no document element yet).
    The server also offers the prompt `tabulate_region` (link + optional columns).
+### 6b. "Summarize this on the board" (a doc linked to the elements)
+
+The typical run is: map the text, tabulate or cluster it, then write the findings where the work is.
+
+1. Read the board (`board_read_region` or `diagram_get`). Elements show their ids; docs show only title, size and headings (`doc_get` reads one).
+2. Write a short Markdown summary: headings, bullet points, a task list for next steps. Cite what you refer to with `[text](#el=<elementId>)` using real ids from the read or from `map_structure`'s `created` map. Never invent ids.
+3. `doc_create` with `title`, `markdown`, `baseRevision` and `anchor: {near: <frame or element id>}` so the card sits beside what it describes.
+4. Read `warnings`: an element link whose id is not on the board is reported (it renders struck through). Fix it with `doc_update`.
+5. Later edits: `doc_get` first, then `doc_update` with `append` or `replaceSection {heading, markdown}` (not a full rewrite). The owner may be typing in the doc; the editor merges, and their text wins on the same text.
+   The server also offers the prompt `summarize_region` (link + optional focus).
 
 ### 6. "Show me the board"
 
@@ -103,7 +113,7 @@ The user right-clicked a selection, frame or canvas area in the editor. Links lo
 
 ## Not available (do not promise)
 
-Long-form documents on the board are not built yet: write summaries in your reply, and use notes, groups, tables and `data` fields on the board. Tables have no formulas, no `date` column type and no connectors to single rows (a connector attaches to the whole table). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
+Long-form text goes in a doc and matrices in a table. Tables have no formulas, no `date` column type and no connectors to single rows (a connector attaches to the whole table). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
 
 ## Reading large boards
 

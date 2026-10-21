@@ -5,6 +5,7 @@ import { tableProblem } from '../../../lib/table/tableSchema';
 // No DOM or React dependencies so everything here is unit-testable.
 
 import { isUnsafeUrlValue } from '../../../lib/safeUrl';
+import { validateDocElements } from '../../../lib/doc/docElement';
 import {
   MAX_CONTENT_BYTES, MAX_ELEMENTS, MAX_CONNECTIONS, MAX_COLLECTION, MAX_DEPTH, FORBIDDEN_KEYS, CONTENT_KEYS,
 } from '../../../lib/diagramLimits';
@@ -173,7 +174,12 @@ export function sanitizeContent(rawContent) {
   }
   const warnings = [];
   const stats = { urls: 0 };
-  const elements = sanitizeElements(rawContent.elements, warnings, stats);
+  const sanitized = sanitizeElements(rawContent.elements, warnings, stats);
+  // Doc cards (AI-5): same caps and the same markdown rewrite the server applies on save
+  const docCheck = validateDocElements({ elements: sanitized });
+  if (!docCheck.ok) return fail(docCheck.error);
+  warnings.push(...docCheck.warnings);
+  const elements = docCheck.content.elements;
   const elementIds = new Set(elements.map(e => e.id));
   const connections = sanitizeConnections(rawConnections, elementIds, warnings, stats);
   if (stats.urls > 0) warnings.push(`${stats.urls} unsafe URL${stats.urls === 1 ? '' : 's'} removed (only http, https and image data URLs are allowed).`);

@@ -48,6 +48,9 @@ import { resolveFKey } from './hooks/interaction/editorShortcuts';
 import { findFreePlacement, placeAtPoint, DEFAULT_STICKY_SIZE, DEFAULT_STENCIL_SIZE } from './hooks/interaction/placement';
 import { newTableElement } from './elements/table/newTableElement';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
+import { docDefaults } from '../../lib/doc/docElement';
+import { openDoc } from './elements/doc/docStore';
+import { requestDocImportFromDrop } from './elements/doc/useDocImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
 import FloatingBox from './ui/FloatingBox';
 import { getObstacleRects } from './ui/positioning';
@@ -571,6 +574,11 @@ function Node({
 
   const handleDoubleClick = (e) => {
     e.stopPropagation();
+    if (element.type === 'doc') {
+      // A doc card opens its side-panel editor (read-only viewers get the same panel without editing controls)
+      openDoc(element.id);
+      return;
+    }
     if (!readOnly && !isConnectMode) {
       // Double-click enters label editing mode
       onEditingLabelDone?.(element.id, true);
@@ -3090,10 +3098,12 @@ export default function DiagramCanvas({
             color: selectedStencil.color,
             layerId: 'default',
             properties: {},
+            ...docDefaults(selectedStencil),
           };
 
           addElement(newElement);
           selectElement(newElement.id);
+          if (newElement.type === 'doc') openDoc(newElement.id);
           // Return to select mode after creating element
           setActiveTool('select');
           setSelectedStencil(null);
@@ -3123,9 +3133,11 @@ export default function DiagramCanvas({
           color: selectedStencil.color,
           layerId: 'default',
           properties: {},
+          ...docDefaults(selectedStencil),
         };
         addElement(newElement);
         selectElement(newElement.id);
+        if (newElement.type === 'doc') openDoc(newElement.id);
         setActiveTool('select');
         setSelectedStencil(null);
         if (isTextLikeStencil(newElement.type)) {
@@ -3772,6 +3784,9 @@ export default function DiagramCanvas({
     const x = (e.clientX - rect.left) / viewport.scale - viewport.x;
     const y = (e.clientY - rect.top) / viewport.scale - viewport.y;
 
+    // A dropped .md file becomes a doc card at the drop point
+    if (requestDocImportFromDrop(e.dataTransfer, { x, y })) return;
+
     // Try to parse dropped data - try application/json first, then fallback to text/plain
     let rawData = e.dataTransfer.getData('application/json');
     if (!rawData) {
@@ -3803,8 +3818,10 @@ export default function DiagramCanvas({
             y: snappedY,
             size: stencil.defaultSize || { width: 120, height: 60 },
             color: stencil.color,
+            ...docDefaults(stencil),
           });
           selectElement(dropped.id);
+          if (dropped.type === 'doc') openDoc(dropped.id);
           if (isTextLikeStencil(stencil.id)) {
             freshNodeIdsRef.current.add(dropped.id);
             setEditingLabelId(dropped.id);
