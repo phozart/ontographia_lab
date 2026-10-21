@@ -206,3 +206,14 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Files changed:** `lib/oauth/connectedApps.js`, `pages/api/user/connected-apps/{index,[id]}.js`, `components/account/ConnectedAppsSection.js`, `pages/account.js`, `pages/api/admin/users/index.js` and `pages/admin/users.js` (count column), `mcp-connect-howto.md` section 7, ADR as-built, e2e test; tests `ConnectedAppsSection`, `oauthConnectedApps` (db), e2e Disconnect.
 - **Deviations from the ADR:** none. Turning the flag on in production and the owner's walk-through on claude.ai and mobile are deployment steps (see the PR's Deployment section), not code.
 - **Tests:** list shapes and privacy (no secrets, names only for readable diagrams), Disconnect effect on access and refresh tokens, foreign and malformed ids, cross-origin refusal, audit row, UI (hidden when off, empty state, rows, expand, confirm, failure), browser e2e of Disconnect from the Account page.
+
+## Slice AI-4 — Table element (editor, export, diff and merge, MCP tools)
+
+- **PR title:** `feat: slice AI-4 table element (typed columns, inline editing, paste, CSV/JSON export, diff and merge) and table_create / table_update / table_get`
+- **Refs:** `docs/architecture/investigations/ai-canvas-via-mcp.md` sections 3.1, 4.1, 6 (AI-4, AI-4w) and 11; owner use case 2026-10-21 (graph, then table, then summary): rows can link to board elements.
+- **Branch:** `feat/ai-4-table`
+- **Files changed:** `lib/table/{tableModel,tableSchema,tableCsv,tablePatch,tableMerge,tableDiff,tableSvg}.js` (new), `lib/mcp/tableTools.js` (new), `lib/merge/order.js` (new, extracted), `lib/merge/threeWay.js`, `lib/versions/diff.js`, `lib/diagramContent.js`, `lib/diagramLimits.js`, `lib/mcp/{ops,server,guide,projections,structure}.js` (`checkAnchor` exported), `lib/render/diagramSvg.js`, `components/diagram-studio/elements/table/*` (new), `packs/CorePack.js`, `packs/catalog/core.js`, `DiagramCanvas.js` (Table tool placement), `DiagramContext.js` (`addElement` gives a table its data), `DiagramStudio.js`, `ui/TitleBar.js`, `ui/CompareSummary.js`, `export/{ExportManager,captureCanvas,diagramJson}.js`, design doc section 11, `mcp-connect-howto.md` section 6a.
+- **Deviations from the doc:** `baseRevision` and `anchor` (as AI-3) instead of `ifRevision` and `placement`; columns are given by name; the table lives in `element.data.table`; a row `elementId` link (owner use case, not in the original design); a gutter column of 40 px; a table is summarized, not truncated, in `diagram_get`; the `tabulate_region` prompt was added.
+- **Not verified:** a real claude.ai session building a table (needs the deployed connector). The interaction was verified in headless Chrome against a throwaway database.
+- **Tests:** see design doc section 11.
+
