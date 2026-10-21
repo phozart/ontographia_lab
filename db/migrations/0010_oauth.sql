@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at TIMESTAMPTZ NOT NULL,
   used_at TIMESTAMPTZ,
-  revoked_at TIMESTAMPTZ
+  revoked_at TIMESTAMPTZ,
+  revoked_reason VARCHAR(30)   -- 'grace_superseded': an unused successor replaced by the 60 s retry path
 );
 CREATE INDEX IF NOT EXISTS idx_oauth_tokens_grant ON oauth_tokens (grant_id, kind, created_at DESC);

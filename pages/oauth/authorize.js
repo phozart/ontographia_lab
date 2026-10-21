@@ -10,6 +10,8 @@ import { runAuthorizeFlow } from '../../lib/oauth/authorizeFlow';
 import { rateLimit, getClientId } from '../../lib/rateLimit';
 
 const limiter = rateLimit({ interval: 60 * 1000, limit: 30, prefix: 'oauth-authorize' });
+// Per address cap on NEW requests (the ones that store a row): 10 every 10 minutes.
+const newRequestLimiter = rateLimit({ interval: 10 * 60 * 1000, limit: 10, prefix: 'oauth-authorize-new' });
 
 const MESSAGES = {
   disabled: ['Sign-in for connected apps is not available', 'This server does not accept connected apps right now. You can still use a personal API token (Account, API tokens).'],
@@ -20,6 +22,7 @@ const MESSAGES = {
   inactive: ['Account not active', 'Your account is not active yet, so it cannot be connected.'],
   other_user: ['Different account', 'This request was opened by another account. Start again from the app.'],
   too_many_pending: ['Too many requests', 'You have too many unfinished sign-in requests. Wait a few minutes and start again from the app.'],
+  busy: ['Busy', 'Too many sign-in requests are waiting right now. Please try again in a few minutes.'],
   rate_limited: ['Too many requests', 'Please wait a minute and try again.'],
 };
 
@@ -32,6 +35,11 @@ export async function getServerSideProps({ req, res, query }) {
   res.setHeader('X-Frame-Options', 'DENY');
   if (!isOAuthEnabled()) return { props: { view: 'error', code: 'disabled' } };
   if (!limiter.consume(getClientId(req)).success) {
+    res.statusCode = 429;
+    return { props: { view: 'error', code: 'rate_limited' } };
+  }
+
+  if (query.rid === undefined && !newRequestLimiter.consume(getClientId(req)).success) {
     res.statusCode = 429;
     return { props: { view: 'error', code: 'rate_limited' } };
   }

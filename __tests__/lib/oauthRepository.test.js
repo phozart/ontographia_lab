@@ -279,11 +279,30 @@ dbDescribe('oauth repository (throwaway database)', () => {
       expect(retry.body.refresh_token).not.toBe(lost.body.refresh_token);
       expect((await grantRow(grant.id)).revoked_at).toBeNull();
       // the lost pair is dead, the retry pair works
-      expect(await refresh(lost.body.refresh_token)).toMatchObject({ ok: false, error: 'invalid_grant' });
-      expect((await grantRow(grant.id)).revoked_at).toBeNull(); // a revoked (not spent) token is not "reuse"
       expect(await repo.verifyAccessToken(lost.body.access_token)).toEqual({ ok: false, reason: 'revoked' });
       expect((await repo.verifyAccessToken(retry.body.access_token)).ok).toBe(true);
       expect((await refresh(retry.body.refresh_token)).ok).toBe(true);
+      expect((await grantRow(grant.id)).revoked_at).toBeNull();
+    });
+    test('theft sequence: a thief replays R1 in the grace window, then the holder presents the superseded R2 = reuse, whole grant revoked', async () => {
+      const { tokens, grant } = await connected(u1);
+      const holder = await refresh(tokens.refresh_token); // R2 (the holder's response is slow or lost)
+      const thief = await refresh(tokens.refresh_token); // replay of R1 within 60 s: grace path hands the thief a chain
+      expect(thief.ok).toBe(true);
+      expect((await db.pg.query("select revoked_reason from oauth_tokens where kind='refresh' and revoked_reason is not null and grant_id=$1", [grant.id])).rows).toEqual([{ revoked_reason: 'grace_superseded' }]);
+      const holderTry = await refresh(holder.body.refresh_token); // the legitimate holder arrives with R2
+      expect(holderTry).toMatchObject({ ok: false, error: 'invalid_grant' });
+      expect((await grantRow(grant.id)).revoked_reason).toBe('reuse');
+      // the thief's chain dies with the grant
+      expect(await repo.verifyAccessToken(thief.body.access_token)).toEqual({ ok: false, reason: 'revoked' });
+      expect(await refresh(thief.body.refresh_token)).toMatchObject({ ok: false, error: 'invalid_grant' });
+    });
+    test('the grace path is allowed at most once per token', async () => {
+      const { tokens, grant } = await connected(u1);
+      await refresh(tokens.refresh_token);
+      expect((await refresh(tokens.refresh_token)).ok).toBe(true); // grace, once
+      expect(await refresh(tokens.refresh_token)).toMatchObject({ ok: false, error: 'invalid_grant' }); // second replay
+      expect((await grantRow(grant.id)).revoked_reason).toBe('reuse');
     });
     test('concurrent refreshes with the same token never revoke the grant and never both keep working tokens', async () => {
       const { tokens, grant } = await connected(u1);
@@ -329,6 +348,23 @@ dbDescribe('oauth repository (throwaway database)', () => {
       expect(list).toHaveLength(10);
       await repo.revokeGrant(list[0].id, 'user', { onlyUserId: u.id });
       await expect(repo.approveAuthorization({ rid, userId: u.id, clientLabel: 'c', scope: 'diagrams:read', roleCap: 'viewer' })).resolves.toBeTruthy();
+    });
+    test('creating requests runs cleanup (at most every 5 minutes) and a global cap on unbound requests applies', async () => {
+      const mk = () => repo.createAuthorization({ clientId: CLAUDE, redirectUri: CB, state: null, codeChallenge: challenge, resource: R, requestedScope: null });
+      await mk();
+      await db.pg.query("update oauth_authorizations set expires_at = now() - interval '1 hour' where user_id is null"); // stale unbound rows
+      const before = (await db.pg.query('select count(*)::int n from oauth_authorizations')).rows[0].n;
+      expect(before).toBeGreaterThan(0);
+      repo.resetCleanupClock();
+      await mk(); // triggers cleanup
+      await new Promise((r) => setTimeout(r, 300));
+      const stale = (await db.pg.query("select count(*)::int n from oauth_authorizations where user_id is null and expires_at < now()")).rows[0].n;
+      expect(stale).toBe(0);
+      // cap: pretend the table is full
+      await db.pg.query("insert into oauth_authorizations (client_id,redirect_uri,code_challenge,resource,expires_at) select 'c','r',$1,'R',now()+interval '5 minutes' from generate_series(1,$2)", ['x'.repeat(43), repo.MAX_UNBOUND_AUTHORIZATIONS]);
+      expect(await mk()).toBeNull();
+      await db.pg.query("delete from oauth_authorizations where client_id='c'");
+      expect(await mk()).toBeTruthy();
     });
     test('at most 20 pending requests per user', async () => {
       const u = await db.user('pending@x.co');

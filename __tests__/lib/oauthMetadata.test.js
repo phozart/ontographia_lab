@@ -14,6 +14,8 @@ import {
   getResourceUrl,
   getProtectedResourceMetadataUrl,
   OAUTH_SCOPES,
+  oauthConfigProblems,
+  resetConfigReport,
 } from '../../lib/oauth/config';
 import { protectedResourceMetadata, authorizationServerMetadata } from '../../lib/oauth/metadata';
 import prmHandler from '../../pages/api/oauth/protected-resource';
@@ -177,5 +179,48 @@ describe('the three well-known URLs Claude probes', () => {
     process.env.MCP_PUBLIC_URL = 'https://lab.ontographia.com/api/mcp';
     expect(protectedResourceMetadata().resource).toBe('https://lab.ontographia.com/api/mcp');
     expect(getProtectedResourceMetadataUrl()).toBe('https://lab.ontographia.com/.well-known/oauth-protected-resource/api/mcp');
+  });
+});
+
+describe('fail-closed configuration (security review L4)', () => {
+  const setEnv = (nodeEnv) => { Object.defineProperty(process.env, 'NODE_ENV', { value: nodeEnv, configurable: true, writable: true }); };
+  const prevEnv = process.env.NODE_ENV;
+  afterEach(() => { setEnv(prevEnv); resetConfigReport(); jest.restoreAllMocks(); });
+
+  test('production with an http issuer or http MCP_PUBLIC_URL disables OAuth, logs why, and the well-known routes answer 404', async () => {
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    setEnv('production');
+    process.env.MCP_OAUTH_ENABLED = 'true';
+    process.env.NEXTAUTH_URL = 'http://lab.example.com';
+    expect(oauthConfigProblems().join(' ')).toMatch(/issuer.*https/);
+    expect(isOAuthEnabled()).toBe(false);
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining('OAUTH_DISABLED'));
+    expect((await get(prmHandler)).statusCode).toBe(404);
+    expect((await get(asHandler)).statusCode).toBe(404);
+    process.env.NEXTAUTH_URL = 'https://lab.example.com';
+    process.env.MCP_PUBLIC_URL = 'http://lab.example.com/api/mcp';
+    expect(oauthConfigProblems().join(' ')).toMatch(/MCP_PUBLIC_URL.*https/);
+    expect(isOAuthEnabled()).toBe(false);
+  });
+  test('https in production is fine; http is fine outside production', () => {
+    setEnv('production');
+    process.env.MCP_OAUTH_ENABLED = 'true';
+    expect(oauthConfigProblems()).toEqual([]);
+    expect(isOAuthEnabled()).toBe(true);
+    setEnv('development');
+    process.env.NEXTAUTH_URL = 'http://localhost:3000';
+    expect(isOAuthEnabled()).toBe(true);
+  });
+  test('only /api/mcp is supported as the resource path: anything else disables OAuth (the rewrites exist for that path only)', () => {
+    process.env.MCP_OAUTH_ENABLED = 'true';
+    const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    for (const url of ['https://lab.example.com/mcp', 'https://lab.example.com/', 'https://lab.example.com/api/mcp/v2']) {
+      process.env.MCP_PUBLIC_URL = url;
+      expect(oauthConfigProblems().join(' ')).toMatch(/only \/api\/mcp is supported/);
+      expect(isOAuthEnabled()).toBe(false);
+    }
+    process.env.MCP_PUBLIC_URL = 'https://lab.example.com/api/mcp/'; // trailing slash tolerated
+    expect(isOAuthEnabled()).toBe(true);
+    expect(spy).toHaveBeenCalled();
   });
 });
