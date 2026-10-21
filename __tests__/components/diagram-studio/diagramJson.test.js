@@ -207,3 +207,22 @@ describe('remapForMerge', () => {
     expect(JSON.stringify(content)).toBe(copy);
   });
 });
+
+describe('doc cards in imports (AI-5)', () => {
+  const { sanitizeContent } = require('../../../components/diagram-studio/export/diagramJson');
+  const docEl = (doc) => ({ id: 'd1', type: 'doc', packId: 'core', x: 0, y: 0, size: { width: 320, height: 220 }, data: { doc } });
+
+  test('markdown is rewritten the way the server does it, with a warning', () => {
+    const r = sanitizeContent({ elements: [docEl({ title: 'T', markdown: '<script>x</script> [a](javascript:alert(1))' })] });
+    expect(r.ok).toBe(true);
+    const md = r.content.elements[0].data.doc.markdown;
+    expect(md).not.toMatch(/(^|[^\\])<script/);
+    expect(md).not.toMatch(/\]\(javascript:/);
+    expect(r.warnings.join(' ')).toMatch(/unsafe link/);
+  });
+
+  test('an oversized or malformed doc fails the import with a message', () => {
+    expect(sanitizeContent({ elements: [docEl({ title: 'T', markdown: 'a'.repeat(100 * 1024 + 1) })] }).ok).toBe(false);
+    expect(sanitizeContent({ elements: [docEl({ title: 'T', markdown: 5 })] }).ok).toBe(false);
+  });
+});

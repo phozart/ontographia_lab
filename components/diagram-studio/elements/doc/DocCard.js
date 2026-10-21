@@ -35,7 +35,7 @@ const stop = (e) => e.stopPropagation();
 export default function DocCard({ element }) {
   const ctx = useDiagram() || {};
   const { elements, updateElement, diagram } = ctx;
-  const doc = docOf(element) || {};
+  const doc = useMemo(() => docOf(element) || {}, [element]);
   const editable = canWrite(diagram?.access);
   const title = doc.title || element.label || 'Untitled doc';
   const markdown = typeof doc.markdown === 'string' ? doc.markdown : '';

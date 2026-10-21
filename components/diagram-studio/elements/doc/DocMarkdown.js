@@ -20,7 +20,8 @@ const S = {
   h: { margin: '0.6em 0 0.25em', fontWeight: 650, lineHeight: 1.25 },
   p: { margin: '0 0 0.55em' },
   list: { margin: '0 0 0.55em', paddingLeft: '1.35em' },
-  task: { listStyle: 'none', marginLeft: '-1.2em' },
+  task: { listStyle: 'none', marginLeft: '-1.2em', display: 'flex', alignItems: 'baseline', gap: 6 },
+  pTight: { margin: 0 },
   quote: { margin: '0 0 0.55em', padding: '0 0 0 10px', borderLeft: `3px solid ${C.border}`, color: C.muted },
   pre: { margin: '0 0 0.55em', padding: '8px 10px', background: 'rgba(15,23,42,0.05)', borderRadius: 6, overflow: 'hidden', whiteSpace: 'pre-wrap', fontSize: 12 },
   code: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '0.92em', background: 'rgba(15,23,42,0.06)', padding: '0 3px', borderRadius: 3 },
@@ -108,7 +109,7 @@ function Blocks({ blocks, ctx }) {
         return <Tag key={i} style={{ ...S.h, fontSize: HEADING_SIZE[b.level] }}><Inline nodes={b.c} ctx={ctx} /></Tag>;
       }
       case 'p':
-        return <p key={i} style={S.p}><Inline nodes={b.c} ctx={ctx} /></p>;
+        return <p key={i} style={ctx.tight ? S.pTight : S.p}><Inline nodes={b.c} ctx={ctx} /></p>;
       case 'ul':
       case 'ol': {
         const Tag = b.t;
@@ -116,8 +117,8 @@ function Blocks({ blocks, ctx }) {
           <Tag key={i} style={S.list} start={b.t === 'ol' && b.start && b.start !== 1 ? b.start : undefined}>
             {b.items.map((it, j) => (
               <li key={j} style={it.checked === undefined ? undefined : S.task}>
-                {it.checked !== undefined && <input type="checkbox" checked={it.checked} disabled readOnly aria-label={it.checked ? 'done' : 'not done'} style={{ marginRight: 6 }} />}
-                <Blocks blocks={it.c} ctx={{ ...ctx, tight: true }} />
+                {it.checked !== undefined && <input type="checkbox" checked={it.checked} disabled readOnly aria-label={it.checked ? 'done' : 'not done'} style={{ margin: 0 }} />}
+                {it.checked !== undefined ? <div style={{ flex: 1, minWidth: 0 }}><Blocks blocks={it.c} ctx={{ ...ctx, tight: true }} /></div> : <Blocks blocks={it.c} ctx={{ ...ctx, tight: true }} />}
               </li>
             ))}
           </Tag>

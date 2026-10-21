@@ -192,10 +192,12 @@ describe('hostile input: parser output never contains an executable construct', 
 });
 
 describe('hostile input: resource limits', () => {
+  // CPU time of this process, not wall-clock: stays meaningful when the machine is busy.
   const time = (fn) => {
-    const t0 = Date.now();
+    const t0 = process.cpuUsage();
     const r = fn();
-    return [Date.now() - t0, r];
+    const d = process.cpuUsage(t0);
+    return [Math.round((d.user + d.system) / 1000), r];
   };
 
   test('huge input (200 KB) parses quickly and is bounded', () => {
@@ -205,7 +207,7 @@ describe('hostile input: resource limits', () => {
   });
 
   test('pathological delimiter and bracket runs stay linear', () => {
-    for (const md of ['*'.repeat(50000), '_a'.repeat(30000), '[' .repeat(30000), '[a]('.repeat(10000), '`'.repeat(30000), '`a '.repeat(20000), '~~a'.repeat(20000), '*a _b '.repeat(10000), '<'.repeat(30000), '!['.repeat(20000), '\\'.repeat(30000)]) {
+    for (const md of ['*'.repeat(50000), '_a'.repeat(30000), '[' .repeat(30000), '[a]('.repeat(10000), '`'.repeat(30000), '`a '.repeat(20000), '~~a'.repeat(20000), '*a _b '.repeat(10000), '<'.repeat(30000), '![' .repeat(20000), '\\'.repeat(30000), '](' .repeat(50000), '[a](' .repeat(20000) + 'x']) {
       const [ms] = time(() => parseMarkdown(md));
       expect(ms).toBeLessThan(2500);
     }
@@ -279,9 +281,19 @@ describe('sanitizeDocMarkdown', () => {
     expect(links(out)).toHaveLength(1);
   });
 
-  test('stays linear on hostile input', () => {
-    const t0 = Date.now();
-    for (const md of ['<'.repeat(100000), '[a]('.repeat(20000), '`'.repeat(100000), '![['.repeat(30000), '[x]: a\n'.repeat(20000)]) clean(md);
-    expect(Date.now() - t0).toBeLessThan(4000);
+  test('stays linear on hostile input (CPU time)', () => {
+    const t0 = process.cpuUsage();
+    for (const md of ['<'.repeat(100000), '[a]('.repeat(20000), '`'.repeat(100000), '![['.repeat(30000), '[x]: a\n'.repeat(20000), '](' .repeat(50000)]) clean(md);
+    const d = process.cpuUsage(t0);
+    expect((d.user + d.system) / 1000).toBeLessThan(2500);
+  });
+
+  test('fails closed when a hostile paragraph exhausts the link-scan budget: a later unsafe link is still neutralized', () => {
+    const md = `${'[a]('.repeat(30000)}\n\n[click](javascript:alert(1)) [more](data:text/html,x)`;
+    const out = clean(md);
+    expect(out).not.toMatch(/\]\(\s*(javascript|data):/i);
+    expect(clean(out)).toBe(out); // still idempotent
+    const ast = parseMarkdown(md);
+    expect(JSON.stringify(ast)).not.toMatch(/javascript/); // the parser makes no link out of it either
   });
 });

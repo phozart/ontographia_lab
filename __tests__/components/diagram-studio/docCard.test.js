@@ -22,7 +22,8 @@ jest.mock('../../../components/diagram-studio/DiagramContext', () => ({
 import DocMarkdown from '../../../components/diagram-studio/elements/doc/DocMarkdown';
 import DocCard from '../../../components/diagram-studio/elements/doc/DocCard';
 import DocPanel from '../../../components/diagram-studio/elements/doc/DocPanel';
-import { registerElementLinkHandler, resetDocStore, getOpenDocId } from '../../../components/diagram-studio/elements/doc/docStore';
+import DocPanelHost from '../../../components/diagram-studio/elements/doc/DocPanelHost';
+import { registerElementLinkHandler, resetDocStore, getOpenDocId, openDoc } from '../../../components/diagram-studio/elements/doc/docStore';
 import { docElementFromMarkdownFile } from '../../../components/diagram-studio/elements/doc/useDocImport';
 import { newDocElement } from '../../../lib/doc/docElement';
 import { MAX_DOC_BYTES } from '../../../lib/doc/markdown';
@@ -291,5 +292,35 @@ describe('.md drop import (pure part)', () => {
     const r = docElementFromMarkdownFile('a'.repeat(MAX_DOC_BYTES + 1), 'big.md', { x: 0, y: 0 }, 'el-1');
     expect(r.error).toMatch(/100 KB/);
     expect(r.element).toBeUndefined();
+  });
+});
+
+describe('DocPanelHost', () => {
+  test('Enter on a selected doc card opens the editor in the side panel (lazy-loaded); Enter in a text field does not', async () => {
+    mockElements = [NODE, mkDoc('Hello')];
+    mockSelection = { nodeIds: ['doc1'], connectionIds: [] };
+    render(<DocPanelHost />);
+    expect(screen.queryByTestId('doc-panel-wrapper')).toBeNull();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(getOpenDocId()).toBeNull();
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(await screen.findByTestId('doc-panel')).toBeInTheDocument();
+    expect(getOpenDocId()).toBe('doc1');
+    input.remove();
+  });
+
+  test('Enter does nothing for a non-doc selection, and a deleted doc closes the panel', async () => {
+    mockElements = [NODE, mkDoc('Hello')];
+    mockSelection = { nodeIds: ['n1'], connectionIds: [] };
+    const { rerender } = render(<DocPanelHost />);
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(getOpenDocId()).toBeNull();
+    act(() => openDoc('doc1'));
+    expect(await screen.findByTestId('doc-panel')).toBeInTheDocument();
+    mockElements = [NODE];
+    rerender(<DocPanelHost />);
+    expect(getOpenDocId()).toBeNull();
   });
 });

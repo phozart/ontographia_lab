@@ -29,6 +29,14 @@ describe('compare diff', () => {
     expect(e.changes[0].fields).toEqual(['data']);
   });
 
+  test('a doc change carries a line-level text diff for Compare', () => {
+    const d = diffContent(content([docEl('d', D('keep\nold line\nsame\n'))]), content([docEl('d', D('keep\nnew line\nanother new\nsame\n'))]));
+    expect(d.changes[0].docText).toEqual({ linesAdded: 2, linesRemoved: 1, titleChanged: false });
+    const t = diffContent(content([docEl('d', D('x', 'A'))]), content([docEl('d', D('x', 'B'))]));
+    expect(t.changes[0].docText).toEqual({ linesAdded: 0, linesRemoved: 0, titleChanged: true });
+    expect(diffContent(content([{ id: 'n', x: 0, y: 0 }]), content([{ id: 'n', x: 50, y: 0 }])).changes[0].docText).toBeUndefined();
+  });
+
   test('added and removed docs are listed with their titles', () => {
     const d = diffContent(content([]), content([docEl('d', D('x', 'New doc'))]));
     expect(d.changes[0]).toMatchObject({ change: 'added', label: 'New doc' });
