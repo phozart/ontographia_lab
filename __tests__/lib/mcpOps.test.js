@@ -77,6 +77,21 @@ describe('add_element', () => {
     expect(child.y).toBeGreaterThanOrEqual(700);
   });
 
+  test('frame membership is explicit: new frames are flagged, a shape placed inside a frame adopts it, explicit parent wins', () => {
+    const r = run([
+      { op: 'add_element', type: 'core/frame', x: 0, y: 700, w: 400, h: 300 },
+      { op: 'add_element', type: 'process-flow/task', x: 50, y: 150 }, // inside fr-1 (0,0,900x500), no parent
+      { op: 'add_element', type: 'process-flow/task', x: 5000, y: 5000 }, // in no frame
+      { op: 'add_element', type: 'process-flow/task', x: 50, y: 150, parent: 'fr-1' },
+    ]);
+    expect(r.ok).toBe(true);
+    const byId = Object.fromEntries(r.content.elements.map((e) => [e.id, e]));
+    expect(byId['el-t1'].membershipExplicit).toBe(true);
+    expect(byId['el-t2'].parentFrameId).toBe('fr-1');
+    expect('parentFrameId' in byId['el-t3']).toBe(false);
+    expect(byId['el-t4'].parentFrameId).toBe('fr-1');
+  });
+
   test('unknown fields are rejected (strict ops)', () => {
     expect(run([{ op: 'add_element', type: 'process-flow/task', evil: { onclick: 'x' } }]).ok).toBe(false);
   });

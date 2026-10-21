@@ -125,6 +125,12 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Tests:** layout engine, placement (no overlaps, frames, grid, 200 elements), ops (validation, atomicity, refs, limits), migration 0009 on a throwaway database, repository on a throwaway database (CAS, concurrent writers, versions, restore undoes the batch), tool through the MCP protocol with the real authz (viewer, commenter, editor without allowlist, outside allowlist, share revoked or downgraded, rate limit, budget), token validation / API / UI. Live check (port 3252, throwaway database): editor token created through the API, read, apply 3 elements + 2 connections without coordinates (rendered in the editor, no overlap), stale revision -> conflict, viewer and commenter and outside-allowlist denied, History lists the agent version.
 - **Deployment note:** migration `0009` runs automatically before the app starts (`prestart` / container `CMD`); take a `pg_dump` first as for any migration. It swaps one CHECK constraint on the small `api_tokens` table and adds another; existing rows satisfy both. Roll out the migration before (or with) the new code: new code with an old schema cannot create editor tokens. Old code with the new schema is safe.
 
+### Slice M2 review follow-ups (PR #39)
+
+- **Branch:** `feat/m2-mcp-edits`. **Files:** `lib/mcp/placement.js` (spatial index, one occupied set, bounded search, overflow rows; hub-and-spoke layout), `lib/mcp/ops.js` (frame `membershipExplicit`, adopt on x/y inside a frame), `lib/diagramRepository.js` (`applyContentChange` computes before the transaction; audit row), `lib/versions/{policy,retention}.js`, `lib/versionRepository.js` (agent retention budget), `lib/mcp/server.js` (token id in actor), History panel and `versionUtils.js`, ADR-0001 as-built.
+- **Behavior notes:** placement no longer runs under the row lock (revision re-checked under the lock); a child that does not fit its frame goes into rows below it instead of searching 61x61 cells per child. A shape added with x/y inside a frame and no `parent` joins that frame (editor `assignFrameOnCreate` rule); an explicit `parent` wins.
+- **Tests:** placement time budget (200 children in a frame on 5000 elements) and hub-and-spoke layouts, agent retention budget and audit row on a throwaway database, ops frame membership, History panel labels and filter.
+
 ## Slice 8 — Compare versions
 
 - **PR title:** `feat: slice 8 compare versions (structural diff, API, History panel summary, canvas overlay)`

@@ -86,7 +86,7 @@ describe('success', () => {
     expect(newId).toMatch(/^el-/);
     expect(r.structuredContent.placed[0]).toMatchObject({ id: newId });
     expect(editRepo.applyContentChange).toHaveBeenCalledWith(A, expect.objectContaining({
-      expectedRevision: 7, userId: OWNER, actor: { userId: OWNER, email: 'owner@x.co', via: 'agent' },
+      expectedRevision: 7, userId: OWNER, actor: { userId: OWNER, email: 'owner@x.co', via: 'agent', tokenId: 'tok-1' },
     }));
     expect(stored.elements.map((e) => e.id)).toContain(newId);
     expect(stored.connections).toHaveLength(1);

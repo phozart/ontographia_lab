@@ -14,7 +14,7 @@ import { useDiagram } from '../DiagramContext';
 import { getVersion, getVersionDiff, listVersions, nameCurrentVersion, renameVersion } from '../versions/versionsClient';
 import CompareSummary from './CompareSummary';
 import { requestReveal, setCompare, useCompare } from '../versions/compareStore';
-import { buildVersionPreview, formatKind, formatRelative, versionTitle } from '../versions/versionUtils';
+import { buildVersionPreview, formatKind, formatRelative, versionAuthor, versionTitle } from '../versions/versionUtils';
 
 export const OPEN_VERSION_HISTORY_EVENT = 'ds:open-version-history';
 
@@ -256,7 +256,7 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
             <button type="button" className="vh-link" onClick={() => setSelected(null)}>&larr; All versions</button>
             <h3>{selectedTitle}</h3>
             <p className="vh-meta">
-              #{selected.number} &middot; {formatKind(selected.kind)} &middot; {selected.createdBy?.name || 'System'} &middot;{' '}
+              #{selected.number} &middot; {formatKind(selected.kind)} &middot; {versionAuthor(selected)} &middot;{' '}
               <time dateTime={selected.createdAt} title={new Date(selected.createdAt).toLocaleString()}>{formatRelative(selected.createdAt)}</time>
               <br />
               {selected.elementCount} element{selected.elementCount === 1 ? '' : 's'}, {selected.connectionCount} connection{selected.connectionCount === 1 ? '' : 's'}
@@ -353,7 +353,8 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
                       <span className="vh-item-title">{versionTitle(v)}</span>
                       <span className="vh-item-meta">
                         <span className={`vh-kind vh-kind-${v.kind}`}>{formatKind(v.kind)}</span>
-                        <span>{v.createdBy?.name || 'System'}</span>
+                        {v.createdVia === 'agent' && <span className="vh-kind vh-kind-agent">AI</span>}
+                        <span>{versionAuthor(v)}</span>
                         <time dateTime={v.createdAt} title={new Date(v.createdAt).toLocaleString()}>{formatRelative(v.createdAt)}</time>
                         <span className="vh-num">#{v.number}</span>
                       </span>
@@ -419,6 +420,7 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
         .vh-item-title { font-weight: 600; overflow-wrap: anywhere; }
         .vh-item-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--text-muted, #6b7280); font-size: 12px; }
         .vh-kind { padding: 0 6px; border-radius: 999px; background: var(--bg-alt, #f3f4f6); }
+        .vh-kind-agent { background: rgba(154, 138, 200, 0.2); color: #5b4a96; }
         .vh-kind-named { background: rgba(79, 179, 206, 0.18); color: #20728a; }
         .vh-num { margin-left: auto; }
         .vh-detail { display: flex; flex-direction: column; gap: 10px; }

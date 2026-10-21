@@ -140,4 +140,41 @@ dbDescribe('diagramRepository.applyContentChange (throwaway database)', () => {
     expect(miss).toBeNull();
     expect((await head(id)).content.elements.map((e) => e.id)).toEqual(['a', 'new']);
   });
+
+  test('writes an agent audit row in the same transaction: on behalf of the user, token id, revision, counts, no content', async () => {
+    const id = await newDiagram();
+    const tokenId = crypto.randomUUID();
+    const r = await repo.applyContentChange(id, {
+      expectedRevision: 0, userId: user.id, actor: { ...actor(), tokenId },
+      compute: (c) => ({ ...add({ content: c }), counts: { addedElements: 1 } }),
+    });
+    const rows = (await pg.query("select actor_type, actor_user_id, on_behalf_of, action, target from audit_events where diagram_id=$1", [id])).rows;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ actor_type: 'agent', actor_user_id: null, on_behalf_of: user.id, action: 'diagram.agent_edit' });
+    expect(rows[0].target).toEqual({ tokenId, revision: 1, versionId: r.versionId, counts: { addedElements: 1 } });
+    expect(JSON.stringify(rows[0].target)).not.toContain('"elements"');
+    // rejected / conflicting batches leave no audit row
+    await repo.applyContentChange(id, { expectedRevision: 0, userId: user.id, actor: actor(), compute: (c) => add({ content: c }) });
+    await repo.applyContentChange(id, { expectedRevision: 1, userId: user.id, actor: actor(), compute: () => ({ ok: false, errors: [] }) });
+    expect((await pg.query('select count(*)::int n from audit_events where diagram_id=$1', [id])).rows[0].n).toBe(1);
+  });
+
+  test('agent versions have their own retention budget: they never evict human autosaves, and are capped themselves', async () => {
+    const id = await newDiagram();
+    const ins = (n, via, ageMs) => pg.query(
+      `insert into diagram_versions (diagram_id, version_number, content, created_by, kind, created_via, created_at)
+       values ($1,$2,$3,'x','auto',$4, now() - ($5 || ' milliseconds')::interval)`,
+      [id, n, JSON.stringify(content(['a'])), via, String(ageMs)]);
+    // 100 human autosaves (the human cap) and 110 older agent versions, all within the 24 h keep-all window
+    for (let i = 0; i < 100; i++) await ins(i + 1, 'web', 1000 * (i + 1));
+    for (let i = 0; i < 110; i++) await ins(101 + i, 'agent', 200000 + 1000 * i);
+    await pg.query('update diagrams set version_seq = 300 where id=$1', [id]);
+    await repo.applyContentChange(id, { expectedRevision: 0, userId: user.id, actor: actor(), compute: (c) => add({ content: c }) });
+    const count = async (via) => (await pg.query("select count(*)::int n from diagram_versions where diagram_id=$1 and kind='auto' and (created_via='agent') = $2", [id, via])).rows[0].n;
+    expect(await count(true)).toBe(100);
+    // human side: 100 web autosaves + the pre-change version (created_via system) = cap 100 + 1 pruned oldest
+    expect(await count(false)).toBe(100);
+    const oldestWeb = (await pg.query("select min(version_number)::int n from diagram_versions where diagram_id=$1 and created_via='web'", [id])).rows[0].n;
+    expect(oldestWeb).toBeLessThanOrEqual(2); // newest human autosaves are kept; only the single oldest may go for the pre-change restore point
+  });
 });

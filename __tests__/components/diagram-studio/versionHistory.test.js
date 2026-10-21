@@ -2,7 +2,7 @@
 import { render, screen, waitFor, within, act, fireEvent } from '@testing-library/react';
 import VersionHistoryPanel, { VersionHistory, OPEN_VERSION_HISTORY_EVENT } from '../../../components/diagram-studio/ui/VersionHistoryPanel';
 import { DiagramProvider, useDiagram } from '../../../components/diagram-studio/DiagramContext';
-import { buildVersionPreview, versionTitle, formatKind } from '../../../components/diagram-studio/versions/versionUtils';
+import { buildVersionPreview, versionTitle, formatKind, versionAuthor } from '../../../components/diagram-studio/versions/versionUtils';
 
 const click = (el) => act(async () => { fireEvent.click(el); });
 const type = (el, value) => act(async () => { fireEvent.change(el, { target: { value } }); });
@@ -50,6 +50,38 @@ describe('versionUtils', () => {
     expect(() => buildVersionPreview({})).not.toThrow();
     expect(() => buildVersionPreview(null)).not.toThrow();
     expect(() => buildVersionPreview({ elements: [{}, null, { x: 'NaN' }] })).not.toThrow();
+  });
+});
+
+describe('AI agent versions in the History panel', () => {
+  beforeEach(() => { jest.spyOn(console, 'error').mockImplementation(() => {}); });
+  afterEach(() => jest.restoreAllMocks());
+  const agentItems = [
+    meta(5, { kind: 'auto', label: null, createdVia: 'agent', createdBy: { id: 'u1', name: 'Ada' } }),
+    meta(4, { kind: 'auto', label: null, createdVia: 'system', createdBy: null }),
+    meta(3, { kind: 'auto', label: null }),
+    meta(2),
+  ];
+
+  test('labels agent versions "AI agent (via owner)" with a badge, and pre-change versions "Before AI change"', async () => {
+    mockApi({ items: agentItems });
+    renderPanel();
+    await screen.findByText('AI agent (via Ada)');
+    expect(screen.getByText('AI')).toBeTruthy();
+    expect(screen.getByText('Before AI change')).toBeTruthy();
+    expect(versionTitle(agentItems[1])).toBe('Before AI change');
+    expect(versionAuthor(agentItems[0])).toBe('AI agent (via Ada)');
+  });
+
+  test('the autosave filter hides agent and pre-change versions too, and shows them again', async () => {
+    mockApi({ items: agentItems });
+    renderPanel();
+    await screen.findByText('AI agent (via Ada)');
+    await click(screen.getByLabelText('Show autosaves'));
+    expect(screen.queryByText('AI agent (via Ada)')).toBeNull();
+    expect(screen.queryByText('Before AI change')).toBeNull();
+    await click(screen.getByLabelText('Show autosaves'));
+    expect(screen.getByText('AI agent (via Ada)')).toBeTruthy();
   });
 });
 

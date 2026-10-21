@@ -96,4 +96,80 @@ describe('placeNewElements', () => {
     placeNewElements({ elements: input, connections: [], newIds: ['a'] });
     expect(input[0].x).toBeUndefined();
   });
+
+  describe('hub and spoke', () => {
+    const star = (hubExtra, n = 6) => {
+      const hub = fresh('h', 120, 80, hubExtra);
+      const kids = Array.from({ length: n }, (_, i) => fresh(`c${i}`, 120, 80, hubExtra));
+      return { elements: [hub, ...kids], connections: kids.map((k) => conn('h', k.id)), newIds: ['h', ...kids.map((k) => k.id)] };
+    };
+    const midY = (e) => e.y + e.size.height / 2;
+
+    test('LR: the hub is centered on the span of its leaves, leaves share one column to its right', () => {
+      const out = placeNewElements(star({}));
+      const m = Object.fromEntries(out.map((e) => [e.id, e]));
+      const kids = out.filter((e) => e.id !== 'h');
+      const top = Math.min(...kids.map((k) => k.y));
+      const bottom = Math.max(...kids.map((k) => k.y + k.size.height));
+      expect(Math.abs(midY(m.h) - (top + bottom) / 2)).toBeLessThanOrEqual(20);
+      kids.forEach((k) => expect(k.x).toBeGreaterThan(m.h.x + 120));
+      expect(anyOverlap(out)).toBeNull();
+    });
+
+    test('TB: the hub is centered over a row of leaves', () => {
+      const out = placeNewElements({ ...star({}), direction: 'TB' });
+      const m = Object.fromEntries(out.map((e) => [e.id, e]));
+      const kids = out.filter((e) => e.id !== 'h');
+      const left = Math.min(...kids.map((k) => k.x));
+      const right = Math.max(...kids.map((k) => k.x + k.size.width));
+      expect(Math.abs(m.h.x + 60 - (left + right) / 2)).toBeLessThanOrEqual(20);
+      kids.forEach((k) => expect(k.y).toBeGreaterThan(m.h.y));
+      expect(anyOverlap(out)).toBeNull();
+    });
+
+    test('mind map: leaves are split to both sides of the hub', () => {
+      const out = placeNewElements(star({ packId: 'mind-map' }));
+      const m = Object.fromEntries(out.map((e) => [e.id, e]));
+      const kids = out.filter((e) => e.id !== 'h');
+      expect(kids.filter((k) => k.x > m.h.x)).toHaveLength(3);
+      expect(kids.filter((k) => k.x < m.h.x)).toHaveLength(3);
+      expect(Math.abs(midY(m.h) - (Math.min(...kids.map((k) => k.y)) + Math.max(...kids.map((k) => k.y + k.size.height))) / 2)).toBeLessThanOrEqual(20);
+      expect(anyOverlap(out)).toBeNull();
+    });
+
+    test('a chain or a tree with an inner node is not a star (hierarchical layout as before)', () => {
+      const els = ['a', 'b', 'c', 'd'].map((id) => fresh(id));
+      const out = placeNewElements({ elements: els, connections: [conn('a', 'b'), conn('b', 'c'), conn('b', 'd')], newIds: ['a', 'b', 'c', 'd'] });
+      const m = Object.fromEntries(out.map((e) => [e.id, e]));
+      expect(m.a.x).toBeLessThan(m.b.x);
+      expect(m.b.x).toBeLessThan(m.c.x);
+    });
+  });
+
+  describe('performance (availability: runs under a row lock)', () => {
+    function bigDiagram(n) {
+      const cols = 100;
+      const els = [{ id: 'f', type: 'frame', x: 0, y: 0, size: { width: 800, height: 600 } }];
+      for (let i = 0; i < n; i++) els.push(el(`e${i}`, 1200 + (i % cols) * 160, (Math.floor(i / cols)) * 120));
+      return els;
+    }
+    test('200 new children in a frame on a 5000-element diagram: < 300 ms, no overlaps', () => {
+      const existing = bigDiagram(5000);
+      const kids = Array.from({ length: 200 }, (_, i) => fresh(`k${i}`, 60, 40, { parentFrameId: 'f' }));
+      const ids = kids.map((k) => k.id);
+      let best = Infinity;
+      let out;
+      for (let run = 0; run < 3; run++) {
+        const t0 = performance.now();
+        out = placeNewElements({ elements: [...existing, ...kids], connections: [], newIds: ids });
+        best = Math.min(best, performance.now() - t0);
+      }
+      expect(best).toBeLessThan(300);
+      const placed = out.filter((e) => e.id.startsWith('k'));
+      expect(placed.every((e) => Number.isFinite(e.x) && Number.isFinite(e.y))).toBe(true);
+      expect(anyOverlap(placed)).toBeNull();
+      const frameKids = placed.filter((e) => e.x >= 0 && e.x + 60 <= 800 && e.y >= 0 && e.y + 40 <= 600);
+      expect(frameKids.length).toBeGreaterThan(50);
+    });
+  });
 });
