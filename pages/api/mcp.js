@@ -1,14 +1,16 @@
 // pages/api/mcp.js
-// Read-only MCP server (stateless Streamable HTTP). Bearer API tokens only; see lib/mcp/http.js.
+// MCP server (stateless Streamable HTTP). Bearer API tokens only; see lib/mcp/http.js.
+// Read tools for every token; the write tool (diagram_apply_ops) needs an editor-capped token with a diagram allowlist.
 
 import { createMcpHandler } from '../../lib/mcp/http';
 import { createMcpServer } from '../../lib/mcp/server';
 import { verifyToken } from '../../lib/apiTokens';
 import { rateLimit } from '../../lib/rateLimit';
 
-// Per token: 120 requests per minute. Failed authentications: 30 per minute per client address.
+// Per token: 120 requests per minute, of which at most 30 writes (Q-MCP7). Failed authentications: 30 per minute per client address.
 // In-memory like the other limiters: per process; move to shared storage with the multi-instance work.
 const tokenLimiter = rateLimit({ interval: 60 * 1000, limit: 120, prefix: 'mcp-token' });
+const writeLimiter = rateLimit({ interval: 60 * 1000, limit: 30, prefix: 'mcp-write' });
 const authFailLimiter = rateLimit({ interval: 60 * 1000, limit: 30, prefix: 'mcp-authfail' });
 
 export const config = {
@@ -20,7 +22,7 @@ export const config = {
 
 export default createMcpHandler({
   verifyToken: (secret) => verifyToken(secret),
-  createServer: (principal) => createMcpServer(principal),
+  createServer: (principal) => createMcpServer(principal, { writeLimiter }),
   tokenLimiter,
   authFailLimiter,
 });

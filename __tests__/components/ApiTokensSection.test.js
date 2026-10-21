@@ -49,6 +49,36 @@ describe('ApiTokensSection', () => {
     expect(screen.queryByText('ogl_SECRETVALUE')).not.toBeInTheDocument();
   });
 
+  test('Editor role forces a diagram choice: restriction is locked on, create is refused until a diagram is picked', async () => {
+    let posted;
+    mockFetch({
+      'GET /api/user/tokens': { body: { tokens: [] } },
+      'GET /api/diagrams': { body: [{ id: 'd1', name: 'Order flow' }] },
+      'POST /api/user/tokens': (opts) => {
+        posted = JSON.parse(opts.body);
+        return { status: 201, body: { token: 'ogl_EDITSECRET', record: { id: 't3', name: posted.name } } };
+      },
+    });
+    render(<ApiTokensSection />);
+    fireEvent.change(screen.getByLabelText(/Token name/i), { target: { value: 'Agent' } });
+    fireEvent.mouseDown(screen.getByLabelText('Role'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Editor (requires choosing diagrams)' }));
+    const box = screen.getByRole('checkbox', { name: /Limit to specific diagrams/i });
+    expect(box).toBeChecked();
+    expect(box).toBeDisabled();
+    expect(screen.getByText(/agent change these diagrams/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create token' }));
+    expect(await screen.findByText(/Pick at least one diagram/i)).toBeInTheDocument();
+    expect(posted).toBeUndefined();
+
+    const input = screen.getByLabelText(/Diagrams this token may/i);
+    fireEvent.mouseDown(input);
+    fireEvent.click(await screen.findByRole('option', { name: 'Order flow' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create token' }));
+    expect(await screen.findByText('ogl_EDITSECRET')).toBeInTheDocument();
+    expect(posted).toMatchObject({ roleCap: 'editor', diagramIds: ['d1'] });
+  });
+
   test('revoke needs a second click, then calls DELETE and reloads', async () => {
     let tokens = [TOKEN];
     mockFetch({

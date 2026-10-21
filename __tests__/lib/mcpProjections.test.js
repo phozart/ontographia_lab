@@ -277,3 +277,13 @@ describe('total output budget', () => {
     expect(o.split('\n').pop()).toMatch(/omitted/);
   });
 });
+
+describe('compact data field', () => {
+  test('falls back to the editor/agent `properties` field so agent-written data round-trips', () => {
+    const out = toCompact({ id: 'd', name: 'D', type: 't', revision: 1 }, {
+      elements: [{ id: 'p', type: 'task', packId: 'process-flow', label: 'P', x: 1, y: 1, properties: { assignee: 'Ops' } }],
+      connections: [],
+    });
+    expect(out.elements[0].data).toEqual({ assignee: 'Ops' });
+  });
+});
