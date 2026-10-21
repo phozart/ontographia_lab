@@ -182,7 +182,18 @@ dbDescribe('diagram_create (throwaway database)', () => {
       const r = await create(await clientFor(t.token), { name: 'Too many' });
       expect(r.isError).toBe(true);
       expect(r.structuredContent.code).toBe('ALLOWLIST_FULL');
+      expect(text(r)).toMatch(/new token|remove boards/i);
+      expect(text(r)).not.toMatch(/reconnect/i);
       expect(await count()).toBe(before);
+    });
+
+    test('OAuth grant with a full list says to reconnect', async () => {
+      const ids = [own.id];
+      for (let i = 0; i < 49; i += 1) ids.push(crypto.randomUUID());
+      const g = await oauthToken(user, { cap: 'editor', diagramIds: ids });
+      const r = await create(await clientFor(g.token), { name: 'Too many' });
+      expect(r.structuredContent.code).toBe('ALLOWLIST_FULL');
+      expect(text(r)).toMatch(/reconnect/i);
     });
   });
 
@@ -308,11 +319,51 @@ dbDescribe('diagram_create (throwaway database)', () => {
       expect(await count()).toBe(before);
       expect(await allowlist(t.record.id)).toEqual([own.id]);
     });
+    test.each([
+      ['NUL in name', { name: 'a\u0000b' }],
+      ['control char in name', { name: 'a\u0007b' }],
+      ['newline in name', { name: 'a\nb' }],
+      ['NUL in description', { name: 'ok', description: 'x\u0000y' }],
+      ['ESC in description', { name: 'ok', description: 'x\u001by' }],
+    ])('%s is rejected up front without using the hourly quota', async (_n, args) => {
+      fixSeq += 1;
+      const u = await db.user(`ctl${fixSeq}@x.co`);
+      const o = await fixture(u);
+      const t = await personal(u, 'editor', [o.id]);
+      const client = await clientFor(t.token);
+      const before = await count();
+      for (let i = 0; i < 12; i += 1) expect((await create(client, args)).isError).toBe(true);
+      expect(await count()).toBe(before);
+      // quota untouched: ten valid creates still succeed
+      for (let i = 0; i < 10; i += 1) expect((await create(client, { name: `v${i}` })).isError).toBeFalsy();
+    });
+    test('tab and newline are fine in a description', async () => {
+      const t = await personal(user, 'editor', [own.id]);
+      const r = await create(await clientFor(t.token), { name: 'ok desc', description: 'a\tb\nc' });
+      expect(r.isError).toBeFalsy();
+    });
     test('the name is trimmed; 255 characters are accepted', async () => {
       const t = await personal(user, 'editor', [own.id]);
       const r = await create(await clientFor(t.token), { name: `  ${'n'.repeat(255)}  ` });
       expect(r.isError).toBeFalsy();
       expect(r.structuredContent.name).toBe('n'.repeat(255));
+    });
+  });
+
+  describe('concurrent creates', () => {
+    test('short ids never collide: plain and transactional creates racing all succeed with distinct LAB-n', async () => {
+      const u = await db.user('race@x.co');
+      const o = await fixture(u);
+      const t = await personal(u, 'editor', [o.id]);
+      const client = await clientFor(t.token);
+      const jobs = [];
+      for (let i = 0; i < 6; i += 1) jobs.push(diagramRepository.createDiagram({ type: 'infinite-canvas', name: `web ${i}` }, u.email, u.id));
+      for (let i = 0; i < 4; i += 1) jobs.push(create(client, { name: `mcp ${i}` }));
+      const res = await Promise.all(jobs);
+      const ids = res.map((r) => r.short_id || r.structuredContent?.shortId);
+      expect(ids.every(Boolean)).toBe(true);
+      expect(new Set(ids).size).toBe(10);
+      expect(res.slice(6).every((r) => !r.isError)).toBe(true);
     });
   });
 

@@ -123,7 +123,7 @@ Ask, for example: "Create a board called Onboarding journey and map these steps 
 
 - **Who can**: only an editor connection (a personal editor token, or a claude.ai connection approved with Editor access, including the administrator's "All boards I can edit"). Viewer and commenter connections are refused ("role does not permit").
 - **What you get**: an empty board named as asked (the same name rule as the dashboard's New workspace dialog: 1 to 255 characters; a name you already use becomes "Name (1)"), owned by you, **private**: nothing is shared, and agents cannot share it. It appears on your dashboard like any workspace and has the next LAB-n id.
-- **Access for the connection that created it**: if that connection is limited to chosen boards, the new board is added to its own list (only that token or connection, never your other ones; a connection may list at most 50 boards, otherwise creating is refused and nothing is created). "All boards I can edit" needs nothing.
+- **Access for the connection that created it**: if that connection is limited to chosen boards, the new board is added to its own list (only that token or connection, never your other ones; a connection may list at most 50 boards, otherwise creating is refused and nothing is created: reconnect with fewer boards, or for a personal token remove boards or create a new token). "All boards I can edit" needs nothing.
 - **Limits**: 10 new boards per hour per connection, on top of the 30 writes per minute. Every creation is recorded in the board's audit trail as an agent action on your behalf (no content).
 - **History**: creating makes no version (a new workspace has none either); the first agent edit makes the usual versions.
 
