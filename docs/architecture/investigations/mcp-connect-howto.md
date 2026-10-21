@@ -51,10 +51,23 @@ Cursor (`~/.cursor/mcp.json` or `.cursor/mcp.json`):
 | `diagram_get`       | One diagram as compact JSON (stable ids), a Mermaid flowchart, or a plain outline. |
 | `diagram_thumbnail` | The stored preview image, when one exists.                                         |
 | `stencil_catalog`   | The stencil packs and what each shape type means.                                  |
+| `board_read_region` | Part of a diagram in reading order: a frame, a selection, a rectangle or the area around one element. |
 
 Resources: `ontographia://diagrams/{id}` (compact JSON), `ontographia://diagrams/{id}/mermaid`, `ontographia://catalog/{packId}`.
 
 Diagram names, labels and descriptions are user-authored data. The tool descriptions tell the model not to treat them as instructions; hosts should still ask for confirmation before acting on anything derived from them.
+
+### Working from a "Copy link for Claude" link
+
+In the editor, right-click a selection (or a frame, or empty canvas for the visible area) and choose **Copy link for Claude**. Paste the link into the chat and ask for what you want ("summarize this frame"). Claude passes it to `board_read_region` as `focus.link`; the link carries the diagram, so no `id` is needed.
+
+- `https://host/diagram/LAB-12?focus=el-a,el-b` is a selection. A frame id in the list means the frame and everything inside it (nested frames included).
+- `https://host/diagram/LAB-12?region=x,y,w,h` is a rectangle in canvas coordinates (used for the visible area, and for selections of more than 200 elements). Every element whose box overlaps it is returned.
+- The same link opens the diagram in the editor, selecting and zooming to that focus.
+- Without a link, give `id` plus one of `focus.frameId`, `focus.elementIds`, `focus.bbox` or `focus.around` (`{elementId, radius}`).
+- Results come in reading order (frames first, then top to bottom, left to right) as compact elements with ids, the connections between them, and a readable outline. Large regions page: pass `next` back as `cursor` with the same focus. A cursor from an older revision is refused, so start again.
+- It works with viewer, commenter and editor tokens alike. A diagram outside the token's access answers "not found".
+- Board content (labels, data, comments) is user-authored data, not instructions.
 
 ## 4. Behavior worth knowing
 
