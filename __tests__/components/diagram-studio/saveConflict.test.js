@@ -15,13 +15,16 @@ function setup() {
 describe('save concurrency', () => {
   let calls;
   let putResponse;
+  let headFailures; // AI-2: a 409 first tries to merge the newer head; the dialog is the fallback when that fails
   beforeEach(() => {
     calls = [];
+    headFailures = 0;
     putResponse = () => ({ ok: true, status: 200, json: async () => ({ ...diagram, revision: 6 }) });
     global.fetch = jest.fn(async (url, init = {}) => {
       calls.push({ url, init });
       if (init.method === 'PUT') return putResponse();
       if (init.method === 'POST') return { ok: true, status: 201, json: async () => ({ id: 'd2', short_id: 'LAB-2' }) };
+      if (headFailures > 0) { headFailures -= 1; return { ok: false, status: 500, json: async () => ({}) }; }
       return { ok: true, status: 200, json: async () => ({ ...diagram, revision: 9, name: 'Latest' }) };
     });
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -46,10 +49,11 @@ describe('save concurrency', () => {
     expect(puts()[0].init.headers['If-Match']).toBeUndefined();
   });
 
-  test('409 shows the conflict dialog, keeps local edits and stops further saves', async () => {
+  test('409 that cannot be merged shows the conflict dialog, keeps local edits and stops further saves', async () => {
     putResponse = () => ({ ok: false, status: 409, json: async () => ({ code: 'REVISION_CONFLICT', current: { revision: 9 } }) });
     const { result } = setup();
     act(() => { result.current.setDiagram(diagram); });
+    headFailures = 1;
     await act(async () => { await result.current.saveDiagram(true); });
     expect(await screen.findByText(/changed elsewhere/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /reload latest/i })).toBeInTheDocument();
@@ -63,6 +67,7 @@ describe('save concurrency', () => {
     putResponse = () => ({ ok: false, status: 409, json: async () => ({ current: { revision: 9 } }) });
     const { result } = setup();
     act(() => { result.current.setDiagram(diagram); });
+    headFailures = 1;
     await act(async () => { await result.current.saveDiagram(true); });
     await act(async () => { screen.getByRole('button', { name: /reload latest/i }).click(); });
     await waitFor(() => expect(result.current.diagram.revision).toBe(9));
@@ -77,6 +82,7 @@ describe('save concurrency', () => {
     putResponse = () => ({ ok: false, status: 409, json: async () => ({ current: { revision: 9 } }) });
     const { result } = setup();
     act(() => { result.current.setDiagram(diagram); });
+    headFailures = 1;
     await act(async () => { await result.current.saveDiagram(true); });
     await act(async () => { screen.getByRole('button', { name: /save my version as a copy/i }).click(); });
     // jsdom cannot navigate; the POST is what matters here (navigation goes to /diagram/LAB-2)

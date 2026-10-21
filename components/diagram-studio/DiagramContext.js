@@ -8,9 +8,13 @@ import { getObstacleRects, getAvoidRects } from './ui/positioning';
 import { useSession } from 'next-auth/react';
 import { generateId } from './utils/ids';
 import { normalizeDiagramContent } from './migrations/normalizeContent';
-import { migrateDiagram } from './migrations/migrateDiagram';
 import SaveConflictDialog from './ui/SaveConflictDialog';
-import { sendSessionEndCheckpoint } from './versions/versionsClient';
+import { sendSessionEndCheckpoint, getVersionDiff } from './versions/versionsClient';
+import { setCompare } from './versions/compareStore';
+import RemoteUpdateNotice from './ui/RemoteUpdateNotice';
+import { mergeContent } from '../../lib/merge/threeWay';
+import { diffContent } from '../../lib/versions/diff';
+import { contentFromDiagram, rebaseHistory, LIVE_POLL_VISIBLE_MS, LIVE_POLL_HIDDEN_MS } from './live/livePickup';
 import { assignFrameOnCreate, remapDuplicateParent } from './utils/frameMembership';
 
 // ============ CONTEXT ============
@@ -163,6 +167,13 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
 
   // Save status
   const [saveStatus, setSaveStatus] = useState({ dirty: false, saving: false, lastSaved: null });
+
+  // Live pickup (AI-2). `baseContentRef` is the content at the last agreement with the server (loaded or last
+  // saved): the "base" of the three-way merge. `stateRef` mirrors the latest render for the poller and the 409 path.
+  const baseContentRef = useRef(null);
+  const stateRef = useRef({});
+  const pickupBusyRef = useRef(false);
+  const [remoteUpdate, setRemoteUpdate] = useState(null);
 
   // Loading state
   const [loading, setLoading] = useState(false);
@@ -640,11 +651,9 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       // or from top-level fields (legacy/direct format)
       // normalize first (legacy nodes/edges, nested double-write shape), then upgrade legacy
       // element types; migrateDiagram only looks at top-level elements, so order matters
-      const content = migrateDiagram(normalizeDiagramContent(newDiagram.content));
-      const elements = migrateDiagram({ elements: newDiagram.elements }).elements || content.elements;
-      const connections = newDiagram.connections || content.connections;
-      const layers = newDiagram.layers || content.layers;
-      const groups = newDiagram.groups || content.groups;
+      const { elements, connections, layers, groups } = contentFromDiagram(newDiagram);
+      baseContentRef.current = { elements, connections, layers, groups };
+      setRemoteUpdate(null);
 
       setElementsState(elements);
       setConnectionsState(connections);
@@ -731,6 +740,146 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   // overwrite (or 409 against) the restored head.
   const restoringRef = useRef(false);
 
+  stateRef.current = {
+    diagram, elements, connections, layers, groups, historyPast, historyFuture,
+    dirty: saveStatus.dirty, saving: saveStatus.saving, conflict: !!conflict, busy: isDragging || isRotating,
+  };
+
+  // ============ LIVE PICKUP (AI-2) ============
+
+  /**
+   * Fetch the server head and, when it is newer than ours, three-way merge it into the editor (base = last agreed
+   * content, ours = local state, theirs = head). Writes nothing to the server: no version, no revision. The next
+   * save simply carries the new revision in If-Match. Never throws.
+   * @param {{probe?: object, fromSave?: boolean}} opts `fromSave`: called from the 409 path (a save is "in flight")
+   * @returns {Promise<{status: 'merged'|'current'|'deferred'|'unmergeable'|'failed'|'skipped'}>}
+   */
+  const pickupRemote = useCallback(async ({ probe = null, fromSave = false } = {}) => {
+    const id = stateRef.current.diagram?.id;
+    if (!id || pickupBusyRef.current) return { status: 'skipped' };
+    pickupBusyRef.current = true;
+    try {
+      const sentRevision = Number(stateRef.current.diagram.revision);
+      const res = await fetch(`/api/diagrams/${id}`);
+      if (!res.ok) return { status: 'failed' };
+      const head = await res.json();
+      let info = probe;
+      if (!info) {
+        try {
+          const pr = await fetch(`/api/diagrams/${id}/revision?since=${sentRevision}`);
+          if (pr.ok) info = await pr.json();
+        } catch (_) { /* attribution is best effort */ }
+      }
+      const cur = stateRef.current; // state may have moved while we awaited
+      if (cur.diagram?.id !== id) return { status: 'skipped' };
+      if (!(Number(head.revision) > Number(cur.diagram.revision))) return { status: 'current' };
+      if (cur.conflict || restoringRef.current || cur.busy || lastCoalesceKeyRef.current !== null || (cur.saving && !fromSave)) {
+        return { status: 'deferred' };
+      }
+
+      const theirs = contentFromDiagram(head);
+      const base = baseContentRef.current;
+      const ours = { elements: cur.elements, connections: cur.connections, layers: cur.layers, groups: cur.groups };
+      const merged = base ? mergeContent(base, ours, theirs) : { ok: !cur.dirty, content: theirs, conflicts: [], summary: { remote: { added: 0, removed: 0, changed: 0 } } };
+      if (!merged.ok) return { status: 'unmergeable' };
+
+      const m = merged.content;
+      // Undo/redo keep working across the merge: every snapshot gets the same remote delta (see livePickup)
+      const rebased = base ? rebaseHistory(cur.historyPast, cur.historyFuture, base, theirs) : null;
+      baseContentRef.current = theirs;
+      setElementsState(m.elements);
+      setConnectionsState(m.connections);
+      setLayersState(m.layers);
+      setGroupsState(m.groups);
+      setHistoryPast(rebased ? rebased.past : []);
+      setHistoryFuture(rebased ? rebased.future : []);
+      lastRecordedRef.current = { elements: null, connections: null };
+      const alive = new Set([...m.elements.map((e) => e.id), ...m.connections.map((c) => c.id)]);
+      setSelection((prev) => ({
+        nodeIds: prev.nodeIds.filter((n) => alive.has(n)),
+        connectionIds: prev.connectionIds.filter((n) => alive.has(n)),
+      }));
+      setDiagramState((prev) => (prev ? {
+        ...prev,
+        revision: Number(head.revision),
+        updated_at: head.updated_at,
+        updated_by: head.updated_by,
+        ...(cur.dirty ? {} : { name: head.name, description: head.description }),
+      } : prev));
+      // Only genuinely local differences keep the editor dirty (and so cause a save later); an agent-only update
+      // leaves it clean, so picking it up never writes a revision or a version.
+      const stillDirty = cur.dirty && diffContent(theirs, m).changes.length > 0;
+      setSaveStatus((prev) => ({ ...prev, dirty: stillDirty }));
+
+      const s = merged.summary.remote;
+      if (s.added + s.removed + s.changed > 0 || merged.conflicts.length > 0) {
+        const agentChange = info?.agentChange || null;
+        setRemoteUpdate({
+          who: info?.updatedBy || null,
+          agent: !!agentChange,
+          agentChange,
+          summary: s,
+          conflicts: merged.conflicts,
+          revision: Number(head.revision),
+        });
+      }
+      return { status: 'merged' };
+    } catch (e) {
+      console.error('Live pickup error:', e);
+      return { status: 'failed' };
+    } finally {
+      pickupBusyRef.current = false;
+    }
+  }, []);
+
+  const reviewAgentChange = useCallback(async () => {
+    const id = stateRef.current.diagram?.id;
+    const change = remoteUpdate?.agentChange;
+    if (!id || !change || change.previousVersionNumber == null) return;
+    try {
+      const diff = await getVersionDiff(id, change.previousVersionNumber, 'head');
+      setCompare({ from: { number: change.previousVersionNumber, title: 'Before the agent change' }, to: 'head', changes: diff.changes, summary: diff.summary });
+    } catch (e) {
+      console.error('Review agent change error:', e);
+    }
+  }, [remoteUpdate]);
+  const dismissRemoteUpdate = useCallback(() => setRemoteUpdate(null), []);
+
+  // Poll the cheap revision probe: every 3 s while the tab is visible, every 30 s hidden; catch up at once on return.
+  useEffect(() => {
+    const id = diagram?.id;
+    if (!id) return undefined;
+    let cancelled = false;
+    let timer = null;
+    const schedule = (ms) => { if (!cancelled) timer = setTimeout(tick, ms); };
+    async function tick() {
+      try {
+        const s = stateRef.current;
+        const rev = Number(s.diagram?.revision);
+        if (!s.conflict && !s.saving && !restoringRef.current && Number.isFinite(rev) && s.diagram?.id === id) {
+          const res = await fetch(`/api/diagrams/${id}/revision?since=${rev}`);
+          if (res.ok && !cancelled) {
+            const probe = await res.json();
+            if (Number(probe?.revision) > Number(stateRef.current.diagram?.revision)) await pickupRemote({ probe });
+          }
+        }
+      } catch (_) { /* offline or a transient error: try again next tick */ }
+      schedule(typeof document !== 'undefined' && document.visibilityState === 'hidden' ? LIVE_POLL_HIDDEN_MS : LIVE_POLL_VISIBLE_MS);
+    }
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || cancelled) return;
+      clearTimeout(timer);
+      schedule(250);
+    };
+    schedule(LIVE_POLL_VISIBLE_MS);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [diagram?.id, pickupRemote]);
+
   const saveDiagram = useCallback(async (forceOrOptions = false) => {
     // Support both saveDiagram(true) and saveDiagram({ force: true, name: 'new name' })
     const options = typeof forceOrOptions === 'boolean'
@@ -777,8 +926,13 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       if (res.status === 409) {
         let info = null;
         try { info = await res.json(); } catch (_) { /* ignore */ }
-        setConflict(info?.current || {});
         setSaveStatus(prev => ({ ...prev, saving: false }));
+        // AI-2: try to merge the newer head into the editor first; the dialog is only the fallback. When the
+        // revision already moved on (live pickup merged while this save was in flight), the next autosave retries.
+        const sent = Number(diagram.revision);
+        const outcome = await pickupRemote({ fromSave: true });        const advanced = Number(stateRef.current.diagram?.revision) !== sent;
+        if (outcome.status === 'merged' || outcome.status === 'deferred' || (outcome.status === 'current' && advanced)) return null;
+        setConflict(info?.current || {});
         return null;
       }
 
@@ -803,6 +957,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       }
 
       const data = await res.json();
+      baseContentRef.current = { elements, connections, layers, groups };
       setDiagramState(prev => ({ ...prev, ...data }));
       setSaveStatus({ dirty: false, saving: false, lastSaved: new Date().toISOString() });
 
@@ -818,7 +973,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       setSaveStatus(prev => ({ ...prev, saving: false }));
       return null;
     }
-  }, [diagram, elements, connections, layers, groups, saveStatus.dirty, onSaveCallback, conflict]);
+  }, [diagram, elements, connections, layers, groups, saveStatus.dirty, onSaveCallback, conflict, pickupRemote]);
 
   // ============ AUTO-SAVE ============
 
@@ -1117,6 +1272,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
           <button type="button" onClick={() => setAccessNotice(null)} aria-label="Dismiss" style={{ border: 0, background: 'transparent', cursor: 'pointer', fontSize: 16 }}>&times;</button>
         </div>
       )}
+      <RemoteUpdateNotice notice={remoteUpdate} onReview={reviewAgentChange} onDismiss={dismissRemoteUpdate} />
       <SaveConflictDialog
         open={!!conflict}
         busy={conflictBusy}
