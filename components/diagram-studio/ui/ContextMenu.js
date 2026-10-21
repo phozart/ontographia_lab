@@ -35,6 +35,8 @@ export default function ContextMenu({
   onToggleContextualToolbar,
   showStencilPanel,
   onToggleStencilPanel,
+  highlightRemoteChanges = true,
+  onToggleHighlightRemoteChanges,
 }) {
   const menuRef = useRef(null);
   const {
@@ -169,6 +171,11 @@ export default function ContextMenu({
     onToggleContextualToolbar?.();
     onClose();
   }, [onToggleContextualToolbar, onClose]);
+
+  const handleToggleHighlightRemote = useCallback(() => {
+    onToggleHighlightRemoteChanges?.();
+    onClose();
+  }, [onToggleHighlightRemoteChanges, onClose]);
 
   const handleToggleStencilPanel = useCallback(() => {
     onToggleStencilPanel?.();
@@ -329,6 +336,14 @@ export default function ContextMenu({
         <TuneIcon fontSize="small" />
         <span>{showContextualToolbar ? 'Hide Style Toolbar' : 'Show Style Toolbar'}</span>
       </button>
+
+      {/* LA-1: ring what other people and agents just changed (per-user setting, default on) */}
+      {onToggleHighlightRemoteChanges && (
+        <button className="ds-context-item" onClick={handleToggleHighlightRemote} role="menuitemcheckbox" aria-checked={highlightRemoteChanges}>
+          <TuneIcon fontSize="small" />
+          <span>{highlightRemoteChanges ? 'Stop highlighting others\' changes' : 'Highlight others\' changes'}</span>
+        </button>
+      )}
 
       {/* View toggles - always visible */}
       <div className="ds-context-divider" />

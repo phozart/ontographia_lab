@@ -2,7 +2,7 @@ import { ROLES, ACTIONS, ACTION_MIN_ROLE, can, capabilitiesFor, maxRole, minRole
 
 // Independent expectation, transcribed from ADR-0003 section 1 (not derived from the implementation).
 const EXPECTED = {
-  viewer: ['diagram.read', 'diagram.export', 'version.read', 'comment.read'],
+  viewer: ['diagram.read', 'diagram.export', 'version.read', 'activity.read', 'comment.read'],
   commenter: ['comment.create', 'comment.reply', 'thread.resolve', 'comment.edit_own', 'comment.delete_own'],
   editor: ['diagram.write', 'version.create', 'version.restore', 'share.read', 'share.manage'],
   owner: ['comment.delete_any', 'diagram.delete', 'ownership.transfer', 'audit.read'],

@@ -1,6 +1,6 @@
 # ADR-0006 — Live activity and presence (Step 1: activity + agent indicator; Step 2: presence + live cursors)
 
-- Status: **Proposed** (2026-10-21). Design only; nothing here is built until the slices in §9 ship.
+- Status: **Accepted** (2026-10-21). Step 1 is built slice by slice (see §17 As built); Step 2 is not started.
 - Builds on: [ADR-0004](0004-realtime-collaboration.md) (Group D direction: Yjs + Hocuspocus sidecar, collab ticket, `authz_changed`), AI-2 live pickup ([ai-canvas-via-mcp.md](../investigations/ai-canvas-via-mcp.md) "AI-2 as built"), slice 8 Compare, audit (`0008`), MCP `agentWrite`. It changes no accepted decision; Step 2 is the transport half of ADR-0004, built before the CRDT half.
 - Owner request (2026-10-21): "can one user see the activity live from another user, or can I see on a board the live Claude activity directly in the tool?"
 - Personas: **CX/UX** running live mapping sessions; **Solution Architect** and **PM** co-working on a board; **AI/MCP agent** made visible as a participant.
@@ -324,3 +324,34 @@ What it would take (ADR-0004 D1): a Y.Doc per board (`elements`/`connections`/..
 - - Step 2 adds presence with an isolated, cheap process that Group D reuses; the 3 s poll load drops by about 10×.
 - − A second service to deploy and monitor; nginx config lives outside the repo and must be changed by hand.
 - − The agent indicator is per process and best-effort (empty after a restart); it reports tool calls, not Claude's intent.
+
+## 17. As built
+
+### LA-1 change highlight (built)
+
+- `mergeContent` returns `summary.remote.ids = {added, changed, removed, truncated}` (elements and connections only, 500 per list). A remote delete that a local edit kept alive is not listed as removed.
+- `pickupRemote` builds `remoteHighlight` (`live/remoteHighlight.js`, pure) and exposes it with `clearRemoteHighlight` from `DiagramContext`. Ghosts come from the local elements before the merge. More than 150 items (or a truncated list) collapse into one ring around the union bbox.
+- `ui/RemoteHighlight.js`: `RemoteHighlightLayer` (rings inside the scaled canvas layer, constant 2 px on screen, `aria-hidden`, no pointer events), `RemoteHighlightChip` ("N changes ↗" at the nearest edge, click pans there and replays the rings), `useHighlightLifecycle` (rings 1.7 s, or a static 3 s hold under `prefers-reduced-motion`; the chip and state live 10 s). CSS animation only (`styles/diagram-studio.css`).
+- Setting: flat `user_settings` key `highlightRemoteChanges` (default on), toggled in the canvas context menu. The ADR sketched `live.highlightChanges`; the existing settings are flat, so no nesting was introduced.
+- Not built (by design): the dashed "Claude is reading" focus box belongs to LA-2.
+
+### LA-2 agent indicator (built)
+
+- `lib/live/agentActivity.js`: process-local register (`globalThis` singleton), key `diagramId:tokenId`, one `read` and one `write` event per key, TTL 120 s, LRU cap 10,000, per-board index so a probe is O(agents on the board). `agentsFor(diagramId, viewerId)` applies the privacy rule: writes to everyone, reads and read focus only to the acting user. States: `editing`/`reading` under 20 s, `recent` until 120 s. Items carry `key` (hash, never the token id), `label`, `forUser`, `mine`, `state`, `tool`, `lastAt`, `ageMs`, optional `focus`.
+- `createMcpServer` has one `noteAgent` helper, called after `authorize()` by `diagram_get`, `diagram_thumbnail`, `board_read_region` (focus = bbox of the region), `diagram_show`, `doc_get`, `table_get`, the diagram resources and, on success only, `agentWrite` (`diagram_apply_ops`, `map_structure`, `layout_apply`, `doc_create`, `doc_update`, `table_create`, `table_update`). The acting user's display name is resolved once per entry in the background. A registry test classifies every registered tool as single-board or non-board, so a new tool cannot forget it.
+- `agentWrite` passes `tool` to `applyContentChange`; the `diagram.agent_edit` audit target gains `tool`. OAuth principals carry `clientLabel` (from the grant); personal tokens show as "Personal token".
+- Probe: `agents[]` from memory (no query; a caught-up probe still runs none). The context applies it on every probe and keeps the same array identity when nothing changed.
+- UI: `AgentIndicator` pill in the top bar before Share ("Claude . reading", "editing", muted "45 s ago"), popover with the last action, Review (when an agent change can be reviewed) and "Open activity" (wired in LA-3); `AgentFocusLayer` draws the dashed lavender "Claude is reading" box for 5 s, only for the acting user.
+
+### LA-3 activity panel (built)
+
+- Migration `0011_diagram_edit_sessions` exactly as in section 7. `diagramRepository.updateDiagram` calls `recordEditSession` inside the save transaction (content saves by a signed-in person only): select the person's newest session, `planSession` decides extend (< 10 minutes since `last_at`) or open, one `UPDATE` or `INSERT`. A failure rolls the save back.
+- `GET /api/diagrams/{id}/activity` (`activity.read` = viewer): three indexed queries (sessions with LATERAL lookups of the bounding versions, audit events with joins for names, versions and the OAuth client label, named versions), merged newest first by `(timestamp, source, id)` with an opaque cursor. Sharing events only when the caller also holds `audit.read`. Items: `edit_session` (`at`, `endAt`, `saves`, `revision {from,to}`, `compare`), `agent_edit` (`agent {label, tool}`, `onBehalfOf`, `counts`, `version`, `compare` from the pre-change version to the edit), `restore`, `named_version`, `share`. p95 under 50 ms on a board with 10,000 audit rows is a db test.
+- UI: History | Activity tabs in the right-hand panel. The Activity tab shows a live row from the probe's `agents[]`, then the feed grouped by day, then consecutive rows by the same actor; runs of agent edits by the same agent for the same person within 10 minutes collapse ("Claude for Peter . 4 changes . tool, tool"). Review and Compare run the slice-8 diff inline; the board's newest state compares against the live board and offers the canvas overlay. Opened from the agent pill ("Open activity") or the title-bar menu; "Open version N" jumps to History.
+- Retention: no audit retention job exists in this codebase yet, so `pruneEditSessions` (365 days) runs opportunistically from the activity endpoint. Audit rows keep growing until that job exists (Q-A2).
+
+### Review follow-ups (built)
+
+- LA-1: when an id list is truncated, `summary.remote.ids.totals` carries the true counts and the highlight and edge chip use them; the CSS `prefers-reduced-motion` rule is covered by a test.
+- LA-2: the register sweeps all expired entries once it passes 500 keys (boards nobody polls), failed or pending display-name lookups are retried at most once a minute, and the registry test now also classifies every MCP resource (board resources record a read after authz, the rest are static).
+- LA-3: the session write runs inside `SAVEPOINT la_sess`; a failure is logged (`EDIT_SESSION_FAILED`) and the save still commits. Migration 0011 gains `idx_edit_sessions_last_at`; pruning deletes in bounded batches (1000 x 5 per call). Activity labels for OAuth clients carry a " (connected app)" suffix so a client name cannot pose as a person.

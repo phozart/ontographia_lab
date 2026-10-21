@@ -13,6 +13,7 @@ import { sendSessionEndCheckpoint, getVersionDiff } from './versions/versionsCli
 import { setCompare } from './versions/compareStore';
 import RemoteUpdateNotice from './ui/RemoteUpdateNotice';
 import { mergeContent } from '../../lib/merge/threeWay';
+import { buildRemoteHighlight } from './live/remoteHighlight';
 import { diffContent } from '../../lib/versions/diff';
 import {
   contentFromDiagram, emptyRemoteLog, appendRemoteDelta, rebaseSnapshot, stampSnapshot,
@@ -199,6 +200,19 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   const setEditingBusy = useCallback((v) => { editingBusyRef.current = !!v; }, []);
   const pollStoppedRef = useRef(false);
   const [remoteUpdate, setRemoteUpdate] = useState(null);
+  // LA-1: what the last pickup changed (ids -> rings/ghosts), shown briefly by the canvas. Never persisted.
+  const [remoteHighlight, setRemoteHighlight] = useState(null);
+  const clearRemoteHighlight = useCallback(() => setRemoteHighlight(null), []);
+  // LA-2: agents the revision probe reports on this board (reading / editing / recent), from the server's in-memory register
+  const [agents, setAgents] = useState([]);
+  const agentsJsonRef = useRef('[]');
+  const applyProbeAgents = useCallback((probe) => {
+    const next = Array.isArray(probe?.agents) ? probe.agents : [];
+    const json = JSON.stringify(next);
+    if (json === agentsJsonRef.current) return; // same list: keep the identity, no re-render every 3 s
+    agentsJsonRef.current = json;
+    setAgents(next);
+  }, []);
 
   // Loading state
   const [loading, setLoading] = useState(false);
@@ -692,6 +706,9 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       remoteLogRef.current = emptyRemoteLog();
       pollStoppedRef.current = false;
       setRemoteUpdate(null);
+      setRemoteHighlight(null);
+      agentsJsonRef.current = '[]';
+      setAgents([]);
 
       setElementsState(elements);
       setConnectionsState(connections);
@@ -862,6 +879,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       if (!merged.ok) return { status: 'unmergeable' };
 
       const m = merged.content;
+      const localBefore = Array.isArray(ours.elements) ? ours.elements : [];
       // Undo/redo keep working across the merge, lazily: record the delta, each snapshot is rebased when reached
       if (base) remoteLogRef.current = appendRemoteDelta(remoteLogRef.current, base, theirs);
       else {
@@ -901,6 +919,10 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       const s = merged.summary.remote;
       if (s.added + s.removed + s.changed > 0 || merged.conflicts.length > 0) {
         const agentChange = info?.agentChange || null;
+        setRemoteHighlight(buildRemoteHighlight({
+          ids: s.ids, elements: m.elements, connections: m.connections, before: localBefore,
+          agent: !!agentChange, who: info?.updatedBy || null,
+        }));
         setRemoteUpdate({
           who: info?.updatedBy || null,
           agent: !!agentChange,
@@ -949,6 +971,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
             pollStoppedRef.current = true;
           } else if (res.ok && !cancelled) {
             const probe = await res.json();
+            applyProbeAgents(probe);
             if (Number(probe?.revision) > Number(stateRef.current.diagram?.revision)) await pickupRemote({ probe });
           }
         }
@@ -968,7 +991,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [diagram?.id, pickupRemote, handleAccessDenied]);
+  }, [diagram?.id, pickupRemote, handleAccessDenied, applyProbeAgents]);
 
   const saveDiagram = useCallback(async (forceOrOptions = false) => {
     // Support both saveDiagram(true) and saveDiagram({ force: true, name: 'new name' })
@@ -1332,6 +1355,13 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     redo,
     recordHistory,
 
+    // Live pickup highlight (LA-1)
+    remoteHighlight,
+    clearRemoteHighlight,
+    agents,
+    canReviewAgentChange: !!(remoteUpdate?.agentChange && remoteUpdate.agentChange.previousVersionNumber != null),
+    reviewAgentChange,
+
     // Persistence
     saveDiagram,
     loadDiagram,
@@ -1340,6 +1370,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   }), [
     diagram, elements, connections, layers, groups,
     viewport, selection, activePack, activeTool, showGrid, gridStyle, selectedStencil, stickyNoteColor, drawingTool, drawingColor, drawingStrokeWidth,
+    remoteHighlight, clearRemoteHighlight, agents, remoteUpdate, reviewAgentChange,
     historyPast.length, historyFuture.length,
     saveStatus, loading, error,
     deleteSelected, duplicateSelected, selectAll, clearSelection,

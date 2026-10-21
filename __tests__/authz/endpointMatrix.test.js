@@ -43,6 +43,7 @@ jest.mock('../../lib/rateLimit', () => ({ rateLimit: () => ({ check: async () =>
 import accessH from '../../pages/api/diagrams/[id]/access';
 import auditH from '../../pages/api/diagrams/[id]/audit';
 import revisionH from '../../pages/api/diagrams/[id]/revision';
+import activityH from '../../pages/api/diagrams/[id]/activity';
 import sharesH from '../../pages/api/diagrams/[id]/shares';
 import memberH from '../../pages/api/diagrams/[id]/members/[userId]';
 import diagramH from '../../pages/api/diagrams/[id]';
@@ -83,6 +84,7 @@ const ENDPOINTS = [
   ['DELETE /members/{userId} (someone else)', memberH, 'DELETE', 'editor'],
   ['GET /audit', auditH, 'GET', 'owner'],
   ['GET /revision', revisionH, 'GET', 'viewer'],
+  ['GET /activity', activityH, 'GET', 'viewer'],
 ];
 
 const PRINCIPALS = [

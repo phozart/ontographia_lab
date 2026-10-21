@@ -7,7 +7,7 @@ import { LogoIcon } from '../../ui/Logo';
 import { useJsonImport } from '../export/useJsonImport';
 import ImportJsonDialog from './ImportJsonDialog';
 import { OPEN_EXPORT_DIALOG_EVENT } from './ExportDialog';
-import { OPEN_VERSION_HISTORY_EVENT } from './VersionHistoryPanel';
+import { OPEN_VERSION_HISTORY_EVENT, OPEN_ACTIVITY_EVENT } from './VersionHistoryPanel';
 import HistoryIcon from '@mui/icons-material/History';
 import { FEATURES } from '../../../lib/features';
 import { formatShortcut } from '../../../lib/platform';
@@ -40,6 +40,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import { AgentIndicator } from './AgentIndicator';
 
 // Grid style icons
 const GridDotsIcon = () => (
@@ -90,6 +91,7 @@ export default function TitleBar({
   onExport,
   onShowShortcuts,
   onShare,
+  onOpenActivity,
   onMenu,
   onNameChange,
   readOnly = false,
@@ -117,6 +119,9 @@ export default function TitleBar({
     elements = [],
     stickyNoteColor = '#fef08a',
     setStickyNoteColor = () => {},
+    agents = [],
+    canReviewAgentChange = false,
+    reviewAgentChange,
   } = diagramContext;
 
   // JSON import (file picker + drag-and-drop requests)
@@ -128,6 +133,10 @@ export default function TitleBar({
 
   const openVersionHistory = useCallback(() => {
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_VERSION_HISTORY_EVENT));
+  }, []);
+
+  const openActivity = useCallback(() => {
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_ACTIVITY_EVENT));
   }, []);
 
   const historyContext = useDiagramHistory() || {};
@@ -782,6 +791,9 @@ export default function TitleBar({
           </button>
         </div>
 
+        {/* LA-2: Claude / agents on this board (from the revision probe) */}
+        <AgentIndicator agents={agents} canReview={canReviewAgentChange} onReview={reviewAgentChange} onOpenActivity={onOpenActivity || openActivity} />
+
         {/* Share button */}
         {FEATURES.sharing && onShare && (
           <button className="ds-title-action-btn" onClick={onShare} title="Share">
@@ -817,6 +829,10 @@ export default function TitleBar({
               <button className="ds-dropdown-item" onClick={() => { openVersionHistory(); setShowMenu(false); }}>
                 <HistoryIcon fontSize="small" />
                 <span>Version history...</span>
+              </button>
+              <button className="ds-dropdown-item" onClick={() => { openActivity(); setShowMenu(false); }}>
+                <HistoryIcon fontSize="small" />
+                <span>Activity...</span>
               </button>
               {!readOnly && (
                 <button className="ds-dropdown-item" onClick={() => { importInputRef.current?.click(); setShowMenu(false); }}>

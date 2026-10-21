@@ -162,7 +162,7 @@ dbDescribe('oauth repository (throwaway database)', () => {
     test('resolves to the agent principal used by lib/authz', async () => {
       const { tokens, grant } = await connected(u1, { cap: 'editor', diagramIds: [d1.id] });
       const v = await repo.verifyAccessToken(tokens.access_token);
-      expect(v).toEqual({ ok: true, principal: { kind: 'agent', userId: u1.id, tokenId: grant.id, roleCap: 'editor', diagramScope: [d1.id], allDiagrams: false, credential: 'oauth', clientId: CLAUDE } });
+      expect(v).toEqual({ ok: true, principal: { kind: 'agent', userId: u1.id, tokenId: grant.id, roleCap: 'editor', diagramScope: [d1.id], allDiagrams: false, credential: 'oauth', clientId: CLAUDE, clientLabel: expect.any(String) } });
     });
     test('unknown, garbage, refresh-as-access and oversize tokens are invalid', async () => {
       const { tokens } = await connected(u1);

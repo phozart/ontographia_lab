@@ -207,6 +207,15 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Deviations from the ADR:** none. Turning the flag on in production and the owner's walk-through on claude.ai and mobile are deployment steps (see the PR's Deployment section), not code.
 - **Tests:** list shapes and privacy (no secrets, names only for readable diagrams), Disconnect effect on access and refresh tokens, foreign and malformed ids, cross-origin refusal, audit row, UI (hidden when off, empty state, rows, expand, confirm, failure), browser e2e of Disconnect from the Account page.
 
+## Slice LA-1 — Change highlight on live pickup
+
+- **PR title:** `feat: slice LA-1 change highlight (rings on what others changed, edge chip, reduced motion, setting)`
+- **REQ refs:** `docs/architecture/adr/0006-live-activity-and-presence.md` section 5.2, 9 (LA-1); owner approval 2026-10-21 (Q-LA4: highlight on by default, per-user toggle).
+- **Branch:** `feat/la-1-highlight`
+- **Files changed:** `lib/merge/threeWay.js` (`summary.remote.ids`), `components/diagram-studio/live/remoteHighlight.js` (new, pure geometry), `components/diagram-studio/ui/RemoteHighlight.js` (new: rings, ghosts, edge chip, lifecycle hook), `DiagramContext.js` (`remoteHighlight`, `clearRemoteHighlight`), `DiagramCanvas.js`, `DiagramStudio.js`, `ui/ContextMenu.js` (toggle), `styles/diagram-studio.css`; tests `mergeThreeWayIds`, `remoteHighlightGeometry`, `remoteHighlightPickup`, `RemoteHighlightUi`, `highlightSetting`, e2e `live-highlight`.
+- **Deviations from the ADR:** the setting is the flat `user_settings` key `highlightRemoteChanges` (the ADR sketched `live.highlightChanges`; the existing settings are flat); ids cover elements and connections only (layers and groups are counted but have nothing to ring); a removed connection leaves no ghost; connections are drawn as a polyline through endpoint centers and waypoints (approximate for curved lines). No migration, no new dependency.
+- **Tests:** unit for ids (added/changed/removed, local-only changes excluded, 500 cap), geometry (colors, ghosts, union bbox above 150, off-screen summary, pan target), pickup (5 ids lavender for an agent, cyan for a person, no PUT), components (fade vs reduced-motion classes, lifecycle timers, chip), e2e in two browser contexts plus a real `diagram_apply_ops` call.
+
 ## Slice AI-C — diagram_create (new private board from an agent)
 
 - **PR title:** `feat(mcp): diagram_create tool (new private board owned by the user, allowlist updated atomically)`
@@ -216,6 +225,24 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Decisions:** editor-capped principals only; same creation path as `POST /api/diagrams` (no per-user quota exists, so none applies); private board; the creating credential's own allowlist gets the id in the same transaction (`ALLOWLIST_FULL` at 50, nothing created); 10 creates per hour per credential plus the shared write limit; audit `diagram.agent_create`; no initial version (the normal create path makes none).
 - **Deviations from the doc sketch:** input is `{name, description?}` only (board type fixed to `infinite-canvas`, no `ops`/`layout`).
 - **Tests:** role denial (viewer/commenter, personal and OAuth), allowlist append for this token/grant only, follow-up `map_structure`, admin `all_diagrams` create and edit, revoked/disconnected/suspended/demoted mid-request, rate limit, name and description validation, audit row without content, dashboard listing, atomicity.
+
+## Slice LA-2 — Agent indicator
+
+- **PR title:** `feat: slice LA-2 agent indicator (activity register, probe agents[], pill, read-focus box, tool name in audit)`
+- **REQ refs:** `docs/architecture/adr/0006-live-activity-and-presence.md` section 5.1, 9 (LA-2); owner approval 2026-10-21 (Q-LA1: reads visible only to the acting user, writes to everyone).
+- **Branch:** `feat/la-2-agent-indicator` (stacked on `feat/la-1-highlight`)
+- **Files changed:** `lib/live/agentActivity.js` (new register), `lib/mcp/server.js` (`noteAgent`, `tool` through `agentWrite`), `lib/mcp/{regionTool,showTool,structureTool,repository}.js`, `lib/diagramRepository.js` (`tool` in the `diagram.agent_edit` target), `lib/oauth/repository.js` (`clientLabel` on the principal), `pages/api/diagrams/[id]/revision.js` (`agents[]`), `components/diagram-studio/ui/AgentIndicator.js` (new), `DiagramContext.js`, `DiagramCanvas.js`, `ui/TitleBar.js`; tests `agentActivity`, `mcpAgentActivity` (registry coverage), `revisionApi`, `AgentIndicator`, `agentsProbe`, `diagramRepositoryAgentEdit` (db), `oauthRepository` (db), e2e `agent-indicator`.
+- **Deviations from the ADR:** the probe ETag stays `"<revision>"` when no agent is visible and becomes `"<revision>-a<time>"` otherwise (the ADR sketched `r<rev>-a<at>`); `forUser.id` is only present for the acting user; each item also carries `ageMs` (server-relative, so no client clock agreement is needed); the `tool` is passed to `applyContentChange` as its own option, not inside `actor`; `diagram_create` is classified non-board (a brand-new board nobody is watching). No migration, no new dependency.
+- **Tests:** register states, TTL, LRU, privacy matrix and labels; every registered tool is classified and, for single-board tools, records exactly one entry after the access check and nothing when access is refused; probe payload with a query-count check (a caught-up probe still runs no query); pill/popover/focus-box components; e2e with two browser contexts and a real MCP agent (the viewer sees no read, both see the write, the pill turns muted after 20 s).
+
+## Slice LA-3 — Activity panel
+
+- **PR title:** `feat: slice LA-3 activity panel (edit sessions, GET /activity, Activity tab with Review and Compare)`
+- **REQ refs:** `docs/architecture/adr/0006-live-activity-and-presence.md` sections 5.3, 7, 8, 9 (LA-3); owner approval 2026-10-21 (Q-LA2: everyone with read access sees content activity, sharing events owner only; Q-LA3: 365 days).
+- **Branch:** `feat/la-3-activity-panel` (stacked on `feat/la-2-agent-indicator`)
+- **Files changed:** `db/migrations/0011_diagram_edit_sessions.sql`, `lib/activity/sessions.js`, `lib/activityRepository.js`, `lib/diagramRepository.js` (session write in the save transaction), `lib/authz/policy.js` (`activity.read`), `pages/api/diagrams/[id]/activity.js`, `components/diagram-studio/activity/{ActivityTab,activityClient,activityUtils}.js`, `ui/VersionHistoryPanel.js` (tabs, `OPEN_ACTIVITY_EVENT`), `ui/TitleBar.js` (menu entry, pill wiring), `jest.config.js`, `docs/architecture/{data-model,api-contracts}.md`; tests `editSessions`, `migrate0011` (db), `activityRepository` (db), `activityApi`, `policy`, `endpointMatrix`, `activityUtils`, `ActivityTab`, `historyActivityTabs`, e2e `activity-panel`.
+- **Deviations from the ADR:** retention is an opportunistic prune of edit sessions run from the activity endpoint (at most every 6 hours per process) because no audit retention job exists in the codebase yet (audit rows are not pruned by this PR); the agent edit label comes from the OAuth grant's `client_label` (personal tokens read "Personal token"); a session with no earlier version has no Compare link; "Compare with now" is exact only when the session is the board's newest state; `share` items cover `share.grant`, `share.change` and `share.revoke`. No new dependency.
+- **Tests:** session bucketing (37 saves in 18 minutes = one row, a 12-minute pause = two, per-person sessions, rollback with the save, rename-only saves write none), the feed over three sources (ordering, cursor walk, names not e-mails, sanitized agent label, compare bounds with the approximate flag, three queries per page, p95 under 50 ms on 10,000 audit rows), role by endpoint matrix, components, and an e2e with an owner, an editor and a real MCP agent (Review opens the diff of exactly that edit, the owner sees sharing, a demoted viewer does not).
 
 ---
 

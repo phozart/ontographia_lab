@@ -13,12 +13,22 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useDiagram } from '../DiagramContext';
 import { getVersion, getVersionDiff, listVersions, nameCurrentVersion, renameVersion } from '../versions/versionsClient';
 import CompareSummary from './CompareSummary';
+import ActivityTab from '../activity/ActivityTab';
 import { requestReveal, setCompare, useCompare } from '../versions/compareStore';
 import { buildVersionPreview, formatKind, formatRelative, versionAuthor, versionTitle } from '../versions/versionUtils';
 
 export const OPEN_VERSION_HISTORY_EVENT = 'ds:open-version-history';
+// LA-3: opens the same panel on its Activity tab (the agent pill's "Open activity", the title-bar menu)
+export const OPEN_ACTIVITY_EVENT = 'ds:open-activity';
 
-export default function VersionHistoryPanel({ open, diagramId, canWrite = false, onClose, onRestore, flushSave }) {
+/**
+ * `tab` ('history' | 'activity') makes the tab controlled (the editor wiring does, so events can open either one);
+ * without it the panel keeps its own. `agents` / `headRevision` feed the Activity tab's live row and refresh.
+ */
+export default function VersionHistoryPanel({ open, diagramId, canWrite = false, onClose, onRestore, flushSave, tab: tabProp, onTabChange, agents, headRevision }) {
+  const [innerTab, setInnerTab] = useState('history');
+  const tab = tabProp || innerTab;
+  const setTab = (t) => { setInnerTab(t); onTabChange?.(t); };
   const [items, setItems] = useState([]);
   const [nextCursor, setNextCursor] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -206,21 +216,42 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
     loadFirstPage();
   };
 
+  // Activity -> "Open version N": switch to History with that version selected
+  const openVersionByNumber = async (n) => {
+    setTab('history');
+    const known = items.find((v) => v.number === n);
+    try {
+      select(known || await getVersion(diagramId, n));
+    } catch (e) {
+      setNotice({ kind: 'error', text: e.message || 'Could not open that version' });
+    }
+  };
+
   const selectedTitle = selected ? versionTitle(selected) : '';
   const listLabel = useMemo(() => 'Versions', []);
 
   if (!open || typeof window === 'undefined') return null;
 
   const content = (
-    <aside className="vh-panel" role="complementary" aria-label="Version history" tabIndex={-1} ref={panelRef}>
+    <aside className="vh-panel" role="complementary" aria-label={tab === 'activity' ? 'Activity' : 'Version history'} tabIndex={-1} ref={panelRef}>
       <header className="vh-header">
-        <h2>Version history</h2>
+        <h2>{tab === 'activity' ? 'Activity' : 'Version history'}</h2>
         <button type="button" className="vh-close" onClick={onClose} aria-label="Close version history">
           <CloseIcon fontSize="small" />
         </button>
       </header>
 
-      <div className="vh-body">
+      <div role="tablist" aria-label="Panel view" className="vh-tabs">
+        <button type="button" role="tab" id="vh-tab-history" aria-selected={tab === 'history'} aria-controls="vh-tabpanel" className={`vh-tab ${tab === 'history' ? 'on' : ''}`} onClick={() => setTab('history')}>History</button>
+        <button type="button" role="tab" id="vh-tab-activity" aria-selected={tab === 'activity'} aria-controls="vh-tabpanel" className={`vh-tab ${tab === 'activity' ? 'on' : ''}`} onClick={() => setTab('activity')}>Activity</button>
+      </div>
+
+      {tab === 'activity' ? (
+        <div className="vh-body" role="tabpanel" id="vh-tabpanel" aria-labelledby="vh-tab-activity">
+          <ActivityTab diagramId={diagramId} headRevision={headRevision} agents={agents} flushSave={flushSave} onOpenVersion={openVersionByNumber} />
+        </div>
+      ) : (
+      <div className="vh-body" role="tabpanel" id="vh-tabpanel" aria-labelledby="vh-tab-history">
         {canWrite && (
           <form className="vh-name-form" onSubmit={saveNamed}>
             <label htmlFor="vh-label">Version name</label>
@@ -370,6 +401,7 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
           </section>
         )}
       </div>
+      )}
 
       <Dialog open={confirmOpen} onClose={() => !restoring && setConfirmOpen(false)} aria-labelledby="vh-restore-title" aria-describedby="vh-restore-desc">
         <DialogTitle id="vh-restore-title">Restore &ldquo;{confirmTitle}&rdquo;?</DialogTitle>
@@ -398,6 +430,10 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
         .vh-header h2 { margin: 0; font-size: 16px; font-weight: 600; }
         .vh-close { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: none; border-radius: 8px; background: transparent; color: var(--text-muted, #6b7280); cursor: pointer; }
         .vh-close:hover { background: var(--bg-alt, #f3f4f6); color: var(--text, #1f2937); }
+        .vh-tabs { display: flex; gap: 4px; padding: 8px 20px 0; border-bottom: 1px solid var(--border, #e5e7eb); }
+        .vh-tab { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted, #6b7280); font: inherit; font-weight: 500; cursor: pointer; }
+        .vh-tab.on { color: var(--text, #1f2937); border-bottom-color: var(--accent, #4fb3ce); }
+        .vh-tab:focus-visible { outline: 2px solid var(--accent, #4fb3ce); outline-offset: -2px; border-radius: 6px; }
         .vh-body { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
         .vh-name-form { display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; border-bottom: 1px solid var(--border, #e5e7eb); }
         .vh-name-form label, .vh-rename label { font-weight: 500; color: var(--text-muted, #6b7280); }
@@ -445,13 +481,19 @@ export default function VersionHistoryPanel({ open, diagramId, canWrite = false,
 /** Editor wiring: opens on OPEN_VERSION_HISTORY_EVENT, reads permissions from the diagram's `access` block. */
 export function VersionHistory() {
   const ctx = useDiagram() || {};
-  const { diagram, saveDiagram, saveStatus, restoreFromVersion } = ctx;
+  const { diagram, saveDiagram, saveStatus, restoreFromVersion, agents } = ctx;
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState('history');
 
   useEffect(() => {
-    const onOpen = () => setOpen(true);
-    window.addEventListener(OPEN_VERSION_HISTORY_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_VERSION_HISTORY_EVENT, onOpen);
+    const onHistory = () => { setTab('history'); setOpen(true); };
+    const onActivity = () => { setTab('activity'); setOpen(true); };
+    window.addEventListener(OPEN_VERSION_HISTORY_EVENT, onHistory);
+    window.addEventListener(OPEN_ACTIVITY_EVENT, onActivity);
+    return () => {
+      window.removeEventListener(OPEN_VERSION_HISTORY_EVENT, onHistory);
+      window.removeEventListener(OPEN_ACTIVITY_EVENT, onActivity);
+    };
   }, []);
 
   // Roles come from the server; when the payload has no access block, let the server decide (it enforces anyway).
@@ -473,6 +515,10 @@ export function VersionHistory() {
       onClose={() => setOpen(false)}
       onRestore={restoreFromVersion}
       flushSave={flushSave}
+      tab={tab}
+      onTabChange={setTab}
+      agents={agents}
+      headRevision={Number(diagram.revision)}
     />
   );
 }

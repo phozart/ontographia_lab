@@ -4381,3 +4381,30 @@
   bottom: 16px;
   right: 16px;
 }
+
+/* LA-1 change highlight: rings over what another writer just changed (cyan = person, lavender = agent) */
+.ds-remote-ring,
+.ds-remote-ghost {
+  pointer-events: none;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--hl-color) 45%, transparent);
+}
+.ds-remote-ring.ds-remote-fade,
+.ds-remote-line.ds-remote-fade {
+  animation: ds-remote-fade 1.6s ease-out forwards;
+}
+.ds-remote-ghost.ds-remote-fade {
+  animation: ds-remote-fade 1.2s ease-out forwards;
+}
+/* Reduced motion: a static ring, no fade (the component drops it after 3 s) */
+.ds-remote-static {
+  animation: none;
+  opacity: 1;
+}
+@keyframes ds-remote-fade {
+  0% { opacity: 1; }
+  60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-remote-fade { animation: none !important; opacity: 1; }
+}
