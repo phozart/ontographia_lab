@@ -177,6 +177,8 @@ dbDescribe('diagramRepository.applyContentChange (throwaway database)', () => {
     expect((await vers(id))).toHaveLength(3);
     await versions.restore(id, v[0].n, { userId: user.id, email: user.email, via: 'web' });
     expect((await head(id)).content.elements.map((e) => e.id)).toEqual(['a', 'b']);
+  });
+
   test('doc_create / doc_update (AI-5) through the same path: one agent version each, audit rows, sanitized text stored, restore-before removes the doc', async () => {
     const { compileDocCreate, compileDocUpdate } = require('../../lib/mcp/docTools');
     const id = await newDiagram();
