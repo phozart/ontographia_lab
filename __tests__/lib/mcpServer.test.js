@@ -73,7 +73,7 @@ describe('tool surface', () => {
     const client = await connect();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['diagram_get', 'diagram_list', 'diagram_search', 'diagram_thumbnail', 'stencil_catalog'].sort()
+      ['board_read_region', 'diagram_get', 'diagram_list', 'diagram_search', 'diagram_thumbnail', 'stencil_catalog'].sort()
     );
     for (const t of tools) {
       expect(t.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, openWorldHint: false });
