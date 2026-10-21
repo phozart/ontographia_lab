@@ -133,6 +133,22 @@ dbDescribe('diagramRepository.applyContentChange (throwaway database)', () => {
     expect((await head(id)).content.elements.map((e) => e.id)).toEqual(['a']);
   });
 
+  test('map_structure (AI-3) through the same path: one agent version, the audit row, and restore-before undoes the whole call', async () => {
+    const { compileMapStructure } = require('../../lib/mcp/structure');
+    const id = await newDiagram();
+    const structure = { nodes: [{ key: 'a', label: 'A', group: 'g' }, { key: 'b', label: 'B', group: 'g' }], edges: [{ from: 'a', to: 'b' }], groups: [{ key: 'g', label: 'Group' }] };
+    const r = await repo.applyContentChange(id, { expectedRevision: 0, userId: user.id, actor: actor(), compute: (c) => compileMapStructure(c, { structure, layout: 'cluster' }) });
+    expect(r.status).toBe('ok');
+    expect(r.result.summary).toMatchObject({ nodes: 2, frames: 1 });
+    const v = await vers(id);
+    expect(v.map((x) => x.via)).toEqual(['system', 'agent']);
+    expect(v[1].content.elements.filter((e) => e.parentFrameId)).toHaveLength(2);
+    const audit = (await pg.query("select action, on_behalf_of from audit_events where diagram_id=$1 and action='diagram.agent_edit'", [id])).rows;
+    expect(audit).toEqual([{ action: 'diagram.agent_edit', on_behalf_of: user.id }]);
+    await versions.restore(id, v[0].n, { userId: user.id, email: user.email, via: 'web' });
+    expect((await head(id)).content.elements.map((e) => e.id)).toEqual(['a']);
+  });
+
   test('an open editor saving with the old revision after an agent write gets the normal CAS miss (409 flow)', async () => {
     const id = await newDiagram();
     await repo.applyContentChange(id, { expectedRevision: 0, userId: user.id, actor: actor(), compute: (c) => add({ content: c }) });
