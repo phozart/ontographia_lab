@@ -208,3 +208,28 @@ describe('batch behavior', () => {
     expect(r.elements.map((e) => e.ref)).toEqual(['@a', '@b']);
   });
 });
+
+describe('locks are user intent', () => {
+  const locked = () => ({
+    elements: [
+      { id: 'L', type: 'task', packId: 'process-flow', label: 'L', x: 0, y: 0, size: { width: 120, height: 80 }, layerId: 'default', locked: true, properties: {} },
+      { id: 'M', type: 'task', packId: 'process-flow', label: 'M', x: 300, y: 0, size: { width: 120, height: 80 }, layerId: 'lk', properties: {} },
+      { id: 'F', type: 'task', packId: 'process-flow', label: 'F', x: 600, y: 0, size: { width: 120, height: 80 }, layerId: 'default', properties: {} },
+    ],
+    connections: [],
+    layers: [{ id: 'default', locked: false }, { id: 'lk', locked: true }],
+  });
+  test('update and remove of a locked element or one on a locked layer fail with a clear error', () => {
+    for (const id of ['L', 'M']) {
+      for (const op of [{ op: 'update_element', id, label: 'x' }, { op: 'remove_element', id }]) {
+        const r = run([op], locked());
+        expect(r.ok).toBe(false);
+        expect(r.code).toBe('INVALID_OPS');
+        expect(r.errors[0].message).toMatch(new RegExp(`"${id}" is locked`));
+      }
+    }
+  });
+  test('unlocked elements are still editable', () => {
+    expect(run([{ op: 'update_element', id: 'F', label: 'ok' }], locked()).ok).toBe(true);
+  });
+});

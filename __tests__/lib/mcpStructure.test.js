@@ -333,3 +333,71 @@ describe('performance (200 nodes into a ~4700-element diagram, near the 5000 con
     expect(ms).toBeLessThan(300);
   });
 });
+
+describe('frame membership of moved notes (F1)', () => {
+  const frames = () => [FRAME('F1', 0, 0, 600, 400), FRAME('F2', 2000, 0, 600, 400)];
+  test('existingId without group: a note leaving its frame is released with parent null', () => {
+    const content = base([...frames(), el('n', 100, 100, { parentFrameId: 'F1' }), el('far', 1000, 1000)]);
+    const r = run(content, { structure: { nodes: [{ key: 'a', existingId: 'n' }, { key: 'b', existingId: 'far' }] }, layout: 'grid', anchor: { at: { x: 5000, y: 5000 } } });
+    expect(r.ok).toBe(true);
+    const n = r.content.elements.find((e) => e.id === 'n');
+    expect(n.parentFrameId).toBeUndefined();
+  });
+  test('layout_apply elementIds releases a non-frame unit moved out of its frame', () => {
+    const content = base([...frames(), el('n', 100, 100, { parentFrameId: 'F1' }), el('m', 300, 100, { parentFrameId: 'F1' })]);
+    const r = compileLayoutApply(content, { target: { elementIds: ['n', 'm'] }, layout: 'grid', anchor: { at: { x: 5000, y: 5000 } } }, { newId });
+    expect(r.ok).toBe(true);
+    for (const id of ['n', 'm']) expect(r.content.elements.find((e) => e.id === id).parentFrameId).toBeUndefined();
+  });
+});
+
+describe('locks (F2)', () => {
+  const lockedContent = () => ({ ...base([el('L', 0, 0, { locked: true }), el('M', 300, 0, { layerId: 'lk' }), el('ok', 600, 0), el('ok2', 900, 0)]), layers: [{ id: 'default', locked: false }, { id: 'lk', locked: true }] });
+  test('map_structure rejects existingId on locked elements and locked layers, naming the ids', () => {
+    const r = run(lockedContent(), { structure: { nodes: [{ key: 'a', existingId: 'L' }, { key: 'b', existingId: 'M' }, { key: 'c', existingId: 'ok' }] }, layout: 'grid' });
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe('INVALID_OPS');
+    expect(msgs(r)).toMatch(/Locked elements.*L, M/);
+  });
+  test('layout_apply skips locked units with a warning and moves the rest', () => {
+    const r = compileLayoutApply(lockedContent(), { target: { elementIds: ['L', 'M', 'ok', 'ok2'] }, layout: 'flow', anchor: { at: { x: 4000, y: 4000 } } }, { newId });
+    expect(r.ok).toBe(true);
+    expect(r.warnings.join(' ')).toMatch(/"L" is locked/);
+    expect(r.warnings.join(' ')).toMatch(/"M" is locked/);
+    expect(r.content.elements.find((e) => e.id === 'L').x).toBe(0);
+    expect(r.content.elements.find((e) => e.id === 'ok').x).toBeGreaterThanOrEqual(4000);
+  });
+  test('layout_apply on a locked frame is rejected; a frame holding a locked member is skipped', () => {
+    const r = compileLayoutApply(base([FRAME('F', 0, 0, 600, 400, { locked: true }), el('n', 50, 50, { parentFrameId: 'F' })]), { target: { frameId: 'F' }, layout: 'grid' }, { newId });
+    expect(r.ok).toBe(false);
+    expect(r.code).toBe('INVALID_OPS');
+    const r2 = compileLayoutApply(base([FRAME('F', 0, 0, 600, 400), el('n', 50, 50, { parentFrameId: 'F', locked: true }), el('x', 5000, 0)]), { target: { elementIds: ['F', 'x'] }, layout: 'grid', anchor: { at: { x: 9000, y: 0 } } }, { newId });
+    expect(r2.ok).toBe(true);
+    expect(r2.warnings.join(' ')).toMatch(/"F" is locked/);
+  });
+});
+
+describe('input hardening (F3, F4, F5)', () => {
+  test('non-array nodes/edges/groups are rejected', () => {
+    for (const s of [{ nodes: 'x' }, { nodes: [{ key: 'a' }], edges: {} }, { nodes: [{ key: 'a' }], groups: 'g' }]) {
+      const r = run(base(), { structure: s, layout: 'tree' });
+      expect(r.ok).toBe(false);
+      expect(msgs(r)).toMatch(/must be an array/);
+    }
+  });
+  test('reserved keys are rejected and created is prototype-free', () => {
+    for (const key of ['__proto__', 'constructor', 'prototype']) {
+      const r = run(base(), { structure: { nodes: [{ key }] }, layout: 'tree' });
+      expect(r.ok).toBe(false);
+      expect(msgs(r)).toMatch(/reserved/);
+    }
+    const ok = run(base(), { structure: { nodes: [{ key: 'a' }] }, layout: 'tree' });
+    expect(Object.getPrototypeOf(ok.created)).toBeNull();
+    expect(Object.getPrototypeOf(ok.groups)).toBeNull();
+  });
+  test('layout_apply on an empty frame says the frame has no members', () => {
+    const r = compileLayoutApply(base([FRAME('F', 0, 0, 600, 400)]), { target: { frameId: 'F' }, layout: 'grid' }, { newId });
+    expect(r.ok).toBe(false);
+    expect(msgs(r)).toMatch(/frame has no members/);
+  });
+});
