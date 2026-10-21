@@ -141,3 +141,15 @@ describe('validateDiagramContent', () => {
     expect(r.warnings).toEqual([]);
   });
 });
+
+describe('unique ids (review follow-up)', () => {
+  test.each(['elements', 'connections', 'layers', 'groups'])('duplicate id in %s -> 400', (key) => {
+    const r = validateDiagramContent({ [key]: [{ id: 'x' }, { id: 'y' }, { id: 'x' }] });
+    expect(r.ok).toBe(false);
+    expect(r.status).toBe(400);
+    expect(r.error).toMatch(/"x"/);
+  });
+  test('the same id in different collections is fine; items without ids are not compared', () => {
+    expect(validateDiagramContent({ elements: [{ id: 'x' }], connections: [{ id: 'x' }], groups: [{}, {}] }).ok).toBe(true);
+  });
+});

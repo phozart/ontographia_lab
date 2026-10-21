@@ -42,6 +42,7 @@ jest.mock('../../lib/rateLimit', () => ({ rateLimit: () => ({ check: async () =>
 
 import accessH from '../../pages/api/diagrams/[id]/access';
 import auditH from '../../pages/api/diagrams/[id]/audit';
+import revisionH from '../../pages/api/diagrams/[id]/revision';
 import sharesH from '../../pages/api/diagrams/[id]/shares';
 import memberH from '../../pages/api/diagrams/[id]/members/[userId]';
 import diagramH from '../../pages/api/diagrams/[id]';
@@ -81,6 +82,7 @@ const ENDPOINTS = [
   ['PUT /members/{userId}', memberH, 'PUT', 'editor'],
   ['DELETE /members/{userId} (someone else)', memberH, 'DELETE', 'editor'],
   ['GET /audit', auditH, 'GET', 'owner'],
+  ['GET /revision', revisionH, 'GET', 'viewer'],
 ];
 
 const PRINCIPALS = [
@@ -127,7 +129,7 @@ describe.each(ENDPOINTS)('%s', (label, handler, method, minRole) => {
       // validation answer). It may then answer anything against the empty stub database, e.g. its own 404.
       expect(res.statusCode).not.toBe(401);
       expect(res.body && res.body.code).not.toBe('FORBIDDEN');
-      const handlerRan = mockOtherQueries.length > 0 || errSpy.mock.calls.length > 0 || [400, 409, 422].includes(res.statusCode);
+      const handlerRan = mockOtherQueries.length > 0 || errSpy.mock.calls.length > 0 || [200, 400, 409, 422].includes(res.statusCode);
       expect(handlerRan).toBe(true);
       return;
     }

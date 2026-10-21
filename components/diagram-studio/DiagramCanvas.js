@@ -1208,6 +1208,7 @@ export default function DiagramCanvas({
     lastLineStyle,
     setIsDragging,
     setIsRotating,
+    setEditingBusy,
   } = useDiagram();
 
   // Connections flagged `autoPorts` follow the facing sides of their shapes; resolve
@@ -1390,6 +1391,13 @@ export default function DiagramCanvas({
   useEffect(() => {
     if (resizing) setIsDragging?.(true);
   }, [resizing, setIsDragging]);
+  // Live pickup (AI-2) must not merge under an in-progress edit: inline label editing and connection
+  // endpoint/waypoint/segment/curve drags hold uncommitted local state. The merge waits until they end.
+  const editingBusy = !!(editingLabelId || editingConnectionId || draggingEndpoint || draggingWaypoint || draggingSegment || draggingCurve);
+  useEffect(() => {
+    setEditingBusy?.(editingBusy);
+    return () => setEditingBusy?.(false);
+  }, [editingBusy, setEditingBusy]);
   const [rotating, setRotating] = useState(null); // { elementId, centerX, centerY, startAngle, startRotation }
   const [rotationIndicator, setRotationIndicator] = useState(null); // { x, y, angle } for showing angle during drag
   const [floatingHandlePos, setFloatingHandlePos] = useState(null); // { x, y } for floating rotation handle

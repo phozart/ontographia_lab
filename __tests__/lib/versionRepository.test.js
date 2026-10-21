@@ -423,4 +423,28 @@ dbDescribe('versionRepository (throwaway database)', () => {
       });
     });
   });
+  describe('latestAgentChangeSince (AI-2 live pickup)', () => {
+    const ins = (id, n, via, rev) => pg.query(
+      "insert into diagram_versions (diagram_id, version_number, content, created_by, kind, created_via, diagram_revision, label) values ($1,$2,'{}','x','auto',$3,$4,$5)",
+      [id, n, via, rev, via === 'agent' ? `agent: edit ${n}` : null]);
+    test('returns the newest agent version above the revision, with the version before it', async () => {
+      const id = await newDiagram();
+      await ins(id, 1, 'web', 1); await ins(id, 2, 'system', 2); await ins(id, 3, 'agent', 3); await ins(id, 4, 'web', 4);
+      expect(await repo.latestAgentChangeSince(id, 2)).toMatchObject({ number: 3, previousNumber: 2, label: 'agent: edit 3' });
+      expect(await repo.latestAgentChangeSince(id, 3)).toBeNull();
+    });
+    test('writerName resolves a user id to a display name, an e-mail to its local part, anything else to null', async () => {
+      expect(await repo.writerName(userA.id)).toBe('Alice');
+      expect(await repo.writerName('bob@example.com')).toBe('bob');
+      expect(await repo.writerName('not-a-uuid')).toBeNull();
+      expect(await repo.writerName('00000000-0000-4000-8000-000000000000')).toBeNull();
+      expect(await repo.writerName(null)).toBeNull();
+    });
+    test('null when only humans wrote, and scoped to its own diagram', async () => {
+      const a = await newDiagram(); const b = await newDiagram();
+      await ins(a, 1, 'web', 5); await ins(b, 1, 'agent', 9);
+      expect(await repo.latestAgentChangeSince(a, 0)).toBeNull();
+      expect(await repo.latestAgentChangeSince(b, 0)).toMatchObject({ number: 1, previousNumber: null });
+    });
+  });
 });

@@ -4,6 +4,7 @@
 
 import { diagramRepository } from '../../../../lib/diagramRepository';
 import { validateDiagramContent } from '../../../../lib/diagramContent';
+import { dedupeContentIds } from '../../../../lib/dedupeIds';
 import { withDiagramAuth } from '../../../../lib/authz/next';
 
 export default withDiagramAuth({ POST: 'diagram.read' }, async (req, res, { diagram, user }) => {
@@ -14,7 +15,7 @@ export default withDiagramAuth({ POST: 'diagram.read' }, async (req, res, { diag
   let warnings = [];
   let toCopy = source;
   if (source.content !== undefined && source.content !== null) {
-    const check = validateDiagramContent(source.content);
+    const check = validateDiagramContent(dedupeContentIds(source.content));
     if (!check.ok) return res.status(check.status).json({ error: check.error, code: check.code });
     toCopy = { ...source, content: check.content };
     warnings = check.warnings;
