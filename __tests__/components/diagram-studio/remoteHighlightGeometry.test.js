@@ -78,6 +78,14 @@ describe('buildRemoteHighlight', () => {
     expect(h.items).toHaveLength(1);
   });
 
+  it('a truncated id list reports the true total, not the capped length', () => {
+    const elements = Array.from({ length: 500 }, (_, i) => el(`n${i}`, i, i));
+    const h = buildRemoteHighlight({ ids: { ...ids(elements.map((e) => e.id), [], [], true), totals: { added: 620, changed: 0, removed: 0 } }, elements, connections: [], before: elements });
+    expect(h.count).toBe(620);
+    const s = offscreenSummary(h, { x: -5000, y: -5000, w: 10, h: 10 });
+    expect(s.count).toBe(620);
+  });
+
   it('gives every highlight a distinct key so a new pickup restarts the animation', () => {
     const e = [el('a', 0, 0)];
     const a = buildRemoteHighlight({ ids: ids([], ['a']), elements: e, connections: [], before: e });

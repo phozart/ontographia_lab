@@ -140,3 +140,12 @@ describe('RemoteHighlightChip', () => {
     expect(container.firstChild).toBeNull();
   });
 });
+
+describe('reduced motion in CSS', () => {
+  it('the stylesheet turns the fade off under prefers-reduced-motion and keeps the ring visible', () => {
+    const css = require('fs').readFileSync(require('path').join(__dirname, '..', '..', '..', 'styles', 'diagram-studio.css'), 'utf8');
+    const block = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce) {\n  .ds-remote-fade'));
+    expect(block).toMatch(/\.ds-remote-fade\s*\{[^}]*animation:\s*none/);
+    expect(block).toMatch(/opacity:\s*1/);
+  });
+});
