@@ -44,17 +44,17 @@ Cursor (`~/.cursor/mcp.json` or `.cursor/mcp.json`):
 
 ## 3. What the server offers
 
-| Tool                | Purpose                                                                            |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| `diagram_list`      | Diagrams the token can read, newest first, with paging.                            |
-| `diagram_search`    | Substring search over name, description and element labels.                        |
-| `diagram_get`       | One diagram as compact JSON (stable ids), a Mermaid flowchart, or a plain outline. |
-| `diagram_thumbnail` | The stored preview image, when one exists.                                         |
-| `stencil_catalog`   | The stencil packs and what each shape type means.                                  |
-| `diagram_apply_ops` | Change a diagram with a batch of operations (editor tokens only; see below).       |
+| Tool                | Purpose                                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `diagram_list`      | Diagrams the token can read, newest first, with paging.                                                     |
+| `diagram_search`    | Substring search over name, description and element labels.                                                 |
+| `diagram_get`       | One diagram as compact JSON (stable ids), a Mermaid flowchart, or a plain outline.                          |
+| `diagram_thumbnail` | The stored preview image, when one exists.                                                                  |
+| `stencil_catalog`   | The stencil packs and what each shape type means.                                                           |
+| `diagram_apply_ops` | Change a diagram with a batch of operations (editor tokens only; see below).                                |
 | `map_structure`     | Build a mind map, tree, flow, cluster or grid from nodes, edges and groups (editor tokens only; section 6). |
-| `layout_apply`      | Re-arrange elements that are already on the board, positions only (editor tokens only; section 6). |
-| `guide_get`         | The canvas guide (workflow, shapes, limits); the same text as the resource below. |
+| `layout_apply`      | Re-arrange elements that are already on the board, positions only (editor tokens only; section 6).          |
+| `guide_get`         | The canvas guide (workflow, shapes, limits); the same text as the resource below.                           |
 
 | `board_read_region` | Part of a diagram in reading order: a frame, a selection, a rectangle or the area around one element. |
 
@@ -96,7 +96,9 @@ Editing is off by default. To turn it on for one diagram:
     "ontographia": {
       "type": "http",
       "url": "https://YOUR-HOST/api/mcp",
-      "headers": { "Authorization": "Bearer ogl_REPLACE_WITH_YOUR_EDITOR_TOKEN" }
+      "headers": {
+        "Authorization": "Bearer ogl_REPLACE_WITH_YOUR_EDITOR_TOKEN"
+      }
     }
   }
 }
@@ -131,7 +133,10 @@ Claude does the thinking (summarizing, grouping, naming); Ontographia only build
       { "key": "onb", "label": "Onboarding is slow" },
       { "key": "price", "label": "Pricing page is unclear" }
     ],
-    "edges": [ { "from": "hub", "to": "onb" }, { "from": "hub", "to": "price" } ]
+    "edges": [
+      { "from": "hub", "to": "onb" },
+      { "from": "hub", "to": "price" }
+    ]
   }
 }
 ```
@@ -177,3 +182,13 @@ Hosted Claude apps cannot send a token header, so they sign in with OAuth instea
 What the server does for you: it accepts only apps on its allowlist (`OAUTH_TRUSTED_CLIENT_IDS`, default Claude's hosted client), sends you back only to the redirect address that app registered, requires PKCE, binds the tokens to this MCP server, rotates refresh tokens and revokes the connection if a used one is replayed, and records `oauth.*` events in the audit trail. Diagram text is still treated as data, never as instructions.
 
 If the connector shows a connection error instead of the sign-in page, ask your administrator to check that `MCP_ALLOWED_ORIGINS` includes `https://claude.ai` and `https://claude.com`, that `/.well-known/oauth-protected-resource/api/mcp` and `/.well-known/oauth-authorization-server` return JSON, and that the reverse proxy forwards `/.well-known/` to the app.
+
+## 8. Install the Claude skill (claude.ai)
+
+The repo ships an Agent Skill, `skills/ontographia-lab/`, that teaches Claude to use this connector well: read before write, `baseRevision` and conflict handling, locks, which layout for which intent, "Copy link for Claude" workflows, and what is not built yet (tables, documents). It does not replace the connector; connect first (section 7).
+
+1. Build a zip with the folder `ontographia-lab/` at its root and `SKILL.md` inside: `cd skills && zip -r ontographia-lab-skill.zip ontographia-lab`. The folder name must match the skill `name`.
+2. In claude.ai open **Customize > Skills** (older wording: Settings > Capabilities > Skills), choose **+**, **+ Create skill**, **Upload a skill**, and pick the zip. Code execution must be enabled (Settings > Capabilities); on Team and Enterprise an owner must allow Skills and user-created skills.
+3. Toggle the skill on. Uploaded skills are private until you share them.
+
+Source: Anthropic Help Center, [Use skills in Claude](https://support.claude.com/en/articles/12512180-use-skills-in-claude), checked 2026-10-21; menu names change, so check that page if the labels differ. `__tests__/lib/claudeSkill.test.js` keeps the skill's tool names in step with the server.
