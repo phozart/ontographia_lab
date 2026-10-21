@@ -22,7 +22,4 @@ describe('verifyBearer dispatch', () => {
     expect(access).toHaveBeenCalledTimes(1);
     expect(personal).not.toHaveBeenCalled();
   });
-  test('the O1 scaffold honors no oga_ token', async () => {
-    expect(await verifyBearer('oga_' + 'a'.repeat(43), { enabled: () => true })).toEqual({ ok: false, reason: 'invalid' });
-  });
 });

@@ -30,6 +30,11 @@ const dbTests = [
   '<rootDir>/__tests__/lib/versionRepository.test.js',
   '<rootDir>/__tests__/lib/commentRepository.test.js',
   '<rootDir>/__tests__/lib/apiTokensConcurrency.test.js',
+  '<rootDir>/__tests__/lib/oauthRepository.test.js',
+  '<rootDir>/__tests__/lib/oauthConsent.test.js',
+  '<rootDir>/__tests__/lib/oauthAllBoardsMcp.test.js',
+  '<rootDir>/__tests__/lib/oauthEndpoints.test.js',
+  '<rootDir>/__tests__/scripts/migrate0010.test.js',
 ];
 
 // Unit tests configuration

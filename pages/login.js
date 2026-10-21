@@ -428,7 +428,7 @@ export default function LoginPage() {
             fullWidth
             variant="contained"
             startIcon={<GoogleIcon />}
-            onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
+            onClick={() => signIn('google', { callbackUrl: callbackUrl ? safeRedirectPath(callbackUrl, '/dashboard') : '/dashboard' })}
             sx={{
               py: 1.5,
               mb: 2,
@@ -449,7 +449,7 @@ export default function LoginPage() {
             fullWidth
             variant="outlined"
             startIcon={<GitHubIcon />}
-            onClick={() => signIn('github', { callbackUrl: '/dashboard' })}
+            onClick={() => signIn('github', { callbackUrl: callbackUrl ? safeRedirectPath(callbackUrl, '/dashboard') : '/dashboard' })}
             sx={{
               py: 1.5,
               mb: 3,
