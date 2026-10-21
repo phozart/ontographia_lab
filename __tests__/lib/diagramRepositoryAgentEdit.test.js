@@ -149,6 +149,36 @@ dbDescribe('diagramRepository.applyContentChange (throwaway database)', () => {
     expect((await head(id)).content.elements.map((e) => e.id)).toEqual(['a']);
   });
 
+  test('table_create and table_update (AI-4) through the same path: one agent version each, audit rows, links survive the database, restore-before removes the table', async () => {
+    const { compileTableCreate, compileTableUpdate } = require('../../lib/mcp/tableTools');
+    const id = await newDiagram(content(['a', 'b']));
+    const made = await repo.applyContentChange(id, {
+      expectedRevision: 0, userId: user.id, actor: actor(),
+      compute: (c) => compileTableCreate(c, { title: 'Inventory', columns: ['Name', { name: 'N', type: 'number' }], rows: [{ cells: ['A', 1], elementId: 'a' }, { cells: ['B', 2], elementId: 'b' }] }),
+    });
+    expect(made.status).toBe('ok');
+    const tableId = made.result.elementId;
+    const stored = (await head(id)).content.elements.find((e) => e.id === tableId);
+    expect(stored.data.table.rows.map((r) => r.elementId)).toEqual(['a', 'b']);
+    expect(stored.data.table.rows[1].cells[stored.data.table.columns[1].id]).toBe(2);
+    const upd = await repo.applyContentChange(id, {
+      expectedRevision: 1, userId: user.id, actor: actor(),
+      compute: (c) => compileTableUpdate(c, { elementId: tableId, key: 'Name', upsertRows: [{ cells: { Name: 'A', N: 10 } }, { cells: { Name: 'C', N: 3 } }] }),
+    });
+    expect(upd.status).toBe('ok');
+    expect(upd.result.summary).toMatchObject({ inserted: 1, updated: 1 });
+    const v = await vers(id);
+    expect(v.map((x) => x.via)).toEqual(['system', 'agent', 'agent']);
+    const audit = (await pg.query("select action, on_behalf_of from audit_events where diagram_id=$1 and action='diagram.agent_edit'", [id])).rows;
+    expect(audit).toHaveLength(2);
+    // a rejected table call writes nothing and makes no version
+    const bad = await repo.applyContentChange(id, { expectedRevision: 2, userId: user.id, actor: actor(), compute: (c) => compileTableUpdate(c, { elementId: tableId, upsertRows: [{ cells: { Nope: 1 } }] }) });
+    expect(bad.status).toBe('rejected');
+    expect((await vers(id))).toHaveLength(3);
+    await versions.restore(id, v[0].n, { userId: user.id, email: user.email, via: 'web' });
+    expect((await head(id)).content.elements.map((e) => e.id)).toEqual(['a', 'b']);
+  });
+
   test('doc_create / doc_update (AI-5) through the same path: one agent version each, audit rows, sanitized text stored, restore-before removes the doc', async () => {
     const { compileDocCreate, compileDocUpdate } = require('../../lib/mcp/docTools');
     const id = await newDiagram();

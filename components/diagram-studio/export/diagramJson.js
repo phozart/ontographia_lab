@@ -1,5 +1,7 @@
 // components/diagram-studio/export/diagramJson.js
 // Pure helpers for the JSON export envelope and JSON import (validation, sanitizing, re-id/offset).
+import { isTableElement } from '../../../lib/table/tableModel';
+import { tableProblem } from '../../../lib/table/tableSchema';
 // No DOM or React dependencies so everything here is unit-testable.
 
 import { isUnsafeUrlValue } from '../../../lib/safeUrl';
@@ -115,6 +117,11 @@ function sanitizeElements(rawElements, warnings, stats) {
         dropped++;
         continue;
       }
+    }
+    // A table element must carry a valid data.table (the server refuses a save otherwise): skip a broken one
+    if (isTableElement(raw)) {
+      const t = isPlainObject(raw.data) ? deepSanitize(raw.data.table) : undefined;
+      if (!t || tableProblem(t)) { dropped++; continue; }
     }
     seen.add(raw.id);
     out.push(deepSanitize(raw, 0, stats));
@@ -292,6 +299,15 @@ export function remapForMerge(content, { center = { x: 0, y: 0 }, idGen } = {}) 
         if (idMap.has(copy[key])) copy[key] = idMap.get(copy[key]);
         else delete copy[key];
       }
+    }
+    // Table rows link to elements by id: follow the new ids, and drop links to elements that are not part of the insert
+    // (the old id could belong to an unrelated element of the target diagram).
+    if (isTableElement(copy) && copy.data?.table && Array.isArray(copy.data.table.rows)) {
+      copy.data.table.rows = copy.data.table.rows.map((r) => {
+        if (!r.elementId) return r;
+        const { elementId, ...rest } = r;
+        return idMap.has(elementId) ? { ...rest, elementId: idMap.get(elementId) } : rest;
+      });
     }
     return copy;
   });

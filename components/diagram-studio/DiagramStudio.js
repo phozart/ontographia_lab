@@ -20,6 +20,7 @@ import { useOpenDocId, registerElementLinkHandler } from './elements/doc/docStor
 import CommandPalette, { useCommandPalette } from './ui/CommandPalette';
 import FrameNavigator from './ui/FrameNavigator';
 import TitleBar from './ui/TitleBar';
+import { useTablePaste } from './elements/table/useTablePaste';
 import ShapeSidebar from './ui/ShapeSidebar';
 import ContextualToolbar from './ui/ContextualToolbar';
 import { useThumbnailCapture } from './hooks/useThumbnailCapture';
@@ -132,6 +133,7 @@ function DiagramStudioInner({
   const canvasContainerRef = useRef(null); // Ref for canvas container (used by FrameNavigator)
   const previewSelectionRef = useRef(null); // selection stashed while previewing
   const iconBarRef = useRef(null); // Ref for ShapeSidebar (used by empty canvas welcome)
+  useTablePaste({ containerRef: canvasContainerRef }); // paste a spreadsheet range as a table; table row links reveal elements
 
   // User settings state - loaded from API
   const [userSettings, setUserSettings] = useState(DEFAULT_SETTINGS);

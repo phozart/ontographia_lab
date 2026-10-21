@@ -64,6 +64,13 @@ The user right-clicked a selection, frame or canvas area in the editor. Links lo
 
 `diagram_apply_ops` (max 200 ops, all-or-nothing): `add_element`, `update_element`, `remove_element`, `connect`, `update_connection`, `remove_connection`. Use `@ref` names so one batch can create and connect things. Take ids from `diagram_get` or `board_read_region`; never guess ids.
 
+### 5a. "Put this in a table" (from a map, a region or text)
+
+1. Read what the rows come from: `diagram_get` or `board_read_region` (ids and labels of the elements) or the text the user gave. Decide the columns and the rows yourself.
+2. `table_create` with `baseRevision`: `columns` (names, or `{name, type: text|number|select|boolean}`), `rows` (arrays aligned to the columns, or `{cells, elementId}`), optional `title` and `anchor` (`{near: elementId}`). **When the rows come from elements on the board, give each row that element's id as `elementId`**: the owner can then click from the row to the shape, and the link is kept when the table is edited. Use `number` and `boolean` column types where the data is numeric or yes/no (a value of the wrong type rejects the call; nothing is written).
+3. Re-running an analysis: `table_update` with `key` (the identifying column) and `upsertRows`, not a second `table_create`; repeating the call adds no rows. Rows can be removed with `removeKeys` / `removeRowIds`, columns added, renamed or retyped. `table_get` reads the rows back (`diagram_get` only gives column names and `rowCount`).
+4. `diagram_show`, then say what the table holds. A written summary of the table goes in your reply (there is no document element yet).
+   The server also offers the prompt `tabulate_region` (link + optional columns).
 ### 6b. "Summarize this on the board" (a doc linked to the elements)
 
 The typical run is: map the text, tabulate or cluster it, then write the findings where the work is.
@@ -87,7 +94,7 @@ The typical run is: map the text, tabulate or cluster it, then write the finding
 | Affinity groups, themes, swimlanes, sections | `cluster` with `groups`                    |
 | Process, journey steps, pipeline (cycles ok) | `flow` (left to right)                     |
 | Hierarchy, org, capability breakdown         | `tree` (top down)                          |
-| Inventory, list of items, backlog            | `grid`                                     |
+| Inventory, list of items, backlog            | `grid` for notes, or a table (`table_create`) when it has columns |
 
 `layout_apply` has no `cluster`; there it means `grid`.
 
@@ -106,7 +113,7 @@ The typical run is: map the text, tabulate or cluster it, then write the finding
 
 ## Not available (do not promise)
 
-Tables are not built yet: use notes, groups and `data` fields (long text goes in a doc). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
+Long-form text goes in a doc and matrices in a table. Tables have no formulas, no `date` column type and no connectors to single rows (a connector attaches to the whole table). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
 
 ## Reading large boards
 
