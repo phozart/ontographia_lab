@@ -37,6 +37,8 @@ const dbTests = [
   '<rootDir>/__tests__/lib/oauthConnectedApps.test.js',
   '<rootDir>/__tests__/lib/mcpDiagramCreate.test.js',
   '<rootDir>/__tests__/scripts/migrate0010.test.js',
+  '<rootDir>/__tests__/scripts/migrate0011.test.js',
+  '<rootDir>/__tests__/lib/activityRepository.test.js',
 ];
 
 // Unit tests configuration

@@ -7,7 +7,7 @@ import { LogoIcon } from '../../ui/Logo';
 import { useJsonImport } from '../export/useJsonImport';
 import ImportJsonDialog from './ImportJsonDialog';
 import { OPEN_EXPORT_DIALOG_EVENT } from './ExportDialog';
-import { OPEN_VERSION_HISTORY_EVENT } from './VersionHistoryPanel';
+import { OPEN_VERSION_HISTORY_EVENT, OPEN_ACTIVITY_EVENT } from './VersionHistoryPanel';
 import HistoryIcon from '@mui/icons-material/History';
 import { FEATURES } from '../../../lib/features';
 import { formatShortcut } from '../../../lib/platform';
@@ -132,6 +132,10 @@ export default function TitleBar({
 
   const openVersionHistory = useCallback(() => {
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_VERSION_HISTORY_EVENT));
+  }, []);
+
+  const openActivity = useCallback(() => {
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_ACTIVITY_EVENT));
   }, []);
 
   const historyContext = useDiagramHistory() || {};
@@ -774,7 +778,7 @@ export default function TitleBar({
         </div>
 
         {/* LA-2: Claude / agents on this board (from the revision probe) */}
-        <AgentIndicator agents={agents} canReview={canReviewAgentChange} onReview={reviewAgentChange} onOpenActivity={onOpenActivity} />
+        <AgentIndicator agents={agents} canReview={canReviewAgentChange} onReview={reviewAgentChange} onOpenActivity={onOpenActivity || openActivity} />
 
         {/* Share button */}
         {FEATURES.sharing && onShare && (
@@ -811,6 +815,10 @@ export default function TitleBar({
               <button className="ds-dropdown-item" onClick={() => { openVersionHistory(); setShowMenu(false); }}>
                 <HistoryIcon fontSize="small" />
                 <span>Version history...</span>
+              </button>
+              <button className="ds-dropdown-item" onClick={() => { openActivity(); setShowMenu(false); }}>
+                <HistoryIcon fontSize="small" />
+                <span>Activity...</span>
               </button>
               {!readOnly && (
                 <button className="ds-dropdown-item" onClick={() => { importInputRef.current?.click(); setShowMenu(false); }}>

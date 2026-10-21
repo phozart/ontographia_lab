@@ -193,6 +193,18 @@ CREATE INDEX IF NOT EXISTS idx_audit_actor   ON audit_events(actor_user_id, occu
 ```
 Application code only INSERTs into `audit_events` (no UPDATE/DELETE outside the retention job). No IP addresses or raw tokens are stored.
 
+### 0011_diagram_edit_sessions (LA-3; ADR-0006)
+One row per (diagram, human user, burst of web saves): a save extends the person's open session when its `last_at` is less than 10 minutes old, otherwise it opens a new one (`first_at`, `last_at`, `save_count`, `revision_from`, `revision_to`). Written in the same transaction as the content `UPDATE` (`lib/activityRepository.recordEditSession`). No content and no counts (Compare computes them on demand). Agent edits are not recorded here (one `audit_events` row each). `diagram_id` cascades; `actor_user_id` is set null when the user is deleted. Retention 365 days, pruned opportunistically (`pruneEditSessions`, run from the activity endpoint at most every 6 hours per process).
+```sql
+CREATE TABLE IF NOT EXISTS diagram_edit_sessions (
+  id BIGSERIAL PRIMARY KEY, diagram_id UUID NOT NULL REFERENCES diagrams(id) ON DELETE CASCADE,
+  actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  first_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  save_count INTEGER NOT NULL DEFAULT 1, revision_from BIGINT NOT NULL, revision_to BIGINT NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_edit_sessions_diagram ON diagram_edit_sessions (diagram_id, last_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_edit_sessions_open ON diagram_edit_sessions (diagram_id, actor_user_id, last_at DESC);
+```
+
 ### Future (not in this phase)
 - `api_tokens(id, user_id, token_hash, role_cap, scopes, expires_at, revoked_at, last_used_at)` for MCP/agents. As built: `role_cap` is `viewer|commenter|editor` (0009), and an `editor` token must have a non-empty `diagram_ids` allowlist (CHECK `api_tokens_editor_requires_allowlist`).
 - `diagram_yupdates(diagram_id, seq, update BYTEA)` for Group D.
