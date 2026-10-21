@@ -479,7 +479,7 @@ For v1 this **supersedes** the "inlined E1 bundle" wording of mcp-and-embedding.
 ### 10.5 Limits and security
 
 - **Size:** the SVG is capped at 96 KB (at most 600 elements and 1,200 connections drawn; labels at most 160 characters). The whole result stays well under Claude's ~150,000-character inline limit (tested with 2,000 elements and 3,000 connections: under 120,000 characters). Over the cap, the view and the text both say "too large, narrow the focus or open it in the lab".
-- **Pre-existing gap:** the older read tools allow up to 256 KB, which can exceed claude.ai's limit. Worth a follow-up once they are used from claude.ai.
+- **Shared output budget (fixed in AI-9a):** the older read tools used to allow 256 KB of text plus the same again as `structuredContent` (about 272 KB), over claude.ai's limit. `MAX_RESPONSE_BYTES` is now 120 KB, so one result is at most about 136 KB with framing (text and `structuredContent` each get about half, as before; paging with `frameId` / `elementIds` / `offset` is unchanged).
 - **Sanitization:**
   - Every user string is XML-escaped.
   - Colours are parsed and re-emitted as `#rrggbb`, so a stored `url(https://…)` can never reach a `fill`.
@@ -509,6 +509,8 @@ Hosts without MCP Apps (Claude Code today, older clients) ignore `_meta.ui` and 
 
 ### 10.9 Open questions (recommended defaults)
 
+**Approved by the product owner on 2026-10-21, all recommended defaults** (Q-AV1 to Q-AV6 as listed below). Q-AV7 (how the lab authenticates as a remote connector) is decided separately: an OAuth design is in progress and is not part of AI-9a.
+
 | ID    | Question                                                                                                                    | Recommended default                                                                                                                                    |
 | ----- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Q-AV1 | Should every write (`diagram_apply_ops`, `map_structure`) render the card itself (tool `_meta.ui`), or only `diagram_show`? | **Only `diagram_show`.** Writes stay text, so a series of edits does not spam cards. Revisit after the AI-9b eval                                      |
@@ -537,3 +539,18 @@ Hosts without MCP Apps (Claude Code today, older clients) ignore `_meta.ui` and 
   - Rendering inside claude.ai, Desktop or mobile. This needs the lab deployed at a public HTTPS URL and added as a custom connector.
   - Claude-specific behaviour: `_meta` forwarding, `ui/open-link` confirmation, and full screen.
   - Claude's stricter default CSP. basic-host's CSP is looser, but the view's own meta CSP is the strict one and was in force.
+
+### 10.11 As built: AI-9a (2026-10-21, branch `feat/ai-9a-diagram-show`)
+
+The spike, hardened. No new dependency, no migration, no feature flag, no auth change.
+
+- **Renderer hardening** (`lib/render/diagramSvg.js`): coordinates beyond ±1e6 are treated as corrupt (the element is skipped; sizes are clamped to 100,000), so the output never contains `Infinity`, `NaN` or exponent notation. Waypoints and removed-ghost bounds follow the same rule.
+- **Model-facing text** (`lib/mcp/showTool.js`): the diagram name, change labels and ids are flattened to one line (`oneLine`), so a name with newlines cannot add lines to the text the model reads.
+- **Shared budget:** `MAX_RESPONSE_BYTES` 256 KB to 120 KB (see 10.5). The `diagram_show` result is unaffected: SVG at most 96 KB plus a small text, tested under 120,000 characters for a 2,000-element board.
+- **Tests added:**
+  - `diagramSvg.test.js`: an injection payload in every user string (ids, labels, `data`, `properties.frameTitle`, connection id, label, colour, line style, waypoints) parses as strict XML (jsdom) with only drawing elements and no `on*`, `href`, `xlink` or `src` attribute; every stencil of every pack renders; absurd numbers; determinism and the byte cap.
+  - `mcpDiagramShow.test.js`: viewer, commenter and editor tokens; the allowlist gives "not found" by id, short id and focus link with no name leak; a link that contradicts `id` is rejected; the text fallback stands alone; `auto` highlight switches off after a later edit; the view HTML's CSP, no network or navigation sinks, and `http(s)` links only.
+  - `mcpServer.test.js` and the other budget tests use the 120 KB budget.
+- **Verified in the MCP Apps reference host** (`basic-host`) again: render, zoom, Fit, Changes, Full screen, Open in lab, and no network request from the view. Still **not** verified in claude.ai, Desktop or mobile (needs the deployed connector, Q-AV7).
+- **How-to:** "See the board in Claude" in `mcp-connect-howto.md` section 7.
+

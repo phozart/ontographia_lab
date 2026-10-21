@@ -4,6 +4,7 @@
 // Server-side SVG renderer for the diagram_show MCP App (spike AI-9): pure, self-contained, injection-safe.
 
 import { renderDiagramSvg, safeColor, escapeXml, wrapLabel, HIGHLIGHT_COLORS } from '../../lib/render/diagramSvg';
+import { PACK_CATALOG } from '../../components/diagram-studio/packs/catalog';
 import { COMPARE_COLORS } from '../../components/diagram-studio/ui/CompareOverlay';
 
 const el = (id, x, y, extra = {}) => ({ id, type: 'task', packId: 'process-flow', label: id.toUpperCase(), x, y, size: { width: 120, height: 60 }, ...extra });
@@ -100,5 +101,91 @@ describe('renderDiagramSvg', () => {
     const short = wrapLabel('a b c d e f g h i j k l', 40, 20, 13);
     expect(short).toHaveLength(1);
     expect(short[0].endsWith('…')).toBe(true);
+  });
+});
+
+// ---- AI-9a hardening ----
+const XSS = '"><script>alert(1)</script><foreignObject><iframe src="https://evil.example"/></foreignObject>\'onload=\'alert(2)';
+const FORBIDDEN = /NaN|undefined|Infinity/;
+
+function assertWellFormedXml(svg) {
+  // eslint-disable-next-line global-require
+  const { JSDOM } = require('jsdom');
+  const dom = new JSDOM(svg, { contentType: 'image/svg+xml' }); // throws on a parse error
+  const doc = dom.window.document;
+  expect(doc.documentElement.nodeName).toBe('svg');
+  const allowed = new Set(['svg', 'defs', 'marker', 'path', 'rect', 'g', 'text', 'tspan', 'ellipse', 'polygon', 'line']);
+  for (const n of doc.querySelectorAll('*')) {
+    expect(allowed.has(n.localName)).toBe(true);
+    for (const a of n.attributes) expect(/^(on|href|xlink|src)/i.test(a.name)).toBe(false);
+  }
+}
+
+describe('renderDiagramSvg hardening (AI-9a)', () => {
+  test('every user string is escaped: ids, labels, data, frame titles, connection ids/labels/colors; output is well-formed XML with only drawing elements', () => {
+    const content = {
+      elements: [
+        { id: `fr${XSS}`, type: 'frame', packId: 'core', label: XSS, properties: { frameTitle: XSS }, x: 0, y: 0, size: { width: 500, height: 300 } },
+        el(`a${XSS}`, 20, 20, { label: XSS, data: { frameTitle: XSS, note: XSS }, properties: { note: XSS }, name: XSS, text: XSS, color: XSS, textColor: XSS, borderColor: XSS }),
+        el('b', 300, 20, { label: XSS, fontSize: XSS, opacity: XSS }),
+      ],
+      connections: [{ id: `k${XSS}`, sourceId: `a${XSS}`, targetId: 'b', label: XSS, color: XSS, lineStyle: XSS, waypoints: [{ x: XSS, y: 1 }, { x: 5, y: 5 }], strokeWidth: XSS }],
+    };
+    const r = renderDiagramSvg(content, { highlight: { added: [`a${XSS}`], removed: [{ id: 'g', bounds: { x: 'x', y: 0, width: 1, height: 1 } }] } });
+    expect(r.svg).not.toMatch(FORBIDDEN);
+    assertWellFormedXml(r.svg);
+  });
+
+  test('frame titles and untyped elements are escaped too (properties.frameTitle, data.frameTitle, unknown stencil)', () => {
+    const { svg } = renderDiagramSvg({
+      elements: [
+        { id: 'f1', type: 'frame', packId: 'core', properties: { frameTitle: '<b>&</b>' }, x: 0, y: 0, size: { width: 300, height: 200 } },
+        { id: 'u1', type: 'no-such-stencil', packId: 'nope', label: '<i>x</i>', x: 400, y: 0 },
+      ],
+      connections: [],
+    });
+    expect(svg).toContain('&lt;b&gt;&amp;&lt;/b&gt;');
+    expect(svg).toContain('&lt;i&gt;x&lt;/i&gt;');
+    expect(svg).not.toMatch(/<b>|<i>/);
+  });
+
+  test('absurd coordinates and sizes never produce NaN, Infinity or exponent notation in the output', () => {
+    const content = {
+      elements: [
+        el('a', 1e308, -1e308, { size: { width: 1e300, height: 1e300 } }),
+        el('b', 0, 0, { size: { width: -5, height: Number.MAX_VALUE } }),
+        el('c', 1e21, 1e21),
+        el('d', 5, 5),
+      ],
+      connections: [{ id: 'k', sourceId: 'a', targetId: 'b' }, { id: 'k2', sourceId: 'c', targetId: 'd', lineStyle: 'step' }],
+    };
+    const r = renderDiagramSvg(content, { highlight: { removed: [{ id: 'g', bounds: { x: 1e308, y: 0, width: 1e308, height: 1 } }] } });
+    expect(r.svg).not.toMatch(/NaN|Infinity|\de[+-]\d/);
+    expect(r.counts.elements).toBe(2); // the two with coordinates beyond +-1e6 are skipped
+    for (const k of ['x', 'y', 'width', 'height']) expect(Number.isFinite(r.viewBox[k])).toBe(true);
+    assertWellFormedXml(r.svg);
+  });
+
+  test('renders the base shape of every stencil of every pack: well-formed, bounded, label inside the box', () => {
+    let n = 0;
+    for (const pack of PACK_CATALOG) {
+      const elements = pack.stencils.map((st, i) => ({
+        id: `${pack.id}-${st.id}`, type: st.id, packId: pack.id, label: `${st.id} <${XSS}>`, x: (i % 10) * 200, y: Math.floor(i / 10) * 140,
+      }));
+      const r = renderDiagramSvg({ elements, connections: [] });
+      expect(r.counts.elements).toBe(elements.length);
+      expect(r.svg).not.toMatch(FORBIDDEN);
+      assertWellFormedXml(r.svg);
+      n += elements.length;
+    }
+    expect(n).toBeGreaterThan(100);
+  });
+
+  test('the same input renders the same bytes (deterministic) and stays within the byte cap or says tooLarge', () => {
+    expect(renderDiagramSvg(CONTENT).svg).toBe(renderDiagramSvg(CONTENT).svg);
+    const big = { elements: Array.from({ length: 600 }, (_, i) => el(`e${i}`, (i % 30) * 140, Math.floor(i / 30) * 80, { label: 'w '.repeat(100) })), connections: [] };
+    const r = renderDiagramSvg(big);
+    if (r.svg) expect(Buffer.byteLength(r.svg)).toBeLessThanOrEqual(96 * 1024);
+    else expect(r.tooLarge).toBe(true);
   });
 });
