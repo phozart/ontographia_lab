@@ -248,6 +248,8 @@ Personal tokens (`ogl_`), their UI, limits and semantics; Claude Code, Cursor an
 
 ## 8. Open questions (recommended defaults)
 
+> **Decision (2026-10-21):** the product owner approved this ADR with all recommended defaults, including the `next.config.js` rewrites for `/.well-known/*` (Q-OA8). Delivery starts with O1, then O2 and O3.
+
 | ID    | Question                                                                                          | Recommended default                                                                                                                                                                   |
 | ----- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Q-OA1 | Minimal in-app AS (D) or `oidc-provider` (B)?                                                     | **D**; revisit B if we add non-Claude clients, DCR or confidential clients                                                                                                            |
