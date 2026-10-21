@@ -6,6 +6,15 @@ const nextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, './'),
 
+  // OAuth discovery documents (ADR-0005, Q-OA8). The handlers answer 404 unless MCP_OAUTH_ENABLED is on.
+  async rewrites() {
+    return [
+      { source: '/.well-known/oauth-protected-resource', destination: '/api/oauth/protected-resource' },
+      { source: '/.well-known/oauth-protected-resource/api/mcp', destination: '/api/oauth/protected-resource' },
+      { source: '/.well-known/oauth-authorization-server', destination: '/api/oauth/authorization-server' },
+    ];
+  },
+
   // Security headers
   async headers() {
     return [

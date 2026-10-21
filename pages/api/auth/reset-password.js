@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import { verifyCaptcha, isProvided } from '../../../lib/captcha';
 import { query } from '../../../lib/db';
 import { strictLimiter } from '../../../lib/rateLimit';
+import { revokeAllGrantsForUser } from '../../../lib/oauth/repository';
 
 // Password validation requirements
 const PASSWORD_REQUIREMENTS = {
@@ -124,6 +125,14 @@ export default async function handler(req, res) {
     );
 
     console.log(`Password reset completed for user: ${user.email}`);
+
+    // A password reset means the account may have been compromised: disconnect every connected app (ADR-0005, Q-OA5).
+    // Best effort: a failure here must not block the reset itself, but it is logged loudly.
+    try {
+      await revokeAllGrantsForUser(user.id, 'password_reset');
+    } catch (revokeError) {
+      console.error('Failed to revoke OAuth connections after password reset', revokeError);
+    }
 
     return res.status(200).json({
       success: true,

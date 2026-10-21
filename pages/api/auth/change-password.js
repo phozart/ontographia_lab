@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from './[...nextauth]';
 import { query } from '../../../lib/db';
+import { revokeAllGrantsForUser } from '../../../lib/oauth/repository';
 
 // Password validation requirements
 const PASSWORD_REQUIREMENTS = {
@@ -116,6 +117,13 @@ export default async function handler(req, res) {
     );
 
     console.log(`Password changed for user: ${user.email}`);
+
+    // Connected apps (OAuth) are signed out on a password change too (security review follow-up L2). Best effort.
+    try {
+      await revokeAllGrantsForUser(user.id, 'password_change');
+    } catch (revokeError) {
+      console.error('Failed to revoke OAuth connections after password change', revokeError);
+    }
 
     return res.status(200).json({
       success: true,
