@@ -8,6 +8,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { query } from '../../../lib/db';
 import { authLimiter } from '../../../lib/rateLimit';
+import { safeRedirectPath } from '../../../lib/safeRedirect';
 
 const GENERIC_LOGIN_ERROR = 'Invalid email or password';
 const SUSPENDED_MESSAGE = 'Your account has been suspended. Please contact an administrator.';
@@ -80,6 +81,18 @@ export const authOptions = {
   ],
 
   callbacks: {
+    // Only same-origin targets are allowed after sign-in/sign-out.
+    async redirect({ url, baseUrl }) {
+      if (typeof url === 'string' && url.startsWith('/')) {
+        return baseUrl + safeRedirectPath(url);
+      }
+      try {
+        if (new URL(url).origin === new URL(baseUrl).origin) return url;
+      } catch {
+        // fall through
+      }
+      return baseUrl;
+    },
     async signIn({ user, account }) {
       try {
         // For credentials provider, user already exists (created during signup)
