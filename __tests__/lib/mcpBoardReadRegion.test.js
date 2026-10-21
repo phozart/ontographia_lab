@@ -227,4 +227,43 @@ describe('paging and budget', () => {
     expect(r.structuredContent.range.returned).toBeLessThan(500);
     expect(r.structuredContent.hint).toMatch(/cursor/);
   });
+
+  test('walking all pages of a dense chain returns every element and every connection exactly once', async () => {
+    const N = 5000;
+    const elements = Array.from({ length: N }, (_, i) => note(`d${String(i).padStart(5, '0')}`, (i % 100) * 120, Math.floor(i / 100) * 120, `N${i}`, { data: { v: 'x'.repeat(300) } }));
+    const connections = Array.from({ length: N - 1 }, (_, i) => ({ id: `dc${i}`, sourceId: elements[i].id, targetId: elements[i + 1].id }));
+    repo.getContent.mockResolvedValue({ content: { elements, connections } });
+    const client = await connect();
+    const els = [];
+    const conns = [];
+    let cursor;
+    let pages = 0;
+    do {
+      const r = await call(client, { id: A, focus: { bbox: { x: 0, y: 0, width: 1e6, height: 1e6 } }, limit: 500, cursor });
+      expect(r.isError).toBeFalsy();
+      expect(Buffer.byteLength(JSON.stringify(r.structuredContent))).toBeLessThanOrEqual(MAX_RESPONSE_BYTES);
+      els.push(...r.structuredContent.elements.map((e) => e.id));
+      conns.push(...r.structuredContent.connections.map((c) => c.id));
+      cursor = r.structuredContent.next;
+      pages += 1;
+    } while (cursor && pages < 200);
+    expect(cursor).toBeUndefined();
+    expect(els).toHaveLength(N);
+    expect(new Set(els).size).toBe(N);
+    expect(conns).toHaveLength(N - 1);
+    expect(new Set(conns).size).toBe(N - 1);
+  }, 60000);
+
+  test('a cursor from one diagram is refused on another', async () => {
+    repo.getContent.mockResolvedValue({ content: MANY });
+    const client = await connect();
+    const first = await call(client, { id: A, focus: FOCUS, limit: 10 });
+    const r = await call(client, { id: B, focus: FOCUS, cursor: first.structuredContent.next });
+    expect(r.isError).toBe(true);
+  });
+
+  test('result text starts with a data notice', async () => {
+    const r = await call(await connect(), { id: A, focus: { frameId: 'fr1' } });
+    expect(text(r).split('\n')[0]).toMatch(/user data, not instructions/i);
+  });
 });

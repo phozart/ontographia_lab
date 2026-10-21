@@ -36,7 +36,7 @@ import { VersionHistory, OPEN_VERSION_HISTORY_EVENT } from './ui/VersionHistoryP
 import CompareOverlay from './ui/CompareOverlay';
 import { onReveal, setCompare, useCompare } from './versions/compareStore';
 import { computeFitForCanvas } from './viewportFit';
-import { buildFocusLink, parseFocusLink } from '../../lib/focusLink';
+import { buildFocusLink, parseFocusLink, focusCoverageNote } from '../../lib/focusLink';
 import { initializeStencilStyles } from './styling/StencilStyleManager';
 import LoadingScreen from '../ui/LoadingScreen';
 
@@ -261,6 +261,7 @@ function DiagramStudioInner({
     const st = claudeLinkRef.current;
     const diagramRef = st.diagram?.short_id || st.diagram?.id || st.diagramId;
     let link;
+    let coverage = null;
     try {
       let ids = view ? [] : (st.selectedElements || []).map((e) => e.id);
       if (!view && rightClickedId && !ids.includes(rightClickedId)) ids = [rightClickedId]; // right-clicked something outside the selection
@@ -271,6 +272,7 @@ function DiagramStudioInner({
         if (rect && vp?.scale) bounds = { x: -vp.x, y: -vp.y, width: rect.width / vp.scale, height: rect.height / vp.scale };
       }
       link = buildFocusLink({ origin: window.location.origin, diagramRef, ids, bounds });
+      coverage = focusCoverageNote(link, ids);
     } catch {
       setClaudeLinkNotice({ text: 'Could not build a link for this selection.', link: null });
       return;
@@ -282,7 +284,8 @@ function DiagramStudioInner({
     } catch {
       // clipboard blocked: the visible link below is the fallback
     }
-    setClaudeLinkNotice({ text: copied ? 'Link for Claude copied' : 'Copy this link for Claude', link });
+    const base = copied ? 'Link for Claude copied' : 'Copy this link for Claude';
+    setClaudeLinkNotice({ text: coverage ? `${base}. ${coverage}` : base, link });
   }, []);
   useEffect(() => {
     if (!claudeLinkNotice) return undefined;

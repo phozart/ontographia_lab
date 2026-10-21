@@ -52,6 +52,8 @@ describe('parseFocusLink', () => {
     '/diagram/LAB-1?region=a,b,c,d',
     '/diagram/LAB-1?region=0,0,,10',
     '/diagram/LAB-1?region=0,0,1e12,10',
+    '/diagram/LAB-1?region=0x10,0,10,10',
+    '/diagram/LAB-1?region=%200,0,10,10',
     '/diagram/LAB-1?focus=bad%20id',
     '/diagram/LAB-1?focus=' + Array.from({ length: MAX_FOCUS_IDS + 1 }, (_, i) => `e${i}`).join(','),
     '/diagram/%E0%A4%A?focus=a',
@@ -62,5 +64,17 @@ describe('parseFocusLink', () => {
   test('non-strings are rejected', () => {
     expect(() => parseFocusLink(undefined)).toThrow(FocusLinkError);
     expect(() => parseFocusLink({})).toThrow(FocusLinkError);
+  });
+});
+
+describe('focusCoverageNote', () => {
+  const { focusCoverageNote } = require('../../lib/focusLink');
+  test('reports when some ids could not be included', () => {
+    expect(focusCoverageNote('/diagram/LAB-1?focus=a,b', ['a', 'b', 'bad id', 'c d', 'e f'])).toBe('Link covers 2 of 5 selected items');
+  });
+  test('silent when complete, empty, or region-only', () => {
+    expect(focusCoverageNote('/diagram/LAB-1?focus=a,b', ['a', 'b'])).toBeNull();
+    expect(focusCoverageNote('/diagram/LAB-1', [])).toBeNull();
+    expect(focusCoverageNote('/diagram/LAB-1?region=0,0,1,1', ['bad id'])).toBe('Link covers 0 of 1 selected items');
   });
 });
