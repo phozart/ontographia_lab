@@ -22,6 +22,16 @@ Tools and parameters: [reference/tools.md](reference/tools.md). Layouts and shap
 
 ## Workflows
 
+### 0. "Create a new board / start a board for ..."
+
+Needs an editor connection (the same as for any write). Viewer and commenter connections cannot create boards.
+
+1. Ask for a name if the user gave none; keep it short. `diagram_create` with `name` (and optional `description`). It makes an empty, private board owned by the user and adds it to this connection's allowed boards automatically. Limit: 10 new boards per hour per connection.
+2. `map_structure` on the new `id` with `baseRevision` = the `revision` that `diagram_create` returned (workflow 2 for choosing the layout).
+3. `diagram_show` so the user sees it, and give them the `url` ("Open in lab"). Tell them the board is private to them; sharing is done in the lab.
+
+Do not create a board when the user only wants to change an existing one; look for it first (`diagram_list` / `diagram_search`).
+
 ### 1. User pastes a "Copy link for Claude" link
 
 The user right-clicked a selection, frame or canvas area in the editor. Links look like `https://lab.ontographia.com/diagram/LAB-12?focus=el-a,el-b` or `...?region=x,y,w,h`.
@@ -88,7 +98,7 @@ The typical run is: map the text, tabulate or cluster it, then write the finding
 3. **Locks**: locked elements (and locked layers) are never changed by agents. `map_structure` with a locked `existingId` and `diagram_apply_ops` on a locked element fail naming the ids; `layout_apply` skips them and says so in `warnings`. Report skipped or refused items to the user; do not work around locks.
 4. **Keep batches modest.** Limits per call: `map_structure` 200 nodes / 400 edges / 40 groups; `layout_apply` 300 elements; `diagram_apply_ops` 200 ops. Split bigger work and anchor each next piece to the previous one. Writes are rate limited (about 30 per minute per connection), so prefer one well-planned call over many small ones.
 5. **Ask before big or destructive changes**: removing elements, re-laying out a whole board, changing more than about 50 things, or anything the user did not ask for. State the plan in a sentence or two and wait.
-6. **After every write** tell the user what changed (counts, new labels, `warnings`) and that every call is saved as a version they can restore from History in the lab (the "Before AI change" version, or "Review agent change" in the editor). You cannot restore versions yourself, and cannot delete diagrams or change sharing.
+6. **After every write** tell the user what changed (counts, new labels, `warnings`) and that every call is saved as a version they can restore from History in the lab (the "Before AI change" version, or "Review agent change" in the editor). You cannot restore versions yourself, and cannot delete diagrams or change sharing (a board you create is private to the user).
 7. **Never claim a change happened without the tool result.** If a call errored, say so and what you will do.
 8. **Read-only connection**: write tools answer that the role does not permit the action, or that the diagram is "not found". The connector was approved with Viewer or Commenter access, or the board is not in its allowed list. Explain how to change it: disconnect and reconnect (claude.ai: Settings, Connectors, Ontographia Lab, Disconnect, then connect again) and on the consent screen choose **Editor** and tick the boards (administrators can pick "All boards I can edit"). You cannot do this for them.
 9. **Prefer real stencils.** Use `stencil_catalog` (or the guide) for `pack/stencil` ids instead of inventing shapes; leave `stencil` out and the layout picks a sensible one.
@@ -96,7 +106,7 @@ The typical run is: map the text, tabulate or cluster it, then write the finding
 
 ## Not available (do not promise)
 
-Tables are not built yet: use notes, groups and `data` fields (long text goes in a doc). There is no tool to delete diagrams, share them, comment, or restore versions. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
+Tables are not built yet: use notes, groups and `data` fields (long text goes in a doc). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
 
 ## Reading large boards
 

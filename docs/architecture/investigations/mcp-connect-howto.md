@@ -54,6 +54,7 @@ Cursor (`~/.cursor/mcp.json` or `.cursor/mcp.json`):
 | `diagram_apply_ops` | Change a diagram with a batch of operations (editor tokens only; see below).                                |
 | `map_structure`     | Build a mind map, tree, flow, cluster or grid from nodes, edges and groups (editor tokens only; section 6). |
 | `layout_apply`      | Re-arrange elements that are already on the board, positions only (editor tokens only; section 6).          |
+| `diagram_create`    | Create a new, empty, private board owned by you (editor connections only; section 5a).                      |
 | `guide_get`         | The canvas guide (workflow, shapes, limits); the same text as the resource below.                           |
 
 | `board_read_region` | Part of a diagram in reading order: a frame, a selection, a rectangle or the area around one element. |
@@ -114,7 +115,17 @@ How an edit works:
 - **Conflicts**: `baseRevision` is required. If the diagram changed since the agent read it, nothing is applied and the error says to call `diagram_get` again.
 - **History**: every successful call creates a version attributed to you, created via the agent, plus a version of the state just before it when that state was not already saved, so restoring "the version before" undoes the whole batch (Version history in the editor).
 - **If you have the diagram open**: the editor does not live-update. Your next save is rejected with the usual "changed by someone else" conflict (409); reload to see the agent's work. Real-time sync is not part of this slice.
-- Agents cannot delete diagrams, change sharing or create share links. Diagram text is treated as data, never as instructions, but an editor token is still a write credential: keep the allowlist small and revoke it when you are done.
+- Agents cannot delete diagrams, change sharing or create share links (see 5a for creating a board). Diagram text is treated as data, never as instructions, but an editor token is still a write credential: keep the allowlist small and revoke it when you are done.
+
+## 5a. Creating a new board (diagram_create)
+
+Ask, for example: "Create a board called Onboarding journey and map these steps onto it." Claude calls `diagram_create`, then `map_structure` with the returned `revision` as `baseRevision`, then `diagram_show`.
+
+- **Who can**: only an editor connection (a personal editor token, or a claude.ai connection approved with Editor access, including the administrator's "All boards I can edit"). Viewer and commenter connections are refused ("role does not permit").
+- **What you get**: an empty board named as asked (the same name rule as the dashboard's New workspace dialog: 1 to 255 characters; a name you already use becomes "Name (1)"), owned by you, **private**: nothing is shared, and agents cannot share it. It appears on your dashboard like any workspace and has the next LAB-n id.
+- **Access for the connection that created it**: if that connection is limited to chosen boards, the new board is added to its own list (only that token or connection, never your other ones; a connection may list at most 50 boards, otherwise creating is refused and nothing is created: reconnect with fewer boards, or for a personal token remove boards or create a new token). "All boards I can edit" needs nothing.
+- **Limits**: 10 new boards per hour per connection, on top of the 30 writes per minute. Every creation is recorded in the board's audit trail as an agent action on your behalf (no content).
+- **History**: creating makes no version (a new workspace has none either); the first agent edit makes the usual versions.
 
 ## 6. Summarize, then map it (map_structure and layout_apply)
 
@@ -195,7 +206,7 @@ If the connector shows a connection error instead of the sign-in page, ask your 
 
 ## 8. Install the Claude skill (claude.ai)
 
-The repo ships an Agent Skill, `skills/ontographia-lab/`, that teaches Claude to use this connector well: read before write, `baseRevision` and conflict handling, locks, which layout for which intent, "Copy link for Claude" workflows, and what is not built yet (tables, documents). It does not replace the connector; connect first (section 7).
+The repo ships an Agent Skill, `skills/ontographia-lab/`, that teaches Claude to use this connector well: read before write, `baseRevision` and conflict handling, locks, which layout for which intent, "Copy link for Claude" workflows, creating a new board (`diagram_create`), and what is not built yet (tables, documents). It does not replace the connector; connect first (section 7).
 
 1. Build a zip with the folder `ontographia-lab/` at its root and `SKILL.md` inside: `cd skills && zip -r ontographia-lab-skill.zip ontographia-lab`. The folder name must match the skill `name`.
 2. In claude.ai open **Customize > Skills** (older wording: Settings > Capabilities > Skills), choose **+**, **+ Create skill**, **Upload a skill**, and pick the zip. Code execution must be enabled (Settings > Capabilities); on Team and Enterprise an owner must allow Skills and user-created skills.

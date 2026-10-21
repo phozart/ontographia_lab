@@ -73,12 +73,12 @@ describe('tool surface', () => {
     const client = await connect();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['board_read_region', 'diagram_apply_ops', 'diagram_get', 'diagram_list', 'diagram_search', 'diagram_show', 'diagram_thumbnail', 'doc_create', 'doc_get', 'doc_update', 'guide_get', 'layout_apply', 'map_structure', 'stencil_catalog'].sort()
+      ['board_read_region', 'diagram_apply_ops', 'diagram_create', 'diagram_get', 'diagram_list', 'diagram_search', 'diagram_show', 'diagram_thumbnail', 'doc_create', 'doc_get', 'doc_update', 'guide_get', 'layout_apply', 'map_structure', 'stencil_catalog'].sort()
     );
     for (const t of tools) {
       expect(t.inputSchema.type).toBe('object');
       expect(t.annotations).toMatchObject(
-        ['diagram_apply_ops', 'map_structure', 'layout_apply', 'doc_create', 'doc_update'].includes(t.name)
+        ['diagram_apply_ops', 'map_structure', 'layout_apply', 'diagram_create', 'doc_create', 'doc_update'].includes(t.name)
           ? { readOnlyHint: false, openWorldHint: false }
           : { readOnlyHint: true, destructiveHint: false, openWorldHint: false }
       );
