@@ -21,6 +21,7 @@ import GitHubIcon from '@mui/icons-material/GitHub';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LoginIcon from '@mui/icons-material/Login';
 import Logo from '../components/ui/Logo';
+import { safeRedirectPath } from '../lib/safeRedirect';
 
 // Ethereal Sky Palette
 const SKY = {
@@ -47,7 +48,7 @@ export default function LoginPage() {
       if (session.user?.status === 'pending') {
         router.push('/pending-approval');
       } else if (session.user?.status === 'active') {
-        router.push(callbackUrl || '/dashboard');
+        router.push(callbackUrl ? safeRedirectPath(callbackUrl) : '/dashboard');
       }
     }
   }, [session, router, callbackUrl]);
@@ -114,7 +115,7 @@ export default function LoginPage() {
         setError(result.error);
         setLoading(false);
       } else if (result?.ok) {
-        router.push(callbackUrl || '/dashboard');
+        router.push(callbackUrl ? safeRedirectPath(callbackUrl) : '/dashboard');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');
