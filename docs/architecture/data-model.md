@@ -194,7 +194,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_actor   ON audit_events(actor_user_id, occu
 Application code only INSERTs into `audit_events` (no UPDATE/DELETE outside the retention job). No IP addresses or raw tokens are stored.
 
 ### Future (not in this phase)
-- `api_tokens(id, user_id, token_hash, role_cap, scopes, expires_at, revoked_at, last_used_at)` for MCP/agents.
+- `api_tokens(id, user_id, token_hash, role_cap, scopes, expires_at, revoked_at, last_used_at)` for MCP/agents. As built: `role_cap` is `viewer|commenter|editor` (0009), and an `editor` token must have a non-empty `diagram_ids` allowlist (CHECK `api_tokens_editor_requires_allowlist`).
 - `diagram_yupdates(diagram_id, seq, update BYTEA)` for Group D.
 - `workspaces`, `workspace_members`, `project_members` — become additional grant sources.
 

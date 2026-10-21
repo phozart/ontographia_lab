@@ -28,9 +28,14 @@ async function handler(req, res, { principal, user }) {
   if (input.diagramIds) {
     for (const id of input.diagramIds) {
       try {
-        await authorize(principal, id, 'diagram.read');
+        // An editor token can only be pointed at diagrams the user may edit; viewer/commenter at readable ones.
+        await authorize(principal, id, input.roleCap === 'editor' ? 'diagram.write' : 'diagram.read');
       } catch (err) {
-        if (err instanceof AuthzError) return res.status(400).json({ error: 'Allowlist contains a diagram you cannot access' });
+        if (err instanceof AuthzError) {
+          return res.status(400).json({
+            error: input.roleCap === 'editor' ? 'Allowlist contains a diagram you cannot edit' : 'Allowlist contains a diagram you cannot access',
+          });
+        }
         throw err;
       }
     }

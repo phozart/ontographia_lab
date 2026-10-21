@@ -60,8 +60,8 @@ describe('POST /api/user/tokens', () => {
     expect(res.headers['Cache-Control']).toMatch(/no-store/);
   });
 
-  test('editor cap and invalid input: 400, nothing created', async () => {
-    for (const body of [{ name: 'n', roleCap: 'editor' }, {}, { name: 'n', diagramIds: [] }]) {
+  test('editor cap without an allowlist, and invalid input: 400, nothing created', async () => {
+    for (const body of [{ name: 'n', roleCap: 'editor' }, { name: 'n', roleCap: 'editor', diagramIds: [] }, {}, { name: 'n', diagramIds: [] }]) {
       const res = mockRes();
       await tokensRoute(req('POST', body), res);
       expect(res.statusCode).toBe(400);
@@ -89,6 +89,26 @@ describe('POST /api/user/tokens', () => {
     await tokensRoute(req('POST', { name: 'n', diagramIds: [D1] }), ok);
     expect(ok.statusCode).toBe(201);
     expect(createToken).toHaveBeenCalledWith(ME, expect.objectContaining({ diagramIds: [D1] }));
+  });
+
+  test('editor tokens: allowlist diagrams must be ones the user can EDIT (diagram.write), not just read', async () => {
+    const OTHER = '22222222-2222-4222-8222-222222222222';
+    const meta = { id: D1, owner_id: OTHER, short_id: 'LAB-1', name: 'x', type: 't', revision: 1 };
+    query.mockResolvedValueOnce({ rows: [meta] }).mockResolvedValueOnce({ rows: [{ role: 'viewer' }] });
+    const res = mockRes();
+    await tokensRoute(req('POST', { name: 'n', roleCap: 'editor', diagramIds: [D1] }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/edit/);
+    expect(createToken).not.toHaveBeenCalled();
+
+    // the owner can
+    query.mockReset();
+    query.mockResolvedValue({ rows: [{ ...meta, owner_id: ME }] });
+    createToken.mockResolvedValue({ token: 'ogl_S', record: { id: T1, role_cap: 'editor' } });
+    const ok = mockRes();
+    await tokensRoute(req('POST', { name: 'n', roleCap: 'editor', diagramIds: [D1] }), ok);
+    expect(ok.statusCode).toBe(201);
+    expect(createToken).toHaveBeenCalledWith(ME, expect.objectContaining({ roleCap: 'editor', diagramIds: [D1] }));
   });
 
   test('token limit surfaces as 409', async () => {

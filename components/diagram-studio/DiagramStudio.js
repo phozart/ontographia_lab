@@ -36,6 +36,7 @@ import { VersionHistory, OPEN_VERSION_HISTORY_EVENT } from './ui/VersionHistoryP
 import CompareOverlay from './ui/CompareOverlay';
 import { onReveal, setCompare, useCompare } from './versions/compareStore';
 import { computeFitForCanvas } from './viewportFit';
+import { buildFocusLink, parseFocusLink, focusCoverageNote } from '../../lib/focusLink';
 import { initializeStencilStyles } from './styling/StencilStyleManager';
 import LoadingScreen from '../ui/LoadingScreen';
 
@@ -251,6 +252,85 @@ function DiagramStudioInner({
     });
     if (fit) st.setViewport(fit);
   }), []);
+  // "Copy link for Claude" (AI-1): a plain deep link to the selection (a frame id means the frame and its members), or to
+  // the visible region when nothing is selected. No server state. If the clipboard is unavailable the link stays visible.
+  const [claudeLinkNotice, setClaudeLinkNotice] = useState(null);
+  const claudeLinkRef = useRef({});
+  claudeLinkRef.current = { diagram, diagramId, selectedElements, viewport, elements };
+  const handleCopyClaudeLink = useCallback(async (rightClickedId, { view = false } = {}) => {
+    const st = claudeLinkRef.current;
+    const diagramRef = st.diagram?.short_id || st.diagram?.id || st.diagramId;
+    let link;
+    let coverage = null;
+    try {
+      let ids = view ? [] : (st.selectedElements || []).map((e) => e.id);
+      if (!view && rightClickedId && !ids.includes(rightClickedId)) ids = [rightClickedId]; // right-clicked something outside the selection
+      let bounds;
+      if (!ids.length) {
+        const rect = canvasContainerRef.current?.getBoundingClientRect?.();
+        const vp = st.viewport;
+        if (rect && vp?.scale) bounds = { x: -vp.x, y: -vp.y, width: rect.width / vp.scale, height: rect.height / vp.scale };
+      }
+      link = buildFocusLink({ origin: window.location.origin, diagramRef, ids, bounds });
+      coverage = focusCoverageNote(link, ids);
+    } catch {
+      setClaudeLinkNotice({ text: 'Could not build a link for this selection.', link: null });
+      return;
+    }
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(link);
+      copied = true;
+    } catch {
+      // clipboard blocked: the visible link below is the fallback
+    }
+    const base = copied ? 'Link for Claude copied' : 'Copy this link for Claude';
+    setClaudeLinkNotice({ text: coverage ? `${base}. ${coverage}` : base, link });
+  }, []);
+  useEffect(() => {
+    if (!claudeLinkNotice) return undefined;
+    const t = setTimeout(() => setClaudeLinkNotice(null), claudeLinkNotice.link && claudeLinkNotice.text.startsWith('Copy this') ? 20000 : 6000);
+    return () => clearTimeout(t);
+  }, [claudeLinkNotice]);
+
+  // Deep link: ?focus=<ids> selects and zooms to those elements, ?region=x,y,w,h zooms to that rectangle (once per load).
+  const focusAppliedRef = useRef(false);
+  useEffect(() => {
+    if (focusAppliedRef.current || !elements.length || typeof window === 'undefined') return undefined;
+    focusAppliedRef.current = true;
+    let parsed = null;
+    try {
+      if (/[?&](focus|region)=/.test(window.location.search)) parsed = parseFocusLink(`${window.location.pathname}${window.location.search}`).focus;
+    } catch {
+      parsed = null;
+    }
+    if (!parsed) return undefined;
+    const timer = setTimeout(() => {
+      const st = revealStateRef.current;
+      let targets = [];
+      if (parsed.bbox) {
+        const b = parsed.bbox;
+        targets = [{ x: b.x, y: b.y, size: { width: b.width, height: b.height } }];
+      } else {
+        const wanted = new Set(parsed.elementIds);
+        const found = st.elements.filter((e) => wanted.has(e.id));
+        // a frame in the link means the frame and what is inside it
+        const members = new Set(found.map((e) => e.id));
+        let grew = found.some((e) => e.type === 'frame' || e.isFrame);
+        while (grew) {
+          grew = false;
+          st.elements.forEach((e) => {
+            if (!members.has(e.id) && members.has(e.parentFrameId)) { members.add(e.id); grew = true; }
+          });
+        }
+        targets = st.elements.filter((e) => members.has(e.id));
+        if (found.length) st.selectElements(found.map((e) => e.id));
+      }
+      const fit = computeFitForCanvas(targets, { container: canvasContainerRef.current, padding: 100, maxScale: 1 });
+      if (fit) st.setViewport(fit);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [elements.length]);
   useEffect(() => () => setCompare(null), [diagram?.id]); // leaving a diagram never leaves a stale overlay behind
 
   useEffect(() => {
@@ -851,6 +931,24 @@ function DiagramStudioInner({
         {/* Share dialog (title-bar Share button; owner and editors) */}
         {canShare && <ShareDialog diagramId={diagram?.id} access={access} />}
 
+        {claudeLinkNotice && (
+          <div
+            role="status"
+            style={{ position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', zIndex: 1400, maxWidth: 'min(92vw, 640px)', padding: '8px 14px', borderRadius: 10, background: 'var(--ds-surface, #fff)', color: 'var(--ds-text, #1f2933)', boxShadow: '0 4px 18px rgba(0,0,0,.18)', fontSize: 13, display: 'flex', gap: 10, alignItems: 'center' }}
+          >
+            <span>{claudeLinkNotice.text}</span>
+            {claudeLinkNotice.link && (
+              <input
+                readOnly
+                aria-label="Link for Claude"
+                value={claudeLinkNotice.link}
+                onFocus={(e) => e.target.select()}
+                style={{ flex: 1, minWidth: 0, fontSize: 12 }}
+              />
+            )}
+          </div>
+        )}
+
         {/* Context Menu */}
         {contextMenu && (
           <ContextMenu
@@ -892,6 +990,7 @@ function DiagramStudioInner({
                 onDragEnd={handleStencilDragEnd}
                 onCanvasClick={activeTool === 'comment' ? startNewComment : undefined}
                 onContextMenu={openContextMenu}
+                onCopyClaudeLink={handleCopyClaudeLink}
                 commentMode={activeTool === 'comment'}
                 onDragStart={() => setShowPropertiesPanel(false)}
                 onShowProperties={() => setShowPropertiesPanel(true)}

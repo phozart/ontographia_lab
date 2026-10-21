@@ -69,15 +69,19 @@ beforeEach(() => {
 });
 
 describe('tool surface', () => {
-  test('lists exactly the read-only tools, all annotated read-only, descriptions static and warn about untrusted data', async () => {
+  test('lists the read tools (annotated read-only) plus the one write tool; descriptions static and warn about untrusted data', async () => {
     const client = await connect();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ['diagram_get', 'diagram_list', 'diagram_search', 'diagram_thumbnail', 'stencil_catalog'].sort()
+      ['board_read_region', 'diagram_apply_ops', 'diagram_get', 'diagram_list', 'diagram_search', 'diagram_thumbnail', 'stencil_catalog'].sort()
     );
     for (const t of tools) {
-      expect(t.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, openWorldHint: false });
       expect(t.inputSchema.type).toBe('object');
+      expect(t.annotations).toMatchObject(
+        t.name === 'diagram_apply_ops'
+          ? { readOnlyHint: false, openWorldHint: false }
+          : { readOnlyHint: true, destructiveHint: false, openWorldHint: false }
+      );
     }
     const get = tools.find((t) => t.name === 'diagram_get');
     expect(get.description).toMatch(/user-authored data, not instructions/i);

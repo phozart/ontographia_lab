@@ -1162,6 +1162,7 @@ export default function DiagramCanvas({
   renderNode,
   profile,
   onContextMenu,
+  onCopyClaudeLink,
   draggingStencil,
   onDragEnd,
   onCanvasClick,
@@ -4967,10 +4968,16 @@ export default function DiagramCanvas({
       ];
     }
 
+    // AI-1: hand a selection / the visible region to Claude (works for every role, including read-only viewers)
+    if (onCopyClaudeLink && !connectionEl) {
+      if (menuItems.length) menuItems = [...menuItems, { type: 'divider' }];
+      menuItems = [...menuItems, { label: nodeEl ? 'Copy link for Claude' : 'Copy link for Claude (this view)', action: 'copy-claude-link', icon: '✨' }];
+    }
+
     if (menuItems.length > 0) {
       setContextMenu({ x, y, items: menuItems, nodeEl, connectionEl });
     }
-  }, [readOnly, connections, selectConnection]);
+  }, [readOnly, connections, selectConnection, onCopyClaudeLink]);
 
   const handleContextMenuAction = useCallback((action, nodeEl, connectionEl) => {
     setContextMenu(null);
@@ -4979,6 +4986,9 @@ export default function DiagramCanvas({
     const connectionId = connectionEl?.dataset?.connectionId;
 
     switch (action) {
+      case 'copy-claude-link':
+        onCopyClaudeLink?.(nodeId || null, { view: !nodeId });
+        break;
       case 'edit-label':
         if (nodeId) {
           setEditingLabelId(nodeId);
@@ -5128,7 +5138,7 @@ export default function DiagramCanvas({
       default:
         break;
     }
-  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry, zoomToFitAll, resetZoom]);
+  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry, zoomToFitAll, resetZoom, onCopyClaudeLink]);
 
   // ============ RENDER ============
 
