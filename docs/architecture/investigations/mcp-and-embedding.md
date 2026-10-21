@@ -378,3 +378,7 @@ Each slice follows the repo rules: TDD, append to `docs/release/IMPLEMENTATION-L
   - tldraw MCP App (create/edit/delete shapes on an interactive canvas): <https://tldraw.dev/blog/tldraw-mcp-app>
   - Lucid MCP server (create-from-specification, export PNG, `create_embed`; released 2026-03-19, tool list per directory listing): <https://www.pulsemcp.com/servers/lucidsoftware>, <https://help.lucid.co/hc/en-us/articles/42578801807508-Integrate-Lucid-with-AI-tools-using-the-Lucid-MCP-server>
 - Embedding targets: Notion embeds via Iframely: <https://www.notion.com/help/embed-and-connect-other-apps>; Confluence iframe macro and XFO blocking: <https://support.atlassian.com/confluence/kb/how-to-put-an-iframe-into-confluence/>
+
+## As-built notes (M4, MCP App spike)
+
+- 2026-10-21: `diagram_show` and `ui://ontographia/diagram-view.html` were spiked with a **server-side SVG** renderer instead of the inlined E1 bundle assumed in B2/M4 above. Design, research, limits and open questions: [ai-canvas-via-mcp.md section 10](ai-canvas-via-mcp.md#10-addendum-2026-10-21-show-the-board-inside-claude-diagram_show-slice-ai-9).
