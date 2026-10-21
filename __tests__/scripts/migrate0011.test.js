@@ -18,7 +18,7 @@ describe('0011 file (pure)', () => {
     expect(code).not.toMatch(/^\s*(BEGIN|COMMIT)\s*;/im);
     expect(code).not.toMatch(/\b(TRUNCATE|DELETE\s+FROM|DROP\s+TABLE|DROP\s+COLUMN|ALTER\s+TABLE)\b/i);
     expect((code.match(/CREATE TABLE IF NOT EXISTS/g) || []).length).toBe(1);
-    expect((code.match(/CREATE INDEX IF NOT EXISTS/g) || []).length).toBe(2);
+    expect((code.match(/CREATE INDEX IF NOT EXISTS/g) || []).length).toBe(3);
   });
 });
 
@@ -45,11 +45,11 @@ dbDescribe('0011 against a throwaway database', () => {
     await admin.end();
   });
 
-  test('creates the table with its two indexes, and re-running the file is harmless', async () => {
+  test('creates the table with its three indexes, and re-running the file is harmless', async () => {
     const cols = (await pg.query("select column_name from information_schema.columns where table_name='diagram_edit_sessions' order by ordinal_position")).rows.map((r) => r.column_name);
     expect(cols).toEqual(['id', 'diagram_id', 'actor_user_id', 'first_at', 'last_at', 'save_count', 'revision_from', 'revision_to']);
     const idx = (await pg.query("select indexname from pg_indexes where tablename='diagram_edit_sessions' order by 1")).rows.map((r) => r.indexname);
-    expect(idx).toEqual(expect.arrayContaining(['idx_edit_sessions_diagram', 'idx_edit_sessions_open']));
+    expect(idx).toEqual(expect.arrayContaining(['idx_edit_sessions_diagram', 'idx_edit_sessions_open', 'idx_edit_sessions_last_at']));
     await pg.query(fs.readFileSync(path.join(DIR, file), 'utf8'));
     await migrate({ connectionString: url, dir: DIR, logger: silent }); // the runner is idempotent too
   });

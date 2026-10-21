@@ -102,16 +102,26 @@ dbDescribe('activityRepository (throwaway database)', () => {
       expect(rows[0].save_count).toBe(1);
     });
 
-    test('a failure in the session write rolls the whole save back (same transaction)', async () => {
+    test('a failure in the session write never loses the save: it commits, the revision bumps, the failure is logged', async () => {
       const id = await newDiagram();
+      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       await pg.query('alter table diagram_edit_sessions rename to diagram_edit_sessions_x');
+      let saved;
       try {
-        await expect(save(id, alice, T0)).rejects.toThrow();
+        saved = await save(id, alice, T0);
       } finally {
         await pg.query('alter table diagram_edit_sessions_x rename to diagram_edit_sessions');
       }
+      expect(saved).toBeTruthy();
+      expect(Number(saved.revision)).toBe(1);
       const row = (await pg.query('select revision::int r from diagrams where id=$1', [id])).rows[0];
-      expect(row.r).toBe(0);
+      expect(row.r).toBe(1);
+      expect(errSpy.mock.calls.some((c) => /EDIT_SESSION_FAILED/.test(String(c[0])))).toBe(true);
+      expect(await sessions(id)).toHaveLength(0);
+      errSpy.mockRestore();
+      // the transaction stayed healthy: the next save records its session normally
+      await save(id, alice, T0 + 1000);
+      expect(await sessions(id)).toHaveLength(1);
     });
 
     test('agent edits write no session (they have one audit row each)', async () => {
@@ -126,6 +136,15 @@ dbDescribe('activityRepository (throwaway database)', () => {
   });
 
   describe('retention', () => {
+    test('pruning deletes in bounded batches', async () => {
+      const id = await newDiagram();
+      await pg.query("insert into diagram_edit_sessions (diagram_id, actor_user_id, first_at, last_at, revision_from, revision_to) select $1,$2,$3,$3,g,g from generate_series(1,25) g", [id, alice.id, new Date(T0 - 500 * 86_400_000)]);
+      const first = await activity.pruneEditSessions({ now: new Date(T0), batchSize: 10, maxBatches: 2 });
+      expect(first).toBe(20);
+      const second = await activity.pruneEditSessions({ now: new Date(T0), batchSize: 10, maxBatches: 2 });
+      expect(second).toBe(5);
+    });
+
     test('pruneEditSessions deletes sessions older than 365 days and nothing else', async () => {
       const id = await newDiagram();
       await save(id, alice, T0);
@@ -194,7 +213,7 @@ dbDescribe('activityRepository (throwaway database)', () => {
 
     test('an agent edit carries the tool, counts, who it acted for, a sanitized client label and a Review compare', async () => {
       const a = (await page(id)).items.find((i) => i.kind === 'agent_edit');
-      expect(a.agent).toEqual({ label: 'Claude desktop', tool: 'map_structure' });
+      expect(a.agent).toEqual({ label: 'Claude desktop (connected app)', tool: 'map_structure' });
       expect(a.counts).toEqual({ addedElements: 1 });
       expect(a.onBehalfOf).toMatchObject({ id: alice.id, name: 'Alice Berg' });
       expect(a.actor.type).toBe('agent');

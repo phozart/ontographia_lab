@@ -3,7 +3,7 @@
 -- than 10 minutes old, otherwise it opens a new one (written in the same transaction as the content UPDATE).
 -- No content and no counts: Compare computes them on demand. Agent edits are not recorded here (one audit row each).
 -- Retention 365 days (Q-LA3), pruned opportunistically by the application.
--- Additive and idempotent: one new table and two indexes, nothing existing is altered.
+-- Additive and idempotent: one new table and three indexes, nothing existing is altered.
 
 CREATE TABLE IF NOT EXISTS diagram_edit_sessions (
   id             BIGSERIAL PRIMARY KEY,
@@ -18,3 +18,5 @@ CREATE TABLE IF NOT EXISTS diagram_edit_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_edit_sessions_diagram ON diagram_edit_sessions (diagram_id, last_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_edit_sessions_open ON diagram_edit_sessions (diagram_id, actor_user_id, last_at DESC);
+-- retention prune scans by age across all boards
+CREATE INDEX IF NOT EXISTS idx_edit_sessions_last_at ON diagram_edit_sessions (last_at);
