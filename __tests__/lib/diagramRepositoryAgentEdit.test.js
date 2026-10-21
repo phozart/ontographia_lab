@@ -149,6 +149,35 @@ dbDescribe('diagramRepository.applyContentChange (throwaway database)', () => {
     expect((await head(id)).content.elements.map((e) => e.id)).toEqual(['a']);
   });
 
+  test('doc_create / doc_update (AI-5) through the same path: one agent version each, audit rows, sanitized text stored, restore-before removes the doc', async () => {
+    const { compileDocCreate, compileDocUpdate } = require('../../lib/mcp/docTools');
+    const id = await newDiagram();
+    const made = await repo.applyContentChange(id, {
+      expectedRevision: 0, userId: user.id, actor: actor(),
+      compute: (c) => compileDocCreate(c, { title: 'Findings', markdown: '## Summary\n\nSee [a](#el=a). <script>x</script> [bad](javascript:alert(1))' }),
+    });
+    expect(made.status).toBe('ok');
+    const docId = made.result.docId;
+    let v = await vers(id);
+    expect(v.map((x) => x.via)).toEqual(['system', 'agent']);
+    const stored = (await head(id)).content.elements.find((e) => e.id === docId);
+    expect(stored).toMatchObject({ type: 'doc', packId: 'core', label: 'Findings' });
+    expect(stored.data.doc.markdown).not.toMatch(/(^|[^\\])<script/);
+    expect(stored.data.doc.markdown).not.toMatch(/\]\(javascript:/);
+    const upd = await repo.applyContentChange(id, {
+      expectedRevision: 1, userId: user.id, actor: actor(),
+      compute: (c) => compileDocUpdate(c, { elementId: docId, append: '## More\n\ntext' }),
+    });
+    expect(upd.status).toBe('ok');
+    v = await vers(id);
+    expect(v.map((x) => x.via)).toEqual(['system', 'agent', 'agent']);
+    expect((await head(id)).content.elements.find((e) => e.id === docId).data.doc.markdown).toMatch(/## More/);
+    const audit = (await pg.query("select action, on_behalf_of from audit_events where diagram_id=$1 and action='diagram.agent_edit'", [id])).rows;
+    expect(audit).toHaveLength(2);
+    await versions.restore(id, v[0].n, { userId: user.id, email: user.email, via: 'web' });
+    expect((await head(id)).content.elements.map((e) => e.id)).toEqual(['a']);
+  });
+
   test('an open editor saving with the old revision after an agent write gets the normal CAS miss (409 flow)', async () => {
     const id = await newDiagram();
     await repo.applyContentChange(id, { expectedRevision: 0, userId: user.id, actor: actor(), compute: (c) => add({ content: c }) });

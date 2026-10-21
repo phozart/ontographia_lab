@@ -199,7 +199,7 @@ describe('guide, prompts and descriptions', () => {
   test('prompts are listed and pre-fill a read-then-build instruction', async () => {
     const client = await connect();
     const { prompts } = await client.listPrompts();
-    expect(prompts.map((p) => p.name).sort()).toEqual(['cluster_region', 'map_from_text']);
+    expect(prompts.map((p) => p.name).sort()).toEqual(['cluster_region', 'map_from_text', 'summarize_region']);
     const p = await client.getPrompt({ name: 'cluster_region', arguments: { link: '/diagram/LAB-1?focus=f1', theme: 'sentiment' } });
     expect(p.messages[0].content.text).toMatch(/board_read_region/);
     expect(p.messages[0].content.text).toMatch(/map_structure/);

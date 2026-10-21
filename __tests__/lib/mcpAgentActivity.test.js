@@ -40,6 +40,10 @@ const SINGLE_BOARD = {
   diagram_apply_ops: { kind: 'write', args: { id: A, baseRevision: 7, ops: [{ op: 'add_element', ref: '@a', type: 'process-flow/task', label: 'New' }] } },
   map_structure: { kind: 'write', args: { id: A, baseRevision: 7, structure: MIND, layout: 'mindmap' } },
   layout_apply: { kind: 'write', args: { id: A, baseRevision: 7, target: { elementIds: ['n1', 'n2', 'n3'] }, layout: 'grid' } },
+  doc_create: { kind: 'write', args: { id: A, baseRevision: 7, title: 'Notes', markdown: '# Notes\n\nHello' } },
+  // these two need a doc on the board first (created through doc_create, then the register is emptied)
+  doc_update: { kind: 'write', setup: 'doc', args: (doc) => ({ id: A, baseRevision: 8, elementId: doc, append: '## More\n\ntext' }) },
+  doc_get: { kind: 'read', setup: 'doc', args: (doc) => ({ id: A, elementId: doc }) },
 };
 // Tools that touch no particular board (or create a brand-new one nobody can be watching yet).
 const NOT_BOARD = ['diagram_list', 'diagram_search', 'stencil_catalog', 'guide_get', 'diagram_create'];
@@ -99,8 +103,14 @@ describe('coverage: every tool is either a recorded single-board tool or an expl
   });
 
   test.each(Object.keys(SINGLE_BOARD))('%s records exactly one entry for (board, token), after the call succeeded', async (tool) => {
-    const { kind, args } = SINGLE_BOARD[tool];
+    const { kind, setup, args: rawArgs } = SINGLE_BOARD[tool];
     const client = await connect();
+    let args = rawArgs;
+    if (setup === 'doc') {
+      const made = await call(client, 'doc_create', { id: A, baseRevision: 7, title: 'Notes', markdown: '# Notes\n\nHello' });
+      args = rawArgs(made.structuredContent.elementId);
+      reg.clear();
+    }
     expect(agentsFor(OWNER)).toEqual([]);
     const r = await call(client, tool, args);
     expect(r.isError).toBeFalsy();
@@ -118,7 +128,8 @@ describe('coverage: every tool is either a recorded single-board tool or an expl
   });
 
   test.each(Object.keys(SINGLE_BOARD))('%s records nothing when the board is not accessible (access check first)', async (tool) => {
-    const { args } = SINGLE_BOARD[tool];
+    const { args: rawArgs } = SINGLE_BOARD[tool];
+    const args = typeof rawArgs === 'function' ? rawArgs('el-x') : rawArgs;
     const client = await connect(principal({ diagramScope: [B] })); // A is outside the allowlist
     const r = await call(client, tool, args);
     expect(r.isError).toBe(true);

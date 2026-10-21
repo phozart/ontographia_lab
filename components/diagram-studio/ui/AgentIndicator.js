@@ -19,6 +19,9 @@ const TOOL_TEXT = {
   diagram_apply_ops: 'edited shapes',
   map_structure: 'mapped a structure',
   layout_apply: 'arranged shapes',
+  doc_create: 'created a doc',
+  doc_update: 'updated a doc',
+  doc_get: 'read a doc',
 };
 
 /** Plain-language past tense for a tool name; unknown tools are named as is (the name is server-supplied text). */
