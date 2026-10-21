@@ -63,6 +63,27 @@ export const stencils = [
     ],
   },
 
+  // Table (AI-4): a typed matrix. Rows, columns and cells live in `element.data.table` (lib/table/tableModel.js);
+  // the size follows the content (height grows with rows), so it is kept in sync by the table editor and the MCP tools.
+  {
+    id: 'table',
+    name: 'Table',
+    description: 'A table with typed columns (text, number, select, boolean). Rows can link to elements on the board.',
+    group: 'Basic',
+    shape: 'table',
+    icon: '▦',
+    color: '#4FB3CE',
+    defaultSize: { width: 520, height: 130 },
+    ports: [
+      { id: 'top', position: 'top' },
+      { id: 'right', position: 'right' },
+      { id: 'bottom', position: 'bottom' },
+      { id: 'left', position: 'left' },
+    ],
+    isContainer: false,
+    properties: [],
+  },
+
   // Text Block
   {
     id: 'text-block',

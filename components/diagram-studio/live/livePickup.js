@@ -78,9 +78,18 @@ export function describeRemoteUpdate(n) {
   const bits = [];
   if (kept.length) bits.push(`your edits were kept on ${plural(kept.length, 'item')} where you both changed the same thing`);
   if (dropped.length) bits.push(`${plural(dropped.length, 'connection')} to deleted shapes ${dropped.length === 1 ? 'was' : 'were'} removed`);
+  // table merges report remote cell changes that could not be applied (type change, removed column, cap fallback)
+  let lostTable = 0;
+  for (const c of n.conflicts) {
+    for (const f of c.fields || []) {
+      const m = /(?:^|\.)lost:(cell|table)(?::[^:]+:[^:]+|:(\d+))?$/.exec(f);
+      if (m) lostTable += m[1] === 'table' ? Number(m[2]) || 1 : 1;
+    }
+  }
+  if (lostTable) bits.push(`${plural(lostTable, 'remote table change')} could not be applied`);
   return {
     title: `Updated by ${who}`,
     detail: parts.join(', '),
-    conflictText: bits.length ? `${bits[0].charAt(0).toUpperCase()}${bits[0].slice(1)}${bits.length > 1 ? `; ${bits[1]}` : ''}.` : null,
+    conflictText: bits.length ? `${bits[0].charAt(0).toUpperCase()}${bits[0].slice(1)}${bits.length > 1 ? `; ${bits.slice(1).join('; ')}` : ''}.` : null,
   };
 }

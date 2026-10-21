@@ -46,6 +46,7 @@ import { resolveQuickCreateOptions } from './hooks/interaction/quickCreateOption
 import { shouldHandleShortcut, isOverlayOpen } from './hooks/interaction/keyboardFocus';
 import { resolveFKey } from './hooks/interaction/editorShortcuts';
 import { findFreePlacement, placeAtPoint, DEFAULT_STICKY_SIZE, DEFAULT_STENCIL_SIZE } from './hooks/interaction/placement';
+import { newTableElement } from './elements/table/newTableElement';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
 import { docDefaults } from '../../lib/doc/docElement';
 import { openDoc } from './elements/doc/docStore';
@@ -3066,6 +3067,15 @@ export default function DiagramCanvas({
     return newElement;
   }, [addElement, selectElement, setActiveTool, stickyNoteColor]);
 
+  // Table tool: a click places a 3 x 3 table (header row, empty cells) centered on the click point.
+  const placeTable = useCallback((x, y) => {
+    const element = newTableElement({ x, y, place: (point, size) => placeAtPoint(point, size, GRID_SIZE) });
+    addElement(element);
+    selectElement(element.id);
+    setActiveTool('select');
+    return element;
+  }, [addElement, selectElement, setActiveTool]);
+
   const handleMouseUp = useCallback((e) => {
     // Complete draw-to-size (requires actual drag, not just click)
     if (drawing) {
@@ -3647,6 +3657,11 @@ export default function DiagramCanvas({
           setDrawing({ startX: x, startY: y, currentX: x, currentY: y });
           clearSelection();
         }
+      } else if (!readOnly && activeTool === 'table') {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (rect) {
+          placeTable((e.clientX - rect.left) / viewport.scale - viewport.x, (e.clientY - rect.top) / viewport.scale - viewport.y);
+        }
       } else if (!readOnly && activeTool === 'sticky') {
         // Sticky tool: drag to size, or a plain click to place at the default size
         // (the decision is made on mouse-up).
@@ -3675,7 +3690,7 @@ export default function DiagramCanvas({
         clearSelection();
       }
     }
-  }, [activeTool, clearSelection, elements, viewport, readOnly, packRegistry, isSpacePressed, commentMode, onCanvasClick, selectedStencil, selection, setSelectedStencil, setActiveTool, stickyNoteColor, addElement, recordHistory, selectElement]);
+  }, [activeTool, clearSelection, elements, viewport, readOnly, packRegistry, isSpacePressed, commentMode, onCanvasClick, selectedStencil, selection, setSelectedStencil, setActiveTool, stickyNoteColor, addElement, recordHistory, selectElement, placeTable]);
 
   // ============ ZOOM HANDLING ============
 
@@ -5203,7 +5218,7 @@ export default function DiagramCanvas({
         onMouseDown={handleCanvasMouseDown}
         onClick={handlePortClick}
         style={{
-          cursor: isPanning ? 'grabbing' : isConnecting ? 'crosshair' : commentMode ? 'crosshair' : activeTool === 'pan' ? 'grab' : activeTool === 'draw' ? 'crosshair' : activeTool === 'sticky' ? 'crosshair' : 'default',
+          cursor: isPanning ? 'grabbing' : isConnecting ? 'crosshair' : commentMode ? 'crosshair' : activeTool === 'pan' ? 'grab' : activeTool === 'draw' ? 'crosshair' : activeTool === 'sticky' || activeTool === 'table' ? 'crosshair' : 'default',
         }}
       >
         <div

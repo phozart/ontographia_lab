@@ -41,9 +41,16 @@ const SINGLE_BOARD = {
   map_structure: { kind: 'write', args: { id: A, baseRevision: 7, structure: MIND, layout: 'mindmap' } },
   layout_apply: { kind: 'write', args: { id: A, baseRevision: 7, target: { elementIds: ['n1', 'n2', 'n3'] }, layout: 'grid' } },
   doc_create: { kind: 'write', args: { id: A, baseRevision: 7, title: 'Notes', markdown: '# Notes\n\nHello' } },
-  // these two need a doc on the board first (created through doc_create, then the register is emptied)
+  table_create: { kind: 'write', args: { id: A, baseRevision: 7, title: 'Inventory', columns: ['Name', { name: 'Count', type: 'number' }], rows: [{ cells: ['Auth', 1] }] } },
+  // these need an element on the board first (created through the matching create tool, then the register is emptied)
   doc_update: { kind: 'write', setup: 'doc', args: (doc) => ({ id: A, baseRevision: 8, elementId: doc, append: '## More\n\ntext' }) },
   doc_get: { kind: 'read', setup: 'doc', args: (doc) => ({ id: A, elementId: doc }) },
+  table_update: { kind: 'write', setup: 'table', args: (tbl) => ({ id: A, baseRevision: 8, elementId: tbl, key: 'Name', upsertRows: [{ cells: { Name: 'Mail', Count: 2 } }] }) },
+  table_get: { kind: 'read', setup: 'table', args: (tbl) => ({ id: A, elementId: tbl }) },
+};
+const SETUP = {
+  doc: ['doc_create', { id: A, baseRevision: 7, title: 'Notes', markdown: '# Notes\n\nHello' }],
+  table: ['table_create', { id: A, baseRevision: 7, title: 'Inventory', columns: ['Name', { name: 'Count', type: 'number' }], rows: [{ cells: ['Auth', 1] }] }],
 };
 // Tools that touch no particular board (or create a brand-new one nobody can be watching yet).
 const NOT_BOARD = ['diagram_list', 'diagram_search', 'stencil_catalog', 'guide_get', 'diagram_create'];
@@ -106,8 +113,9 @@ describe('coverage: every tool is either a recorded single-board tool or an expl
     const { kind, setup, args: rawArgs } = SINGLE_BOARD[tool];
     const client = await connect();
     let args = rawArgs;
-    if (setup === 'doc') {
-      const made = await call(client, 'doc_create', { id: A, baseRevision: 7, title: 'Notes', markdown: '# Notes\n\nHello' });
+    if (setup) {
+      const made = await call(client, SETUP[setup][0], SETUP[setup][1]);
+      expect(made.isError).toBeFalsy();
       args = rawArgs(made.structuredContent.elementId);
       reg.clear();
     }

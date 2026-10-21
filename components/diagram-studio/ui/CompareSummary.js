@@ -37,7 +37,7 @@ export default function CompareSummary({ diff, against, fromTitle, overlayOn, on
                       <>
                         <span className={`vh-dot vh-dot-${c.change}`} aria-hidden="true" />
                         <span className="vh-change-name">{c.label || c.id}</span>
-                        <span className="vh-change-meta">{c.change}{c.fields?.length ? `: ${c.fields.join(', ')}` : ''}{c.docText ? ` (${[c.docText.linesAdded ? `+${c.docText.linesAdded}` : '', c.docText.linesRemoved ? `-${c.docText.linesRemoved}` : ''].filter(Boolean).join(' / ') || 'title'} lines)` : ''}</span>
+                        <span className="vh-change-meta">{c.change}{c.fields?.length ? `: ${c.fields.join(', ')}` : ''}{c.table ? ` (${tableSummary(c.table)})` : ''}{c.docText ? ` (${[c.docText.linesAdded ? `+${c.docText.linesAdded}` : '', c.docText.linesRemoved ? `-${c.docText.linesRemoved}` : ''].filter(Boolean).join(' / ') || 'title'} lines)` : ''}</span>
                       </>
                     );
                     return (
@@ -80,4 +80,15 @@ export default function CompareSummary({ diff, against, fromTitle, overlayOn, on
       `}</style>
     </section>
   );
+}
+
+/** "rows +2 -1 ~3, columns +1, 4 cells" for a changed table (lib/table/tableDiff.js). */
+function tableSummary(t) {
+  const part = (label, o) => {
+    const bits = [o.added && `+${o.added}`, o.removed && `-${o.removed}`, o.changed && `~${o.changed}`].filter(Boolean);
+    return bits.length ? `${label} ${bits.join(' ')}` : '';
+  };
+  return [part('rows', t.rows), part('columns', t.columns), t.cells ? `${t.cells} cell${t.cells === 1 ? '' : 's'}` : '', t.rows.moved ? 'rows reordered' : '']
+    .filter(Boolean)
+    .join(', ');
 }

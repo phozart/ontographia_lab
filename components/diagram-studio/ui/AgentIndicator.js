@@ -22,6 +22,9 @@ const TOOL_TEXT = {
   doc_create: 'created a doc',
   doc_update: 'updated a doc',
   doc_get: 'read a doc',
+  table_create: 'created a table',
+  table_update: 'updated a table',
+  table_get: 'read a table',
 };
 
 /** Plain-language past tense for a tool name; unknown tools are named as is (the name is server-supplied text). */
