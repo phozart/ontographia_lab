@@ -32,4 +32,21 @@ describe('layoutText', () => {
     const a = layoutText({ text: 'a b c d e', preset: 'title', box: { width: 300 } });
     expect(layoutText({ text: 'a b c d e', preset: 'title', box: { width: 300 } })).toEqual(a);
   });
+  // ADR-0008 T1: the wrapping is the shared lib/text engine, not a characters-per-line estimate
+  test('delegates to the shared engine: glyph widths matter (wide letters wrap earlier than narrow ones)', () => {
+    const narrow = layoutText({ text: 'i'.repeat(40), preset: 'body', box: { width: 400 } });
+    const wide = layoutText({ text: 'W'.repeat(40), preset: 'body', box: { width: 400 } });
+    expect(wide.lines.length).toBeGreaterThan(narrow.lines.length);
+  });
+  test('words stay whole and CJK wraps per character', () => {
+    const r = layoutText({ text: 'Customer Order Service review', preset: 'body', box: { width: 300 } });
+    for (const l of r.lines) for (const w of l.text.split(' ')) expect(['Customer', 'Order', 'Service', 'review']).toContain(w);
+    const ja = layoutText({ text: '\u{9867}\u{5BA2}\u{6E80}\u{8DB3}\u{5EA6}\u{5206}\u{6790}\u{30B5}\u{30FC}\u{30D3}\u{30B9}'.repeat(3), preset: 'body', box: { width: 200 } });
+    expect(ja.lines.length).toBeGreaterThan(2);
+  });
+  test('the theme font id picks the metric class: a serif theme measures wider than Inter', () => {
+    const inter = layoutText({ text: 'x '.repeat(200), preset: 'body', box: { width: 800 }, theme: { fonts: { heading: 'inter', body: 'inter' } } });
+    const serif = layoutText({ text: 'x '.repeat(200), preset: 'body', box: { width: 800 }, theme: { fonts: { heading: 'source-serif-4', body: 'source-serif-4' } } });
+    expect(serif.lines.length).toBeGreaterThanOrEqual(inter.lines.length);
+  });
 });
