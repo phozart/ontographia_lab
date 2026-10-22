@@ -135,8 +135,14 @@ export default function TableNode({ element, stencil, isSelected }) {
 
   // Keep size and column widths equal to the content: a resize handle drag scales the columns proportionally and the
   // height always follows the rows (settles shortly after the gesture).
+  // Never on open: a stored size that differs from the content stays as saved until the table or its size actually changes
+  // in this session (an edit or a resize), so opening a board does not dirty it and bump the revision.
+  const openedRef = useRef(null);
+  if (openedRef.current === null && table) openedRef.current = { sig: JSON.stringify(table), w: element.size?.width, h: element.size?.height };
   useEffect(() => {
     if (!table || !canEdit) return undefined;
+    const opened = openedRef.current;
+    if (opened && JSON.stringify(table) === opened.sig && element.size?.width === opened.w && element.size?.height === opened.h) return undefined;
     const natural = tableMetrics(table);
     const w = element.size?.width / tscale;
     const hgt = element.size?.height / tscale;

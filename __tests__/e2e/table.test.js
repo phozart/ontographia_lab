@@ -233,4 +233,34 @@ describe('Table element (AI-4)', () => {
     await client.close();
     await page.close();
   });
+
+  test('opening a board with a table whose stored size is off does not write; editing a cell still grows and saves', async () => {
+    const page = await newPage();
+    const table = {
+      headerRow: true, headerColumn: false,
+      columns: [{ id: 'col-a', name: 'Name', type: 'text', width: 160 }, { id: 'col-b', name: 'Note', type: 'text', width: 160 }],
+      rows: [{ id: 'row-1', cells: { 'col-a': 'Gateway', 'col-b': 'edge' } }, { id: 'row-2', cells: { 'col-a': 'Auth' } }],
+    };
+    const tbl = { id: 'tbl-off', type: 'table', packId: 'core', label: 'Stale size', x: 50100, y: 50100, size: { width: 400, height: 40 }, color: '#4FB3CE', layerId: 'default', properties: {}, data: { table } };
+    const d = await create(page, 'E2E table no write on open', [tbl]);
+    const before = (await head(page, d)).revision;
+    await open(page, d);
+    await page.waitForSelector('[data-testid="table-node"]');
+    await sleep(10000);
+    const idle = await tableData(page, d);
+    expect(idle.revision).toBe(before);
+    expect(idle.el.size.height).toBe(40);
+
+    // a user edit still grows the table to its content and saves
+    await page.click('[data-testid="table-title"]');
+    await sleep(300);
+    await dblclick(page, '[data-testid="table-cell-0-0"]');
+    await page.waitForSelector('[data-testid="table-cell-editor"]');
+    await page.keyboard.type('Gateway service');
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
+    const saved = await waitSaved(page, d, (t) => t.rows[0].cells['col-a'] === 'GatewayGateway service');
+    expect(saved.revision).toBeGreaterThan(before);
+    expect(saved.el.size.height).toBeGreaterThan(80);
+  });
 });
