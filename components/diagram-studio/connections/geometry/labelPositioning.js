@@ -136,33 +136,76 @@ export function findNonOverlappingLabelPosition(preferredPosition, obstacles, la
     return preferredPosition;
   }
 
-  // Try different offsets: the small ring first (a 30 px nudge keeps a short label near its line), then rings scaled to the
-  // label's real size (ADR-0008 5: a wrapped, 3-line label needs a bigger move than a 20 px chip to clear a node).
-  const ring = (dx, dy) => [
-    { x: 0, y: -dy },   // above
-    { x: 0, y: dy },    // below
-    { x: dx, y: 0 },    // right
-    { x: -dx, y: 0 },   // left
-    { x: dx, y: -dy },  // top-right
-    { x: -dx, y: -dy }, // top-left
-    { x: dx, y: dy },   // bottom-right
-    { x: -dx, y: dy },  // bottom-left
-  ];
-  const stepX = labelSize.width + 12;
-  const stepY = labelSize.height + 12;
-  const offsets = [...ring(30, 30)];
-  for (let k = 1; k <= 4; k++) offsets.push(...ring(Math.max(30, k * stepX * 0.6), Math.max(30, k * stepY * 0.6)));
-
-  for (const offset of offsets) {
-    const testPos = {
-      x: preferredPosition.x + offset.x,
-      y: preferredPosition.y + offset.y,
-    };
-    if (!overlaps(testPos)) {
-      return testPos;
-    }
+  // The smallest clear offset wins (L4): candidates on a fine grid of vertical, horizontal and diagonal moves, capped so a
+  // label never drifts far from its line; the nearest one that clears every node is taken. Vertical moves come first on
+  // a tie (a label belongs above or below its line).
+  const capY = labelSize.height * 1.5 + 40;
+  const capX = labelSize.width * 0.75 + 40;
+  const stepsY = [];
+  for (let d = 6; d <= capY; d += 6) stepsY.push(d);
+  const stepsX = [];
+  for (let d = 6; d <= capX; d += 6) stepsX.push(d);
+  const cands = [];
+  for (const d of stepsY) cands.push({ x: 0, y: -d, k: d }, { x: 0, y: d, k: d + 0.1 });
+  for (const d of stepsX) cands.push({ x: d, y: 0, k: d + 0.2 }, { x: -d, y: 0, k: d + 0.3 });
+  for (const dy of stepsY.filter((_, i) => i % 2 === 0)) for (const dx of stepsX.filter((_, i) => i % 2 === 0)) {
+    const k = Math.hypot(dx, dy) + 0.4;
+    cands.push({ x: dx, y: -dy, k }, { x: -dx, y: -dy, k }, { x: dx, y: dy, k }, { x: -dx, y: dy, k });
+  }
+  cands.sort((p, q) => p.k - q.k);
+  for (const offset of cands) {
+    const testPos = { x: preferredPosition.x + offset.x, y: preferredPosition.y + offset.y };
+    if (!overlaps(testPos)) return testPos;
   }
 
   // If all positions overlap, return the preferred position
   return preferredPosition;
+}
+
+/**
+ * The mid label with its leader: the label moves clear of nodes (smallest offset); when it ends up more than 36 px from
+ * where it belongs, `leader` is the point on the line it speaks for, so the renderer can draw a small tick to it.
+ * @returns {{position: {x: number, y: number}, leader: {x: number, y: number} | null}}
+ */
+export function placeMidLabel(preferred, linePoint, obstacles, labelSize) {
+  const position = findNonOverlappingLabelPosition(preferred, obstacles, labelSize);
+  const moved = Math.hypot(position.x - preferred.x, position.y - preferred.y);
+  return { position, leader: moved > 36 ? { x: linePoint.x, y: linePoint.y } : null };
+}
+
+/**
+ * Position of an endpoint (cardinality) label: beside the line, never over a node. The label sits at the side of the line
+ * (normal offset) and starts right outside the endpoint's node, sliding along the line toward the other end (then to the
+ * other side, then farther out) until its rectangle clears every node.
+ * @param {{x: number, y: number}} end the endpoint
+ * @param {{x: number, y: number}} other the other end of the connection (gives the line direction and the room)
+ * @param {{width: number, height: number}} size measured label size
+ * @param {{x: number, y: number, width: number, height: number}[]} nodes every node rectangle (the two endpoints included)
+ */
+export function placeEndpointLabel(end, other, size, nodes) {
+  const dx = other.x - end.x;
+  const dy = other.y - end.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  let nx = -uy;
+  let ny = ux;
+  if (ny > 0 || (ny === 0 && nx < 0)) { nx = -nx; ny = -ny; } // prefer above, or to the right of a vertical line
+  const hw = size.width / 2;
+  const hh = size.height / 2;
+  const clear = (c) => !nodes.some((n) => c.x - hw < n.x + n.width && c.x + hw > n.x && c.y - hh < n.y + n.height && c.y + hh > n.y);
+  const alongExt = Math.abs(ux) * hw + Math.abs(uy) * hh;
+  const normExt = Math.abs(nx) * hw + Math.abs(ny) * hh;
+  const reach = Math.max(len / 2, alongExt * 2 + 8);
+  let first = null;
+  for (const out of [4, 18, 34]) {
+    for (const side of [1, -1]) {
+      for (let a = 4 + alongExt; a <= reach + alongExt; a += 4) {
+        const c = { x: end.x + ux * a + nx * side * (normExt + out), y: end.y + uy * a + ny * side * (normExt + out) };
+        if (!first) first = c;
+        if (clear(c)) return c;
+      }
+    }
+  }
+  return first;
 }

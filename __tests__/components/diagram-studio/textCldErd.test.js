@@ -125,6 +125,22 @@ describe('ERD entity compartments', () => {
   const entity = ERDPack.stencils.find((s) => s.id === 'entity');
   const fields = (n) => Array.from({ length: n }, (_, i) => ({ name: `field_${i}`, dataType: 'VARCHAR(255)', isPrimaryKey: i === 0 }));
 
+  test('L3: a row gives its type its measured width first (shown whole) and clamps the name, the badge sits in its own column', () => {
+    const f = [{ name: 'order_total_including_vat_and_shipping', dataType: 'decimal(12,2)' }];
+    const c = draw('erd', entity, 'Orders', { data: { fields: f } });
+    const type = c.container.querySelector('[data-text-block="field-type"]');
+    const name = c.container.querySelector('[data-text-block="field"]');
+    expect(type.textContent).toBe('decimal(12,2)');
+    expect(type.getAttribute('data-overflow')).toBeNull();
+    expect(name.getAttribute('data-overflow')).toBe('true');
+    expect(name.textContent.replace(/\u22EF$/, '').endsWith('\u2026')).toBe(true);
+    // the badge column: the clamped block is 18 px narrower than the room and the badge hangs right after it
+    expect(name.className).toMatch(/erd-cell/);
+    const left = parseFloat(name.style.left);
+    const w = parseFloat(name.style.width);
+    expect(left + w + 18).toBeLessThanOrEqual(parseFloat(type.style.left) + 1); // never over the type column
+  });
+
   test('the name is the first slot; attribute rows are mono role-meta (11 px) blocks', () => {
     const c = draw('erd', entity, 'Customer', { data: { fields: fields(3) } });
     const bs = blocks(c);

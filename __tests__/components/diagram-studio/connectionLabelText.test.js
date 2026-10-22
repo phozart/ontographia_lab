@@ -99,3 +99,30 @@ describe('EndpointLabel', () => {
     expect(draw(<EndpointLabel value="" position={{ x: 1, y: 1 }} />).container.querySelector('text')).toBeNull();
   });
 });
+
+describe('review fixes (M1, L4)', () => {
+  test('L4: a label moved away from its line draws a leader tick to the line point', () => {
+    const { container } = draw(<ConnectionLabel value="Yes" position={{ x: 100, y: 20 }} leader={{ x: 100, y: 90 }} />);
+    const line = container.querySelector('line.ds-conn-label-leader');
+    expect(line).not.toBeNull();
+    expect(line.getAttribute('x2')).toBe('100');
+    expect(line.getAttribute('y2')).toBe('90');
+    expect(draw(<ConnectionLabel value="Yes" position={{ x: 100, y: 20 }} />).container.querySelector('line')).toBeNull();
+  });
+
+  test('M1: an endpoint label next to a node is placed outside it and capped by the room along the line', () => {
+    const node = { x: 260, y: 0, width: 200, height: 160 };
+    const other = { x: 200, y: 80 };
+    const { container } = draw(<EndpointLabel value="exactly one customer" position={{ x: 260, y: 80 }} otherPos={other} nodes={[node, { x: 0, y: 0, width: 200, height: 160 }]} port="left" />);
+    const rect = container.querySelector('rect');
+    const x = parseFloat(rect.getAttribute('x'));
+    const w = parseFloat(rect.getAttribute('width'));
+    const y = parseFloat(rect.getAttribute('y'));
+    const h = parseFloat(rect.getAttribute('height'));
+    expect(w).toBeLessThanOrEqual(60 - 8 + 0.5);
+    const overlaps = (n) => x < n.x + n.width && x + w > n.x && y < n.y + n.height && y + h > n.y;
+    expect(overlaps(node)).toBe(false);
+    expect(overlaps({ x: 0, y: 0, width: 200, height: 160 })).toBe(false);
+  });
+});
+

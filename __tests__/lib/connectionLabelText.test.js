@@ -4,7 +4,7 @@
  * would overlap one (findNonOverlappingLabelPosition now gets the real size).
  */
 import { connectionLabelLayout, endpointLabelLayout, CONN_LABEL } from '../../lib/text/connectionLabel';
-import { findNonOverlappingLabelPosition } from '../../components/diagram-studio/connections/geometry/labelPositioning';
+import { findNonOverlappingLabelPosition, placeEndpointLabel } from '../../components/diagram-studio/connections/geometry/labelPositioning';
 import { MIN_SIZE } from '../../lib/text/tokens';
 
 const C140 = 'Aggregate all inbound partner shipment notifications, reconcile them against open purchase orders and flag any discrepancies for review';
@@ -60,6 +60,14 @@ describe('connectionLabelLayout', () => {
   });
 });
 
+describe('a tight gap narrows the mid label', () => {
+  test('the room between the nodes caps the width (never below 76 px)', () => {
+    expect(connectionLabelLayout('Validate payment details', 100).width).toBeLessThanOrEqual(92);
+    expect(connectionLabelLayout('Validate payment details', 20).width).toBeLessThanOrEqual(76);
+    expect(connectionLabelLayout('Validate payment details').width).toBeGreaterThan(92);
+  });
+});
+
 describe('endpointLabelLayout (multiplicity and cardinality)', () => {
   test('is the 11 px meta role with a measured width', () => {
     const l = endpointLabelLayout('0..*');
@@ -96,5 +104,66 @@ describe('placement never collides with a node when there is room', () => {
     const size = { width: 100, height: 30 };
     const wall = { x: -5000, y: -5000, width: 10000, height: 10000 };
     expect(findNonOverlappingLabelPosition({ x: 5, y: 5 }, [wall], size)).toEqual({ x: 5, y: 5 });
+  });
+});
+
+describe('endpoint labels never sit over a node (M1)', () => {
+  const rectsOverlap = (a, b) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
+  const rectAt = (p, s) => ({ x: p.x - s.width / 2, y: p.y - s.height / 2, width: s.width, height: s.height });
+
+  test('the width is capped by the room along the line and wraps to up to 3 lines', () => {
+    const l = endpointLabelLayout('exactly one customer', 56);
+    expect(l.width).toBeLessThanOrEqual(56);
+    expect(l.layout.lines.length).toBeLessThanOrEqual(3);
+    expect(endpointLabelLayout('0..*', 56).width).toBeLessThan(40);
+  });
+
+  test('a long label in a 60 px gap is placed beside the line, outside both nodes', () => {
+    const a = { x: 0, y: 0, width: 200, height: 160 };
+    const b = { x: 260, y: 0, width: 200, height: 160 };
+    const size = (() => { const l = endpointLabelLayout('exactly one customer', 52); return { width: l.width, height: l.height }; })();
+    const end = { x: 260, y: 80 }; // the line arrives at the left side of b
+    const other = { x: 200, y: 80 };
+    const p = placeEndpointLabel(end, other, size, [a, b]);
+    const r = rectAt(p, size);
+    expect(rectsOverlap(r, a)).toBe(false);
+    expect(rectsOverlap(r, b)).toBe(false);
+    expect(Math.abs(p.y - end.y)).toBeGreaterThanOrEqual(size.height / 2); // beside the line, not on it
+  });
+
+  test('a short label next to its node stays close to the endpoint', () => {
+    const b = { x: 260, y: 0, width: 200, height: 160 };
+    const size = { width: 30, height: 16 };
+    const p = placeEndpointLabel({ x: 260, y: 80 }, { x: 100, y: 80 }, size, [b]);
+    expect(rectsOverlap(rectAt(p, size), b)).toBe(false);
+    expect(Math.hypot(p.x - 260, p.y - 80)).toBeLessThan(40);
+  });
+
+  test('is deterministic and works for vertical lines', () => {
+    const b = { x: 0, y: 200, width: 120, height: 80 };
+    const size = { width: 40, height: 16 };
+    const a = placeEndpointLabel({ x: 60, y: 200 }, { x: 60, y: 100 }, size, [b]);
+    expect(a).toEqual(placeEndpointLabel({ x: 60, y: 200 }, { x: 60, y: 100 }, size, [b]));
+    expect(rectsOverlap(rectAt(a, size), b)).toBe(false);
+  });
+});
+
+describe('a long mid label stays near its line (L4)', () => {
+  test('takes the smallest clear offset, not a far ring', () => {
+    const size = { width: 120, height: 36 };
+    const node = { x: 80, y: 100, width: 100, height: 20 };
+    const p = findNonOverlappingLabelPosition({ x: 130, y: 110 }, [node], size);
+    expect(Math.hypot(p.x - 130, p.y - 110)).toBeLessThanOrEqual(36 / 2 + 20 / 2 + 12 + 6);
+  });
+
+  test('reports a leader when the label had to move far from the line', () => {
+    const { placeMidLabel } = require('../../components/diagram-studio/connections/geometry/labelPositioning');
+    const size = { width: 160, height: 56 };
+    const node = { x: 0, y: 60, width: 400, height: 100 };
+    const r = placeMidLabel({ x: 200, y: 140 }, { x: 200, y: 155 }, [node], size);
+    expect(r.leader).toEqual({ x: 200, y: 155 });
+    const free = placeMidLabel({ x: 900, y: 900 }, { x: 900, y: 915 }, [node], size);
+    expect(free.leader).toBeNull();
+    expect(free.position).toEqual({ x: 900, y: 900 });
   });
 });

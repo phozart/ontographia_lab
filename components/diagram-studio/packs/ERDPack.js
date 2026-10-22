@@ -345,12 +345,31 @@ function useEntityHeader(element, label, innerW, badgeW, maxH) {
 }
 
 // A field row: a pk/fk tinted strip with the key icons, then the name and the type as slots in the row
-function FieldRow({ element, field, y, innerW }) {
-  const typeW = Math.floor(innerW * TYPE_SHARE);
+const BADGE_W = 18; // the overflow badge of a clamped cell sits in its own 18 px column, never over the text
+const probe = (element, text, width, align) => layoutForSlot(element, { text, box: { x: 0, y: 0, width, height: ERD_ROW_H }, role: 'meta', mono: true, align, maxLines: 1 }).layout;
+
+// Column widths of a row (L3): the type column gets its measured width first (up to what leaves the name 40 px), the name
+// takes the rest; a clamped cell keeps a badge column right after its text.
+function rowColumns(element, name, type, innerW) {
   const nameX = 10 + 20 + 6;
-  const nameW = Math.max(20, innerW - nameX - 10 - typeW - 6);
+  const avail = innerW - nameX - 10 - 8;
+  const nat = (t) => Math.ceil(probe(element, t, 2000, 'start').width) + 2;
+  const nw = nat(name);
+  const tw = type ? nat(type) : 0;
+  const typeW = Math.max(0, Math.min(tw, avail - 40));
+  const nameW = Math.max(40, avail - typeW);
+  const cell = (text, w, align) => (probe(element, text, w, align).overflow ? { w: Math.max(20, w - BADGE_W), clamped: true } : { w, clamped: false });
+  const n = cell(name, nameW, 'start');
+  const t = type ? cell(type, typeW, 'end') : { w: 0, clamped: false };
+  return { nameX, nameW: n.w, typeW: t.w, typeFull: typeW, nw };
+}
+
+// A field row: a pk/fk tinted strip with the key icons, then the name and the type as slots in the row
+function FieldRow({ element, field, y, innerW }) {
   const keys = `${field.isPrimaryKey ? 'PK ' : ''}${field.isForeignKey ? 'FK ' : ''}`;
   const type = `${keys}${field.dataType || ''}${field.isNullable === false ? ' *' : ''}`.trim();
+  const cols = rowColumns(element, field.name || '', type, innerW);
+  const { nameX, nameW, typeW, typeFull } = cols;
   return (
     <div className={`erd-field ${field.isPrimaryKey ? 'pk' : ''} ${field.isForeignKey ? 'fk' : ''}`} style={{ top: y }}>
       <span className="erd-field-icons">
@@ -358,8 +377,8 @@ function FieldRow({ element, field, y, innerW }) {
         {field.isForeignKey && <span className="erd-fk-icon" title="Foreign Key">🔗</span>}
         {!field.isPrimaryKey && !field.isForeignKey && <span className="erd-field-spacer">•</span>}
       </span>
-      <SlotText element={element} text={field.name || ''} box={{ x: nameX, y: 0, width: nameW, height: ERD_ROW_H }} role="meta" mono align="start" maxLines={1} color="var(--text, #1f2937)" testId="field" />
-      <SlotText element={element} text={type} box={{ x: innerW - 10 - typeW, y: 0, width: typeW, height: ERD_ROW_H }} role="meta" mono align="end" maxLines={1} color="var(--text-muted, #6b7280)" testId="field-type" />
+      <SlotText element={element} text={field.name || ''} box={{ x: nameX, y: 0, width: nameW, height: ERD_ROW_H }} role="meta" mono align="start" maxLines={1} color="var(--text, #1f2937)" className="erd-cell" testId="field" />
+      <SlotText element={element} text={type} box={{ x: innerW - 10 - typeFull, y: 0, width: typeW, height: ERD_ROW_H }} role="meta" mono align="end" maxLines={1} color="var(--text-muted, #6b7280)" className="erd-cell" testId="field-type" />
     </div>
   );
 }

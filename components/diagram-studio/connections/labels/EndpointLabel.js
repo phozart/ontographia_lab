@@ -3,7 +3,7 @@
 // ADR-0008 T2: the lines come from the shared layout (11 px meta role); the background is the measured text plus padding.
 
 import React, { useMemo } from 'react';
-import { calculateEndpointLabelPosition } from '../geometry/labelPositioning';
+import { calculateEndpointLabelPosition, placeEndpointLabel } from '../geometry/labelPositioning';
 import SvgTextBlock from '../../text/SvgTextBlock';
 import { endpointLabelLayout } from '../../../../lib/text/connectionLabel';
 
@@ -22,8 +22,15 @@ export default function EndpointLabel({
   isSelected = false,
   showOnHover = true,
   isHovered = false,
+  otherPos,
+  nodes,
+  placed,
 }) {
-  const box = useMemo(() => endpointLabelLayout(value), [value]);
+  // the room along the line between the two ends caps the width (it wraps instead of reaching a node)
+  const room = position && otherPos ? Math.hypot(otherPos.x - position.x, otherPos.y - position.y) : null;
+  const maxW = room === null ? undefined : Math.max(40, room - 8);
+  const own = useMemo(() => (placed ? null : endpointLabelLayout(value, maxW)), [placed, value, maxW]);
+  const box = placed ? placed.box : own;
 
   // Don't render if no value
   if (!value) return null;
@@ -31,10 +38,15 @@ export default function EndpointLabel({
   if (!position) return null;
 
   // Calculate offset position based on port direction
-  const offset = calculateEndpointLabelPosition(position, port, 12);
-
   // Measured label dimensions
   const { layout, width: labelWidth, height: labelHeight, textBox } = box;
+
+  // beside the line, never over a node (M1); without the other end, the legacy offset from the port
+  const offset = placed
+    ? placed.center
+    : otherPos && nodes
+    ? placeEndpointLabel(position, otherPos, { width: labelWidth, height: labelHeight }, nodes)
+    : calculateEndpointLabelPosition(position, port, 12);
 
   // Opacity based on selection/hover state
   // Per spec: 70-80% opacity when not selected

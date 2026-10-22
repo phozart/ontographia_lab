@@ -29,6 +29,7 @@ export default function ConnectionLabel({
   onEditComplete,
   readOnly = false,
   labelBox,
+  leader,
 }) {
   const [localValue, setLocalValue] = useState(value);
   const inputRef = useRef(null);
@@ -126,6 +127,19 @@ export default function ConnectionLabel({
       onClick={stopPropagation}
       onMouseDown={stopPropagation}
     >
+      {/* Leader tick: a label that had to move clear of a node still points at its line */}
+      {leader && (
+        <line
+          className="ds-conn-label-leader"
+          x1={Math.min(Math.max(leader.x, x0), x0 + w)}
+          y1={Math.min(Math.max(leader.y, y0), y0 + h)}
+          x2={leader.x}
+          y2={leader.y}
+          stroke="var(--border)"
+          strokeWidth={1}
+          strokeDasharray="2 2"
+        />
+      )}
       {/* Background rectangle */}
       <rect
         x={x0}
