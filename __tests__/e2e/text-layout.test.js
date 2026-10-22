@@ -146,7 +146,12 @@ describe('Text layout and autosizing (ADR-0008 T1)', () => {
       expect(line.font).toBe(14);
     }
     // parity: the lines the browser drew are the lines lib/text computes in Node for the same element
-    const stored = (await call(page, 'GET', `/api/diagrams/${board.id}`)).body.content.elements.find((e) => e.id === 'r1');
+    let stored;
+    for (let i = 0; i < 40; i++) { // wait for the autosave
+      stored = (await call(page, 'GET', `/api/diagrams/${board.id}`)).body.content.elements.find((e) => e.id === 'r1');
+      if (stored.label !== 'Billing') break;
+      await sleep(500);
+    }
     expect(stored.label).toBe(`Line one\n${C140}`);
     const policy = policyFor('core', { id: 'rectangle', shape: 'rect', defaultSize: { width: 120, height: 80 } });
     const expected = layoutForElement({ ...stored }, policy).layout.lines.map((l) => l.text);
@@ -206,7 +211,7 @@ describe('Text layout and autosizing (ADR-0008 T1)', () => {
           expect([n.type, n.label, line.left >= -1.5 && line.right >= -1.5 && line.top >= -1.5 && line.bottom >= -1.5]).toEqual([n.type, n.label, true]);
         }
       } else {
-        for (const line of n.lines) expect(line.w).toBeLessThanOrEqual(122); // an external label is at most max(2w, 120) wide
+        for (const line of n.lines) expect(line.w).toBeLessThanOrEqual(242); // an external label wraps at max(2w, 120) and widens to 240 for one long word
         expect(n.lines.length).toBeLessThanOrEqual(3);
       }
     }

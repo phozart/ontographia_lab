@@ -207,6 +207,19 @@ describe('render-time layout of a stored element', () => {
     expect(box.width).toBe(120);
   });
 
+  test('an external label widens (up to 240 px) for a long Latin word instead of breaking it, and breaks it only beyond that', () => {
+    const policy = policyFor('process-flow', stencil('process-flow/start-event').stencil);
+    const de = layoutForExternal({ label: 'Kundenzufriedenheitsanalyse', size: { width: 44, height: 44 } }, policy);
+    expect(de.layout.breaks.emergency).toBe(0);
+    expect(de.layout.lines).toHaveLength(1);
+    expect(de.box.width).toBeGreaterThan(120);
+    expect(de.box.width).toBeLessThanOrEqual(240);
+    expect(de.box.x).toBeCloseTo(22 - de.box.width / 2, 5);
+    const huge = layoutForExternal({ label: 'Donaudampfschifffahrtsgesellschaftskapitaensmuetzenabzeichenhalterung', size: { width: 44, height: 44 } }, policy);
+    expect(huge.box.width).toBe(240);
+    expect(huge.layout.breaks.emergency).toBeGreaterThan(0);
+  });
+
   test('titles are one line with an ellipsis', () => {
     const policy = policyFor('core', stencil('core/frame').stencil);
     const { layout } = layoutForTitle({ label: C140, size: { width: 300, height: 200 } }, policy);

@@ -51,7 +51,8 @@ describe('break opportunities (toAtoms)', () => {
   });
   test('breaks after a hyphen or slash between letters, not at the ends', () => {
     expect(words('state-of-the-art')).toEqual(['state-', 'of-', 'the-', 'art']);
-    expect(words('req/s')).toEqual(['req/', 's']);
+    expect(words('req/s')).toEqual(['req/s']); // a one-character tail stays with its word
+    expect(words('read/write')).toEqual(['read/', 'write']);
     expect(words('a - b')).toEqual(['a', '-', 'b']);
     expect(words('-x')).toEqual(['-x']);
   });
