@@ -240,7 +240,7 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **PR title:** `feat: doc copy with formatting, .docx and .pdf export, formatted table copy, and doc scrolling`
 - **REQ refs:** `docs/architecture/investigations/ai-canvas-via-mcp.md` section 11.7; owner request 2026-10-22.
 - **Branch:** `feat/doc-copy-export`
-- **Files changed:** `lib/doc/{docLinks,docHtml,docDocx,docPdf}.js`, `lib/clipboard/richCopy.js`, `lib/table/tableClipboard.js` (new); `components/diagram-studio/elements/doc/{docActions,docStore,DocPanel,DocPanelHost,DocCard}.js`, `elements/table/TableNode.js`, `DiagramCanvas.js` (context menu); `skills/ontographia-lab/SKILL.md`; `package.json` / lock (`docx` 9.13.0, MIT, 19 MB unpacked, dynamic import only).
+- **Files changed:** `lib/doc/{docLinks,docHtml,docDocx,docPdf}.js`, `lib/clipboard/richCopy.js`, `lib/table/tableClipboard.js` (new); `components/diagram-studio/elements/doc/{docActions,docStore,DocPanel,DocPanelHost,DocCard}.js`, `elements/table/TableNode.js`, `DiagramCanvas.js` (context menu); `skills/ontographia-lab/SKILL.md`; `package.json` / lock (`docx` 9.13.0, MIT, 19 MB unpacked, dynamic import only; `fflate` 0.8.3 made direct), plus `lib/table/tableXlsx.js` and `export/copyAsImage.js` (Excel export, copy as image).
 - **Tests:** unit (docHtml, docDocx, docPdf, tableClipboard, richCopy, components/docCopyExport) and e2e `doc-copy-export` (clipboard read-back, downloads, wheel scroll).
 
 ---

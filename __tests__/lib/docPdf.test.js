@@ -29,6 +29,21 @@ describe('docToPdf', () => {
   test('non Latin-1 characters become ? (documented), cp1252 punctuation survives', () => {
     expect(pdfSafeText('café “q” – 中 😀')).toBe('café “q” – ? ?');
   });
+  test('typographic extras map to equivalents, the rest still becomes ?', () => {
+    expect(pdfSafeText('a→b ≥ − x​y ✓ “q” … € •')).toBe('a->b >= - xy v “q” … € •');
+    expect(pdfSafeText('Ж 中')).toBe('? ?');
+  });
+  test('a link keeps a normal space gap after the preceding word', async () => {
+    const pdf = await docToPdf({ ...CTX, markdown: 'reads the [Auth service](https://e.com) notes.' });
+    const xs = [...pdf.output().matchAll(/([\d.]+) [\d.]+ Td\n\(([^)]*)\) Tj/g)].map((m) => ({ x: parseFloat(m[1]), t: m[2] }));
+    const before = xs.find((s) => s.t.startsWith('reads the'));
+    const link = xs.find((s) => s.t === 'Auth service');
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(10.5);
+    const gap = link.x - (before.x + pdf.getTextWidth('reads the'));
+    expect(gap).toBeGreaterThan(pdf.getTextWidth(' ') * 0.9);
+    expect(gap).toBeLessThan(pdf.getTextWidth(' ') * 1.5);
+  });
   test('empty doc yields a one page file', async () => {
     expect((await docToPdf({ ...CTX, markdown: '' })).getNumberOfPages()).toBe(1);
   });

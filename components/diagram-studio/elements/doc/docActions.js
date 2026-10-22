@@ -75,6 +75,21 @@ export function exportDocElement(kind, element, diagram) {
   return exportDocFile(kind, { title: d.title || element?.label || '', markdown: d.markdown || '', diagram });
 }
 
+/** Download a table as .xlsx (typed cells, no formulas, lab links as hyperlinks). The writer is imported on demand. */
+export async function exportTableXlsx(table, { title, diagram } = {}) {
+  try {
+    const { tableToXlsx, tableFileName } = await import('../../../../lib/table/tableXlsx');
+    const bytes = await tableToXlsx(table, { title, ...linkContext(diagram) });
+    const name = tableFileName(title);
+    saveBlob(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name);
+    postDocNotice(`Downloaded ${name}`, 'success');
+    return true;
+  } catch {
+    postDocNotice('Could not create the Excel file.', 'error');
+    return false;
+  }
+}
+
 /** Copy a table as a formatted table (HTML) + TSV. */
 export async function copyTableRich(table, diagram) {
   const r = await copyRich({ html: tableToHtml(table, linkContext(diagram)), text: tableToTsv(table) });

@@ -18,7 +18,7 @@ import {
   columnWidths, COLUMN_TYPES, MIN_COLUMN_WIDTH,
 } from '../../../../lib/table/tableModel';
 import { tableToCsv, tableToJson, parseDelimited } from '../../../../lib/table/tableCsv';
-import { copyTableRich } from '../doc/docActions';
+import { copyTableRich, exportTableXlsx } from '../doc/docActions';
 import CellEditor from './CellEditor';
 import TableMenu from './TableMenu';
 
@@ -363,6 +363,7 @@ export default function TableNode({ element, stencil, isSelected }) {
       { separator: true },
       { label: 'Export as CSV', onSelect: () => exportTable('csv') },
       { label: 'Export as JSON', onSelect: () => exportTable('json') },
+      { label: 'Export as Excel (.xlsx)', onSelect: () => exportTableXlsx(tableRef.current, { title: elRef.current.label || 'table', diagram }) },
       { label: 'Copy table (formatted)', onSelect: copyTable },
     ];
   };

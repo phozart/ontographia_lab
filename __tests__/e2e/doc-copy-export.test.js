@@ -218,4 +218,79 @@ describe('Doc copy and export', () => {
     await shot(page, 'table-copied.png');
     await page.close();
   });
+
+  const readImage = async (page) => {
+    for (let n = 0; ; n++) {
+      try {
+        return await page.evaluate(async () => {
+          for (const item of await navigator.clipboard.read()) if (item.types.includes('image/png')) {
+            const b = await item.getType('image/png');
+            const head = new Uint8Array(await b.slice(0, 8).arrayBuffer());
+            const bmp = await createImageBitmap(b);
+            return { size: b.size, sig: Array.from(head), w: bmp.width, h: bmp.height };
+          }
+          return null;
+        });
+      } catch (e) { if (n >= 5) throw e; await sleep(300); }
+    }
+  };
+
+  test('copy as image: selection, board and table go to the clipboard as a PNG (2x); the shortcut does the same', async () => {
+    const page = await open();
+    // board (nothing selected): right-click empty canvas
+    await page.mouse.click(1100, 700, { button: 'right' });
+    await page.waitForSelector('[data-testid="ctx-copy-image"]');
+    await page.click('[data-testid="ctx-copy-image"]');
+    let img = await waitFor(() => readImage(page), 30000);
+    expect(img.sig).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    expect(img.size).toBeGreaterThan(1000);
+    const boardW = img.w;
+    await page.keyboard.press('Escape');
+    // the table, individually
+    await page.evaluate(() => navigator.clipboard.writeText('x'));
+    const tb = await (await page.$('[data-node-id="tbl1"]')).boundingBox();
+    await page.mouse.click(tb.x + 10, tb.y + 8, { button: 'right' });
+    await page.waitForSelector('[data-testid="ctx-copy-image"]');
+    await page.click('[data-testid="ctx-copy-image"]');
+    img = await waitFor(() => readImage(page), 30000);
+    expect(img.sig.slice(0, 4)).toEqual([0x89, 0x50, 0x4e, 0x47]);
+    expect(img.w).toBeGreaterThanOrEqual(2 * 420); // 2x of the table width
+    expect(img.w).toBeLessThan(boardW);
+    await shot(page, 'copied-table-image.png');
+    // shortcut with a doc card selected on the canvas -> image of the card (not the doc HTML)
+    await page.evaluate(() => navigator.clipboard.writeText('y'));
+    const r0 = await cardRect(page);
+    await page.mouse.click(r0.x + 60, r0.y + 20);
+    await sleep(300);
+    await page.keyboard.down('Control'); await page.keyboard.down('Shift'); await page.keyboard.press('KeyC'); await page.keyboard.up('Shift'); await page.keyboard.up('Control');
+    img = await waitFor(() => readImage(page), 30000);
+    expect(img.w).toBeGreaterThanOrEqual(2 * 360);
+    await page.close();
+  });
+
+  test('table menu: Export as Excel downloads a valid .xlsx with typed cells and no formulas', async () => {
+    const page = await open();
+    const tb = await (await page.$('[data-node-id="tbl1"]')).boundingBox();
+    await page.mouse.click(tb.x + 10, tb.y + 8);
+    await sleep(300);
+    await page.waitForSelector('[data-testid="table-options"]');
+    await page.click('[data-testid="table-options"]');
+    await page.waitForSelector('[data-testid="table-menu"]');
+    const items = await page.$$('[data-testid="table-menu"] button');
+    for (const b of items) { if (/Excel/.test(await b.evaluate((n) => n.textContent))) { await b.click(); break; } }
+    const file = path.join(downloadDir, 'Risks.xlsx');
+    await waitFor(() => fs.existsSync(file) && fs.statSync(file).size > 0 && !fs.readdirSync(downloadDir).some((f) => f.endsWith('.crdownload')), 30000);
+    const buf = fs.readFileSync(file);
+    expect(buf.subarray(0, 2).toString()).toBe('PK');
+    const JSZip = require('jszip');
+    const zip = await JSZip.loadAsync(buf);
+    const sheet = await zip.file('xl/worksheets/sheet1.xml').async('string');
+    expect(sheet).toContain('<c r="B2"><v>3</v></c>');
+    expect(sheet).toContain('>=HYPERLINK(&quot;x&quot;)</t>');
+    expect(sheet).not.toMatch(/<f[ >/]/);
+    expect(await zip.file('xl/worksheets/_rels/sheet1.xml.rels').async('string')).toContain(`${BASE_URL}/diagram/${diagram.short_id}?focus=auth`);
+    expect(await zip.file('xl/workbook.xml').async('string')).toContain('name="Risks"');
+    if (SHOTS) fs.copyFileSync(file, path.join(SHOTS, 'sample-table.xlsx'));
+    await page.close();
+  });
 });

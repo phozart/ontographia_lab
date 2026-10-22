@@ -1,4 +1,4 @@
-# How to copy and export a doc (and copy a table)
+# How to copy and export a doc, copy a table, export to Excel, copy as image
 
 ## Copy a doc with formatting (Outlook, Word, Google Docs)
 
@@ -20,6 +20,16 @@ In the doc panel header (or the card's right-click menu): **.docx** (Word), **.p
 ## Copy a table
 
 Right-click the table and choose **Copy table with formatting** (or use the table's ⋯ menu, **Copy table (formatted)**). Paste into Excel or Google Sheets for cells, or into Word or Outlook for a bordered table. Text that a spreadsheet would read as a formula (starting with `=`, `+`, `-` or `@`) is pasted with a leading `'` so it is not evaluated.
+
+## Export a table to Excel
+
+Open the table's ⋯ menu and choose **Export as Excel (.xlsx)**. Numbers are numeric cells, booleans are TRUE/FALSE, everything else is text. The header row is bold and frozen, column widths follow the content, and the sheet is named after the table (at most 31 characters, characters Excel forbids replaced by spaces). Rows linked to a board element get an "Element link" column with a hyperlink to the full lab URL. No formulas are ever written: a cell such as `=SUM(A1)` stays literal text.
+
+## Copy as image
+
+Right-click an element, a table, a doc card or a frame (or the empty board) and choose **Copy as image**, or press **Cmd/Ctrl+Shift+C** with the canvas focused. With several elements selected the image covers the selection; with a frame selected, the frame; with nothing selected, the whole board. It is a PNG at 2x with a white background and a margin. If the browser cannot put images on the clipboard (for example Firefox), the PNG is downloaded instead and a message says so.
+
+**Shortcut conflict:** the same keys do two things depending on focus. Inside the doc panel (title or text field included) Cmd/Ctrl+Shift+C copies the doc with formatting; on the canvas it copies an image. Plain Cmd/Ctrl+C still copies elements, and nothing happens while you type in a field.
 
 ## Scrolling a long doc
 

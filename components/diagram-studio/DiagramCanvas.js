@@ -50,6 +50,7 @@ import { newTableElement } from './elements/table/newTableElement';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
 import { docDefaults } from '../../lib/doc/docElement';
 import { openDoc } from './elements/doc/docStore';
+import { copyAsImage } from './export/copyAsImage';
 import { copyDocElement, exportDocElement, copyTableElement } from './elements/doc/docActions';
 import { requestDocImportFromDrop } from './elements/doc/useDocImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
@@ -5035,7 +5036,10 @@ export default function DiagramCanvas({
       } else if (target?.type === 'table') {
         extra.push({ label: 'Copy table with formatting', action: 'table-copy', icon: '📋' });
       }
-      if (extra.length) menuItems = [...menuItems, ...(menuItems.length ? [{ type: 'divider' }] : []), ...extra];
+      extra.push({ label: target?.type === 'frame' || target?.isFrame ? 'Copy frame as image' : 'Copy as image', action: 'copy-image', icon: '🖼️', shortcut: '⇧⌘C' });
+      menuItems = [...menuItems, ...(menuItems.length ? [{ type: 'divider' }] : []), ...extra];
+    } else if (!connectionEl) {
+      menuItems = [...menuItems, { type: 'divider' }, { label: 'Copy board as image', action: 'copy-image', icon: '🖼️', shortcut: '⇧⌘C' }];
     }
 
     // AI-1: hand a selection / the visible region to Claude (works for every role, including read-only viewers)
@@ -5065,6 +5069,13 @@ export default function DiagramCanvas({
         if (action === 'doc-copy') copyDocElement(target, diagram);
         else if (action === 'table-copy') copyTableElement(target, diagram);
         else exportDocElement(action === 'doc-docx' ? 'docx' : 'pdf', target, diagram);
+        break;
+      }
+      case 'copy-image': {
+        // right-clicking inside the current selection copies the whole selection, otherwise just that element; none = board
+        const sel = selection?.nodeIds || [];
+        const ids = nodeId ? (sel.includes(nodeId) ? sel : [nodeId]) : [];
+        copyAsImage({ elements, connections, selection: { nodeIds: ids, connectionIds: [] }, name: diagram?.name });
         break;
       }
       case 'copy-claude-link':
@@ -5219,7 +5230,7 @@ export default function DiagramCanvas({
       default:
         break;
     }
-  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry, zoomToFitAll, resetZoom, onCopyClaudeLink, diagram]);
+  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry, zoomToFitAll, resetZoom, onCopyClaudeLink, diagram, selection]);
 
   // ============ RENDER ============
 
