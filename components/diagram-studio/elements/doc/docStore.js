@@ -36,6 +36,26 @@ export const followElementLink = (id) => {
   if (typeof followHandler === 'function') followHandler(id);
 };
 
+// ---- transient notice (copy / export results). One toast for the page; DocPanelHost renders it.
+let notice = null;
+let noticeTimer = null;
+const noticeListeners = new Set();
+const subscribeNotice = (l) => {
+  noticeListeners.add(l);
+  return () => noticeListeners.delete(l);
+};
+export function postDocNotice(text, kind = 'info') {
+  notice = { text: String(text), kind, id: Date.now() + Math.random() };
+  noticeListeners.forEach((l) => l());
+  if (noticeTimer) clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => {
+    notice = null;
+    noticeListeners.forEach((l) => l());
+  }, 4000);
+}
+export const getDocNotice = () => notice;
+export const useDocNotice = () => useSyncExternalStore(subscribeNotice, getDocNotice, () => null);
+
 /** Tests only. */
 export function resetDocStore() {
   openId = null;
