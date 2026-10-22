@@ -43,6 +43,7 @@ import { computeFitForCanvas } from './viewportFit';
 import { buildFocusLink, parseFocusLink, focusCoverageNote } from '../../lib/focusLink';
 import { initializeStencilStyles } from './styling/StencilStyleManager';
 import LoadingScreen from '../ui/LoadingScreen';
+import { fitElementsToText } from './text/fitActions';
 
 // Default settings (used before API response)
 // All packs enabled by default - users can customize via the "+N more" menu
@@ -114,7 +115,7 @@ function DiagramStudioInner({
   diagramName,
 }) {
   const { data: session } = useSession();
-  const { diagram, setDiagram, activePack, saveStatus, saveDiagram, elements, connections, addElement, addConnection, undo, redo, selectAll, clearSelection, deleteSelected, activeTool, setActiveTool, selectedStencil, setSelectedStencil, drawingTool, drawingColor, drawingStrokeWidth, isDragging, isRotating, stickyNoteColor } = useDiagram();
+  const { diagram, setDiagram, activePack, saveStatus, saveDiagram, elements, connections, addElement, updateElement, addConnection, undo, redo, selectAll, clearSelection, deleteSelected, activeTool, setActiveTool, selectedStencil, setSelectedStencil, drawingTool, drawingColor, drawingStrokeWidth, isDragging, isRotating, stickyNoteColor } = useDiagram();
   const { viewport, setViewport, zoomIn, zoomOut } = useDiagramViewport();
   useThumbnailCapture({
     diagramId: diagram?.id,
@@ -690,6 +691,12 @@ function DiagramStudioInner({
       case 'deselect':
         clearSelection?.();
         break;
+      case 'fit-selection-to-text':
+        if (!profile?.editingPolicy?.readOnly) fitElementsToText(selectedElements, packRegistry, updateElement);
+        break;
+      case 'fit-all-to-text':
+        if (!profile?.editingPolicy?.readOnly) fitElementsToText(elements, packRegistry, updateElement);
+        break;
       case 'delete':
         if (!profile?.editingPolicy?.readOnly) deleteSelected?.();
         break;
@@ -723,7 +730,7 @@ function DiagramStudioInner({
       default:
         break;
     }
-  }, [selectAll, clearSelection, deleteSelected, saveDiagram, handleExport, toggleCommentTool, shortcutsHelp, profile?.editingPolicy?.readOnly]);
+  }, [selectAll, clearSelection, deleteSelected, saveDiagram, handleExport, toggleCommentTool, shortcutsHelp, profile?.editingPolicy?.readOnly, selectedElements, elements, packRegistry, updateElement]);
 
   // Keyboard shortcuts
   useEffect(() => {

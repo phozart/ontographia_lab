@@ -28,10 +28,10 @@ import Minimap from './Minimap';
 import { resolveLabelColor, withAlpha } from './packs/colorUtils';
 import { resolveElementTokens } from '../../lib/present/themes';
 import { isPresetText } from '../../lib/present/textPreset';
-import { sizeAfterLabelEdit } from '../../lib/text/autoFit';
+import { sizeAfterLabelEdit, textFitAfterResize } from '../../lib/text/autoFit';
 import { ElementText } from './text/useTextLayout';
 import { policyFor, textBoxOf } from '../../lib/text/policy';
-import { fontOf } from '../../lib/text/fit';
+import { fontOf, sizeForStencilLabel } from '../../lib/text/fit';
 import { SmartRouter } from './routing/SmartRouter';
 import ConnectionToolbar from './ui/toolbar/ConnectionToolbar';
 import EmptyCanvasWelcome from './ui/EmptyCanvasWelcome';
@@ -2030,6 +2030,7 @@ export default function DiagramCanvas({
           x: newX,
           y: newY,
           size: { width: newWidth, height: newHeight },
+          ...(resizing.textFit !== undefined ? { textFit: resizing.textFit } : {}),
         }, { coalesceKey: `resize:${resizing.elementId}` }); // one undo entry per resize gesture
       }
     };
@@ -2978,6 +2979,7 @@ export default function DiagramCanvas({
         x: Math.max(0, newX),
         y: Math.max(0, newY),
         size: { width: newWidth, height: newHeight },
+        ...(resizing.textFit !== undefined ? { textFit: resizing.textFit } : {}),
       }, { coalesceKey: `resize:${elementId}` }); // one undo entry per resize gesture
       return;
     }
@@ -3115,7 +3117,8 @@ export default function DiagramCanvas({
         const pos = placeAtPoint({ x: drawing.startX, y: drawing.startY }, { width: DEFAULT_STICKY_SIZE, height: DEFAULT_STICKY_SIZE }, GRID_SIZE);
         placeSticky(pos.x, pos.y, DEFAULT_STICKY_SIZE);
       } else if (selectedStencil) {
-        const size = selectedStencil.defaultSize || DEFAULT_STENCIL_SIZE;
+        // ADR-0008: the size follows the default label (never below the stencil default)
+        const size = sizeForStencilLabel(selectedStencil.packId, selectedStencil, selectedStencil.defaultLabel ?? selectedStencil.name, DEFAULT_STENCIL_SIZE);
         const pos = placeAtPoint({ x: drawing.startX, y: drawing.startY }, size, GRID_SIZE);
         const newElement = {
           id: generateId('el'),
@@ -3518,6 +3521,8 @@ export default function DiagramCanvas({
             startSize: { ...size },
             startPos: { x: element.x, y: element.y },
             aspect: frameAspectOf(element), // ADR-0007: slide frames keep their ratio
+            // ADR-0008 resize rule: a width handle turns auto into auto-height, a height or corner handle turns it into fixed
+            textFit: textFitAfterResize(element.packId, stencil || { id: element.type }, element, direction),
           });
         }
       }
@@ -3802,9 +3807,10 @@ export default function DiagramCanvas({
         const stencil = pack?.stencils?.find(s => s.id === data.stencilId);
 
         if (stencil) {
-          // Center the element on the drop point
-          const snappedX = snapToGrid(x - (stencil.defaultSize?.width || 60) / 2);
-          const snappedY = snapToGrid(y - (stencil.defaultSize?.height || 30) / 2);
+          // Center the element on the drop point (the size follows the default label, ADR-0008)
+          const dropSize = sizeForStencilLabel(data.packId || activePack, stencil, stencil.defaultLabel ?? stencil.name);
+          const snappedX = snapToGrid(x - dropSize.width / 2);
+          const snappedY = snapToGrid(y - dropSize.height / 2);
 
           const dropped = addElement({
             type: stencil.id,
@@ -3813,7 +3819,7 @@ export default function DiagramCanvas({
             label: stencil.defaultLabel ?? stencil.name,
             x: snappedX, // Allow any coordinate on infinite canvas
             y: snappedY,
-            size: stencil.defaultSize || { width: 120, height: 60 },
+            size: dropSize,
             color: stencil.color,
             ...docDefaults(stencil),
           });

@@ -14,8 +14,6 @@ export function useTextPolicy(element, stencil, override, packIdFallback) {
   return useMemo(() => override || policyFor(packId, stencil || { id }), [packId, stencil, id, override]);
 }
 
-const KEYS = (el) => [labelOf(el), el?.size?.width, el?.size?.height, el?.fontSize, el?.fontWeight, el?.fontFamily, el?.textAlign, el?.verticalAlign, el?.textFit];
-
 /**
  * @param {'inside'|'external'|'title'} kind
  * @returns {{layout: object, box: object, policy: object}}
@@ -23,11 +21,10 @@ const KEYS = (el) => [labelOf(el), el?.size?.width, el?.size?.height, el?.fontSi
 export function useTextLayout(element, stencil, kind = 'inside', text, policyOverride, packIdFallback) {
   const policy = useTextPolicy(element, stencil, policyOverride, packIdFallback);
   const t = text === undefined ? labelOf(element) : text;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => {
     const r = kind === 'external' ? layoutForExternal(element, policy, t) : kind === 'title' ? layoutForTitle(element, policy, t) : layoutForElement(element, policy, t);
     return { ...r, policy };
-  }, [policy, kind, t, ...KEYS(element)]);
+  }, [policy, kind, t, element]);
 }
 
 /**

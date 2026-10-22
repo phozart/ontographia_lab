@@ -3,6 +3,7 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useDiagram, useDiagramSelection } from './DiagramContext';
+import { sizeForStencilLabel } from '../../lib/text/fit';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import SearchIcon from '@mui/icons-material/Search';
@@ -215,7 +216,7 @@ export default function LeftPalette({
         label: stencil.name,
         x: 100 + Math.random() * 200,
         y: 100 + Math.random() * 200,
-        size: stencil.defaultSize || { width: 120, height: 60 },
+        size: sizeForStencilLabel(packId, stencil, stencil.name),
         color: stencil.color,
       };
       addElement(newElement);
