@@ -55,6 +55,9 @@ const SINGLE_BOARD = {
   slide_remove: { kind: 'write', args: { id: A, baseRevision: 7, presentationId: 'pres-1', slideId: 'sl-1' } },
   slide_update: { kind: 'write', args: { id: A, baseRevision: 7, presentationId: 'pres-1', slideId: 'sl-1', notes: 'Say hello' } },
   presentation_get: { kind: 'read', args: { id: A, presentationId: 'pres-1' } },
+  // ADR-0007 P2
+  text_add: { kind: 'write', args: { id: A, baseRevision: 7, markdown: 'Hello', preset: 'body', anchor: { at: { x: 0, y: 0 } } } },
+  theme_apply: { kind: 'write', args: { id: A, baseRevision: 7, preset: 'paper' } },
   table_get: { kind: 'read', setup: 'table', args: (tbl) => ({ id: A, elementId: tbl }) },
 };
 const SETUP = {

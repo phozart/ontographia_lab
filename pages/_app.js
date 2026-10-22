@@ -5,6 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { SessionProvider } from 'next-auth/react';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { ToastProvider } from '../components/ui/ToastProvider';
+import '../styles/fonts.css';
 import '../styles/globals.css';
 import '../styles/diagram-studio.css';
 import '../styles/diagram-studio-tokens.css';

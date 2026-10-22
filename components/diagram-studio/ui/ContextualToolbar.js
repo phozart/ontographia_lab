@@ -7,6 +7,7 @@ import { useFloatingPlacement, placePopoverElement } from './positioning';
 import { generateId } from '../utils/ids';
 import { useDiagram, useDiagramSelection } from '../DiagramContext';
 import SlideFrameActions from '../present/SlideFrameActions';
+import { alignToSlide, slideFrameOf } from '../../../lib/present/alignToSlide';
 import {
   COLOR_PALETTE,
   COLOR_PRESETS,
@@ -52,64 +53,28 @@ import ContentPasteIcon from '@mui/icons-material/ContentPaste';
 import FormatPaintIcon from '@mui/icons-material/FormatPaint';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import { FONT_STACKS } from '../../../lib/present/themes';
 import PhotoSizeSelectSmallIcon from '@mui/icons-material/PhotoSizeSelectSmall';
 import RotateLeftIcon from '@mui/icons-material/RotateLeft';
 import RotateRightIcon from '@mui/icons-material/RotateRight';
 
-// Font family options - Business, Professional, and Decorative fonts
+// Font family options: the closed list of self-hosted OFL fonts (public/fonts, styles/fonts.css; ADR-0007 Q-P11) plus
+// the system stacks. Nothing is loaded from a font CDN. Elements that stored another family keep their CSS stack and fall
+// back to the generic family at the end of it.
 const FONT_FAMILIES = [
-  // System/Default
   { id: 'system', name: 'System Default', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', category: 'System' },
-
-  // Professional/Business Sans-Serif
-  { id: 'inter', name: 'Inter', value: '"Inter", sans-serif', category: 'Business', google: 'Inter:wght@400;500;600;700' },
-  { id: 'roboto', name: 'Roboto', value: '"Roboto", sans-serif', category: 'Business', google: 'Roboto:wght@400;500;700' },
-  { id: 'open-sans', name: 'Open Sans', value: '"Open Sans", sans-serif', category: 'Business', google: 'Open+Sans:wght@400;500;600;700' },
-  { id: 'lato', name: 'Lato', value: '"Lato", sans-serif', category: 'Business', google: 'Lato:wght@400;700;900' },
-  { id: 'montserrat', name: 'Montserrat', value: '"Montserrat", sans-serif', category: 'Business', google: 'Montserrat:wght@400;500;600;700;800' },
-  { id: 'poppins', name: 'Poppins', value: '"Poppins", sans-serif', category: 'Business', google: 'Poppins:wght@400;500;600;700;800' },
-  { id: 'nunito', name: 'Nunito', value: '"Nunito", sans-serif', category: 'Business', google: 'Nunito:wght@400;600;700;800' },
-  { id: 'source-sans', name: 'Source Sans 3', value: '"Source Sans 3", sans-serif', category: 'Business', google: 'Source+Sans+3:wght@400;500;600;700' },
-  { id: 'work-sans', name: 'Work Sans', value: '"Work Sans", sans-serif', category: 'Business', google: 'Work+Sans:wght@400;500;600;700;800' },
-  { id: 'dm-sans', name: 'DM Sans', value: '"DM Sans", sans-serif', category: 'Business', google: 'DM+Sans:wght@400;500;600;700' },
-
-  // Professional Serif
-  { id: 'playfair', name: 'Playfair Display', value: '"Playfair Display", serif', category: 'Elegant', google: 'Playfair+Display:wght@400;500;600;700;800' },
-  { id: 'merriweather', name: 'Merriweather', value: '"Merriweather", serif', category: 'Elegant', google: 'Merriweather:wght@400;700;900' },
-  { id: 'lora', name: 'Lora', value: '"Lora", serif', category: 'Elegant', google: 'Lora:wght@400;500;600;700' },
-  { id: 'pt-serif', name: 'PT Serif', value: '"PT Serif", serif', category: 'Elegant', google: 'PT+Serif:wght@400;700' },
-  { id: 'libre-baskerville', name: 'Libre Baskerville', value: '"Libre Baskerville", serif', category: 'Elegant', google: 'Libre+Baskerville:wght@400;700' },
-
-  // Bold/Impact Fonts for Titles
-  { id: 'oswald', name: 'Oswald', value: '"Oswald", sans-serif', category: 'Impact', google: 'Oswald:wght@400;500;600;700' },
-  { id: 'bebas-neue', name: 'Bebas Neue', value: '"Bebas Neue", sans-serif', category: 'Impact', google: 'Bebas+Neue' },
-  { id: 'anton', name: 'Anton', value: '"Anton", sans-serif', category: 'Impact', google: 'Anton' },
-  { id: 'archivo-black', name: 'Archivo Black', value: '"Archivo Black", sans-serif', category: 'Impact', google: 'Archivo+Black' },
-  { id: 'black-ops-one', name: 'Black Ops One', value: '"Black Ops One", sans-serif', category: 'Impact', google: 'Black+Ops+One' },
-  { id: 'righteous', name: 'Righteous', value: '"Righteous", sans-serif', category: 'Impact', google: 'Righteous' },
-  { id: 'russo-one', name: 'Russo One', value: '"Russo One", sans-serif', category: 'Impact', google: 'Russo+One' },
-  { id: 'alfa-slab', name: 'Alfa Slab One', value: '"Alfa Slab One", serif', category: 'Impact', google: 'Alfa+Slab+One' },
-  { id: 'titan-one', name: 'Titan One', value: '"Titan One", sans-serif', category: 'Impact', google: 'Titan+One' },
-  { id: 'bungee', name: 'Bungee', value: '"Bungee", sans-serif', category: 'Impact', google: 'Bungee' },
-
-  // Creative/Decorative
-  { id: 'pacifico', name: 'Pacifico', value: '"Pacifico", cursive', category: 'Creative', google: 'Pacifico' },
-  { id: 'lobster', name: 'Lobster', value: '"Lobster", cursive', category: 'Creative', google: 'Lobster' },
-  { id: 'satisfy', name: 'Satisfy', value: '"Satisfy", cursive', category: 'Creative', google: 'Satisfy' },
-  { id: 'permanent-marker', name: 'Permanent Marker', value: '"Permanent Marker", cursive', category: 'Creative', google: 'Permanent+Marker' },
-  { id: 'bangers', name: 'Bangers', value: '"Bangers", cursive', category: 'Creative', google: 'Bangers' },
-  { id: 'fredoka', name: 'Fredoka', value: '"Fredoka", sans-serif', category: 'Creative', google: 'Fredoka:wght@400;500;600;700' },
-  { id: 'comfortaa', name: 'Comfortaa', value: '"Comfortaa", cursive', category: 'Creative', google: 'Comfortaa:wght@400;500;600;700' },
-  { id: 'caveat', name: 'Caveat', value: '"Caveat", cursive', category: 'Creative', google: 'Caveat:wght@400;500;600;700' },
-
-  // Monospace
-  { id: 'fira-code', name: 'Fira Code', value: '"Fira Code", monospace', category: 'Monospace', google: 'Fira+Code:wght@400;500;600;700' },
-  { id: 'jetbrains-mono', name: 'JetBrains Mono', value: '"JetBrains Mono", monospace', category: 'Monospace', google: 'JetBrains+Mono:wght@400;500;600;700' },
-  { id: 'source-code', name: 'Source Code Pro', value: '"Source Code Pro", monospace', category: 'Monospace', google: 'Source+Code+Pro:wght@400;500;600;700' },
+  { id: 'inter', name: 'Inter', value: FONT_STACKS.inter, category: 'Business' },
+  { id: 'ibm-plex-sans', name: 'IBM Plex Sans', value: FONT_STACKS['ibm-plex-sans'], category: 'Business' },
+  { id: 'lato', name: 'Lato', value: FONT_STACKS.lato, category: 'Business' },
+  { id: 'montserrat', name: 'Montserrat', value: FONT_STACKS.montserrat, category: 'Business' },
+  { id: 'source-serif-4', name: 'Source Serif 4', value: FONT_STACKS['source-serif-4'], category: 'Elegant' },
+  { id: 'georgia', name: 'Georgia', value: 'Georgia, "Times New Roman", serif', category: 'Elegant' },
+  { id: 'ibm-plex-mono', name: 'IBM Plex Mono', value: FONT_STACKS['ibm-plex-mono'], category: 'Monospace' },
+  { id: 'system-mono', name: 'System Mono', value: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace', category: 'Monospace' },
 ];
 
 // Group fonts by category for the picker UI
-const FONT_CATEGORIES = ['System', 'Business', 'Elegant', 'Impact', 'Creative', 'Monospace'];
+const FONT_CATEGORIES = ['System', 'Business', 'Elegant', 'Monospace'];
 
 // Style variant icon component
 const VariantIcon = ({ variant, size = 16 }) => {
@@ -160,21 +125,10 @@ const VariantIcon = ({ variant, size = 16 }) => {
 let styleClipboard = null;
 
 // Track loaded Google Fonts to avoid duplicate loading
-const loadedFonts = new Set();
 
 // Load a Google Font dynamically
-function loadGoogleFont(fontDef) {
-  if (!fontDef.google || loadedFonts.has(fontDef.id)) return;
-
-  loadedFonts.add(fontDef.id);
-  const link = document.createElement('link');
-  link.href = `https://fonts.googleapis.com/css2?family=${fontDef.google}&display=swap`;
-  link.rel = 'stylesheet';
-  document.head.appendChild(link);
-}
-
 export default function ContextualToolbar({ viewport, packRegistry, containerRef, onClose, onEditLabel }) {
-  const { elements, addElement, updateElement, deleteSelected, duplicateSelected } = useDiagram();
+  const { elements, layers, addElement, updateElement, deleteSelected, duplicateSelected } = useDiagram();
   const { selectedIds, selectedElements, clearSelection } = useDiagramSelection();
 
   // State for style popovers
@@ -267,13 +221,6 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
     return FONT_FAMILIES.find(f => f.value === currentStyles.fontFamily) || FONT_FAMILIES[0];
   }, [currentStyles.fontFamily]);
 
-  // Load font when it changes
-  useEffect(() => {
-    if (currentFontDef && currentFontDef.google) {
-      loadGoogleFont(currentFontDef);
-    }
-  }, [currentFontDef]);
-
   // Check if selected elements support style variants (rect-based stencils)
   const supportsStyleVariants = useMemo(() => {
     if (!selectedElements?.length || !packRegistry) return false;
@@ -322,7 +269,6 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
 
   // Font family change
   const handleFontFamilyChange = useCallback((fontDef) => {
-    loadGoogleFont(fontDef);
     handleStyleChange('fontFamily', fontDef.value);
     setShowFontPicker(false);
   }, [handleStyleChange]);
@@ -793,6 +739,13 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
       (el.scaleY !== undefined && el.scaleY !== 1)
     );
   }, [selectedElements]);
+
+  // ADR-0007 P2: align to the slide frame that holds the selection (works for one element too)
+  const slideFrame = useMemo(() => slideFrameOf(elements || [], (selectedElements || []).map((e) => e.id)), [elements, selectedElements]);
+  const alignToSlideMode = useCallback((mode) => {
+    if (!slideFrame) return;
+    for (const { id, ...update } of alignToSlide(selectedElements || [], slideFrame, mode, { layers })) updateElement(id, update);
+  }, [slideFrame, selectedElements, layers, updateElement]);
 
   // Alignment functions
   const alignElements = useCallback((alignment) => {
@@ -1577,7 +1530,7 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
                         key={font.id}
                         className={`ds-ct-font-option ${currentFontDef?.id === font.id ? 'active' : ''}`}
                         onClick={() => handleFontFamilyChange(font)}
-                        onMouseEnter={() => loadGoogleFont(font)}
+                       
                         style={{ fontFamily: font.value }}
                       >
                         {font.name}
@@ -1831,6 +1784,25 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
               <FlipToBackIcon fontSize="small" />
               <span>Send to back</span>
             </button>
+
+            {slideFrame && (
+              <>
+                <div className="ds-ct-overflow-divider" />
+                <div className="ds-ct-overflow-section" data-testid="align-to-slide">
+                  <span className="ds-ct-overflow-label">Align to slide</span>
+                  <div className="ds-ct-overflow-grid">
+                    {[['left', 'Left', FormatAlignLeftIcon], ['center-h', 'Centre horizontally', FormatAlignCenterIcon], ['right', 'Right', FormatAlignRightIcon], ['top', 'Top', VerticalAlignTopIcon], ['center-v', 'Centre vertically', VerticalAlignCenterIcon], ['bottom', 'Bottom', VerticalAlignBottomIcon]].map(([mode, label, Icon]) => (
+                      <button key={mode} className="ds-ct-btn" data-testid={`align-slide-${mode}`} onClick={() => { alignToSlideMode(mode); setShowOverflowMenu(false); }} title={`Align ${label.toLowerCase()} in slide`} aria-label={`Align ${label.toLowerCase()} in slide`}>
+                        <Icon fontSize="small" />
+                      </button>
+                    ))}
+                    <button className="ds-ct-btn" data-testid="align-slide-center" onClick={() => { alignToSlideMode('center'); setShowOverflowMenu(false); }} title="Centre in slide" aria-label="Centre in slide">
+                      <span style={{ fontSize: 11, fontWeight: 600 }}>Centre</span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Alignment (only show for multiple selection) */}
             {multipleSelected && (

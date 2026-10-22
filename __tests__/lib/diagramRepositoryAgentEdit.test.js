@@ -251,6 +251,45 @@ dbDescribe('diagramRepository.applyContentChange (throwaway database)', () => {
     expect((await head(id)).content.presentations || []).toEqual([]);
   });
 
+  test('P2 tools (theme, layouts and blocks, text) through the same path: one agent version and one audit row per call, restore brings back the old theme', async () => {
+    const { compilePresentationCreate } = require('../../lib/mcp/deckTools');
+    const { compileNewSlides, compileTextAdd, compileThemeApply } = require('../../lib/mcp/slideCompose');
+    const id = await newDiagram({ ...content(['a']), elements: [{ id: 'a', type: 'rectangle', packId: 'core', x: 0, y: 0, size: { width: 300, height: 200 }, label: 'A' }] });
+    const tokenId = crypto.randomUUID();
+    const via = { ...actor(), tokenId };
+    const run = (expectedRevision, tool, compute) => repo.applyContentChange(id, { expectedRevision, userId: user.id, actor: via, tool, compute });
+
+    const made = await run(0, 'presentation_create', (c) => compilePresentationCreate(c, { title: 'Deck' }));
+    const presentationId = made.result.presentationId;
+    const themed = await run(1, 'theme_apply', (c) => compileThemeApply(c, { preset: 'paper' }));
+    expect(themed.status).toBe('ok');
+    expect((await head(id)).content.theme.preset).toBe('paper');
+    const slides = await run(2, 'slide_add', (c) => compileNewSlides(c, { presentationId, revision: 2, slides: [{ title: 'Hello', layout: 'two-column', blocks: [{ slot: 'left', copy: { elementIds: ['a'] } }, { slot: 'right', text: { markdown: '- one\n- two' } }] }] }));
+    expect(slides.status).toBe('ok');
+    const stored = (await head(id)).content;
+    expect(stored.presentations[0].slides).toHaveLength(1);
+    expect(stored.elements.filter((e) => e.origin?.copiedFrom).length).toBe(1);
+    const txt = await run(3, 'text_add', (c) => compileTextAdd(c, { markdown: 'Caption', preset: 'caption', anchor: { near: 'a' } }));
+    expect(txt.status).toBe('ok');
+    // refused calls write nothing: no version, no audit row, revision unchanged
+    const refused = await run(4, 'slide_add', (c) => compileNewSlides(c, { presentationId, revision: 4, slides: [{ title: 'x', layout: 'carousel' }] }));
+    expect(refused.status).toBe('rejected');
+    const bad = await run(4, 'theme_apply', (c) => compileThemeApply(c, { preset: 'neon' }));
+    expect(bad.status).toBe('rejected');
+    expect((await head(id)).rev).toBe(4);
+
+    const v = await vers(id);
+    expect(v.filter((x) => x.via === 'agent')).toHaveLength(4);
+    const audit = (await pg.query("select target from audit_events where diagram_id=$1 and action='diagram.agent_edit' order by occurred_at, id", [id])).rows;
+    expect(audit.map((r) => r.target.tool)).toEqual(['presentation_create', 'theme_apply', 'slide_add', 'text_add']);
+    expect(JSON.stringify(audit)).not.toContain('Caption'); // slide text is content, never in the audit row
+
+    // restoring the version made before the theme brings the default theme back
+    const beforeTheme = v.find((x) => x.via === 'agent' && !(x.content.theme));
+    await versions.restore(id, beforeTheme.n, { userId: user.id, email: user.email, via: 'web' });
+    expect((await head(id)).content.theme).toBeUndefined();
+  });
+
   test('an open editor saving with the old revision after an agent write gets the normal CAS miss (409 flow)', async () => {
     const id = await newDiagram();
     await repo.applyContentChange(id, { expectedRevision: 0, userId: user.id, actor: actor(), compute: (c) => add({ content: c }) });

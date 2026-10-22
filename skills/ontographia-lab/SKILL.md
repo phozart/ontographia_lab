@@ -83,7 +83,7 @@ The typical run is: map the text, tabulate or cluster it, then write the finding
 6. Tell the user what they can do with it: in the lab, the doc panel (and the card's right-click menu) has **Copy** (formatted, to paste into Outlook or Word; Cmd/Ctrl+Shift+C), **.docx**, **.pdf** and **.md**; a table has right-click **Copy table with formatting** (pastes as cells into Excel or Sheets) and **Export as Excel (.xlsx)** in its ⋯ menu; right-click any element, frame or the empty board for **Copy as image** (Cmd/Ctrl+Shift+C on the canvas) to paste a picture into a mail or chat. You cannot copy or export for them; just say where the buttons are.
    The server also offers the prompt `summarize_region` (link + optional focus).
 
-### 6c. "Make a presentation from these frames"
+### 6c. "Make a presentation from these frames" (and "build a deck from this board")
 
 A slide is a frame that already exists on the board; a deck (presentation) is an ordered list of them plus speaker notes. The owner presents it full screen and exports PDF/PNG from the editor (Menu, Presentation); you build and order it.
 
@@ -92,6 +92,13 @@ A slide is a frame that already exists on the board; a deck (presentation) is an
 3. Speaker notes with `slide_update {slideId, notes}`; `hidden: true` skips a slide. `slide_reorder` takes every `slideId` once; `slide_remove` only drops the slide (the frame stays) unless `deleteFrame`.
 4. A locked frame can be added as a slide (read-only reference); `fitAspect` and `deleteFrame` are refused on it. `presentation_get` pages long decks (`next` is the next `offset`), cuts notes to 500 characters, and `slideId` returns one slide with its full notes.
 5. Tell the user to open Menu, Presentation and press Present (arrow keys, Esc to leave) or Export PDF. You cannot start the show or download files. Ids and revisions come from the tool results; never invent them.
+
+**Presentable out of the box (themes, text presets, layouts).** To build slides rather than reference frames: `theme_apply {preset}` once (`ethereal-sky` default, `paper`, `slate-dark`, `contrast`), then one `slide_add {presentationId, slides: [{title, layout, blocks, notes}]}` with up to 40 slides in a single saved version.
+- Layouts (slots): `title` (title, subtitle: the cover), `title-body` (title, body), `two-column` (title, left, right), `three-column` (title, c1, c2, c3), `title-visual` (title, visual), `visual-caption` (visual, caption), `big-number` (number, label, body), `blank` (full). Each slot has a typography preset; blocks without a `slot` fill the free slots in order.
+- Blocks: `{text: {markdown, preset?}}` (presets `title`, `subtitle`, `heading`, `body`, `caption`, `quote`, `number`; Markdown inline subset only, no HTML), `{copy: {elementIds | frameId}}` (a SNAPSHOT of board content scaled into the slot, with `origin.copiedFrom`; never above 1.5x, refused below 0.35x with advice to give it its own slide), `{table: {columns, rows}}`.
+- Side by side = `two-column` with a `copy` block left and a `text` block right. A KPI = `big-number`. Keep one idea per slide, at most 6 bullets; read `warnings` (a text that does not fit its slot is reported, never clipped).
+- `text_add` adds one styled text on the board or `inSlide {presentationId, slideId, slot}`; `slide_update {layout?, blocks?, title?}` re-composes only what the tools placed. Check two or three slides with `diagram_show` focusing the slide frame before you hand over.
+- Copy, do not move, the owner's working material; slide text is a snapshot, so later board edits do not change it.
 
 ### 6. "Show me the board"
 
@@ -124,7 +131,7 @@ A slide is a frame that already exists on the board; a deck (presentation) is an
 
 ## Not available (do not promise)
 
-Long-form text goes in a doc and matrices in a table. Tables have no formulas, no `date` column type and no connectors to single rows (a connector attaches to the whole table). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Decks (`presentation_create` and friends) only reference frames that already exist: there are no slide layouts, text boxes, themes, images, charts or PPTX export yet, `diagram_show` has no per-slide view, and presenting and exporting happen in the editor, not through you. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
+Long-form text goes in a doc and matrices in a table. Tables have no formulas, no `date` column type and no connectors to single rows (a connector attaches to the whole table). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Decks (`presentation_create` and friends) have layouts, text presets, one board theme and copy blocks, but no images, icons, charts or PPTX export yet, `diagram_show` has no per-slide view (focus the slide's frame), and presenting and exporting happen in the editor, not through you. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
 
 ## Reading large boards
 

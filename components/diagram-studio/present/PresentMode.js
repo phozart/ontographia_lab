@@ -11,23 +11,21 @@ import CloseIcon from '@mui/icons-material/Close';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import NotesIcon from '@mui/icons-material/Notes';
 import { buildExportHost } from '../export/captureCanvas';
+import { frameBackground } from '../../../lib/present/themes';
 import { pruneToFrame } from './slideClone';
 import { actionForKey, actionForClick, actionForSwipe, moveIndex } from './presentKeys';
 
 const HIDE_CONTROLS_MS = 2000;
 const FOCUSABLE = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-const backgroundOf = (frame) => {
-  const c = frame?.data?.backgroundColor;
-  return typeof c === 'string' && c && c !== 'transparent' ? c : '#ffffff';
-};
+const backgroundOf = frameBackground;
 
 /**
  * @param {{slides: Array<{slideId: string, frameId: string, frame: object, title: string, notes: string}>,
  *          deckTitle: string, index: number, onIndexChange: (i: number) => void, onExit: () => void,
  *          elements: object[], connections: object[]}} props
  */
-export default function PresentMode({ slides, deckTitle, index, onIndexChange, onExit, elements, connections }) {
+export default function PresentMode({ slides, deckTitle, index, onIndexChange, onExit, elements, connections, theme }) {
   const count = slides.length;
   const slide = slides[Math.min(index, Math.max(0, count - 1))] || null;
   const rootRef = useRef(null);
@@ -207,7 +205,7 @@ export default function PresentMode({ slides, deckTitle, index, onIndexChange, o
           ref={stageRef}
           className="ds-present-stage"
           data-testid="present-stage"
-          style={{ width: fw * scale, height: fh * scale, background: backgroundOf(slide.frame), visibility: black ? 'hidden' : 'visible' }}
+          style={{ width: fw * scale, height: fh * scale, background: backgroundOf(slide.frame, theme), visibility: black ? 'hidden' : 'visible' }}
         />
       ) : (
         <p className="ds-present-empty">There are no slides to present. Add slides to the presentation, or show hidden ones.</p>

@@ -10,6 +10,7 @@ import { clampPixelRatio } from '../export/exportUtils';
 import { sanitizeFilename } from '../export/diagramJson';
 import { nextFrames } from '../export/exportRenderer';
 import { pruneToFrame } from './slideClone';
+import { frameBackground } from '../../../lib/present/themes';
 
 export const PDF_WARN_SLIDES = 100; // the panel asks before exporting more than this
 
@@ -30,19 +31,16 @@ export function pdfPageSize(frameWidth, frameHeight) {
   return { width, height: Math.round(width / ratio) };
 }
 
-const backgroundOf = (frame) => {
-  const c = frame?.data?.backgroundColor;
-  return typeof c === 'string' && c && c !== 'transparent' ? c : '#ffffff';
-};
+const backgroundOf = frameBackground;
 
-async function captureSlide(htmlToImage, slide, { elements, connections, fontEmbedCSS, scale }) {
+async function captureSlide(htmlToImage, slide, { elements, connections, fontEmbedCSS, scale, theme }) {
   const { host, bounds, cleanup } = buildExportHost({ scope: 'frame', frame: slide.frame, elements, connections, padding: 0, background: 'white' });
   try {
     pruneToFrame(host, slide.frame);
     if (typeof document !== 'undefined' && document.fonts?.ready) await document.fonts.ready;
     const pixelRatio = clampPixelRatio(bounds.width, bounds.height, scale);
     const dataUrl = await htmlToImage.toPng(host, {
-      width: bounds.width, height: bounds.height, pixelRatio, backgroundColor: backgroundOf(slide.frame), cacheBust: false, fontEmbedCSS,
+      width: bounds.width, height: bounds.height, pixelRatio, backgroundColor: backgroundOf(slide.frame, theme), cacheBust: false, fontEmbedCSS,
     });
     return { dataUrl, width: bounds.width, height: bounds.height };
   } finally {
@@ -63,7 +61,7 @@ function dataUrlToBlob(dataUrl) {
  *          title: string, scale?: number, signal?: AbortSignal, onProgress?: (done: number, total: number) => void}} p
  * @returns {Promise<{format: 'pdf', content: Blob, mimeType: string, filename: string, pages: number}>}
  */
-export async function exportDeckPdf({ slides, elements, connections, title, scale = scaleForSlides(slides.length), signal, onProgress }) {
+export async function exportDeckPdf({ slides, elements, connections, title, theme, scale = scaleForSlides(slides.length), signal, onProgress }) {
   if (!slides.length) throw new Error('There are no slides to export. Add slides, or show hidden ones.');
   const htmlToImage = await import('html-to-image');
   const { jsPDF } = await import('jspdf');
@@ -72,7 +70,7 @@ export async function exportDeckPdf({ slides, elements, connections, title, scal
   for (let i = 0; i < slides.length; i += 1) {
     if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
     onProgress?.(i, slides.length);
-    const shot = await captureSlide(htmlToImage, slides[i], { elements, connections, fontEmbedCSS, scale });
+    const shot = await captureSlide(htmlToImage, slides[i], { elements, connections, fontEmbedCSS, scale, theme });
     const page = pdfPageSize(shot.width, shot.height);
     if (!doc) {
       doc = new jsPDF({ orientation: page.width >= page.height ? 'landscape' : 'portrait', unit: 'pt', format: [page.width, page.height], compress: true });
@@ -90,10 +88,10 @@ export async function exportDeckPdf({ slides, elements, connections, title, scal
 }
 
 /** One slide as a PNG (2x by default, clamped like every export). */
-export async function exportSlidePng({ slide, elements, connections, title, scale = 2, number }) {
+export async function exportSlidePng({ slide, elements, connections, title, theme, scale = 2, number }) {
   const htmlToImage = await import('html-to-image');
   const fontEmbedCSS = await getFontEmbedCSS();
-  const shot = await captureSlide(htmlToImage, slide, { elements, connections, fontEmbedCSS, scale });
+  const shot = await captureSlide(htmlToImage, slide, { elements, connections, fontEmbedCSS, scale, theme });
   const suffix = number ? `-slide-${number}` : '-slide';
   return { format: 'png', content: dataUrlToBlob(shot.dataUrl), mimeType: 'image/png', filename: `${sanitizeFilename(title, 'presentation')}${suffix}.png`, width: shot.width, height: shot.height };
 }

@@ -60,11 +60,12 @@ export default function DocCard({ element }) {
   const collapsed = doc.collapsed === true;
   const lines = Number.isInteger(doc.excerptLines) ? doc.excerptLines : DEFAULT_EXCERPT_LINES;
 
+  const isFull = doc.display === 'full'; // ADR-0007 P2: the text alone, without the card chrome (slide prose)
   const selected = Boolean(ctx.selection?.nodeIds?.includes(element.id));
   // Only a selected or pointed-at card renders its full body (20k chars / 150 blocks); the rest keep the cheap 4k excerpt, so a
   // board with dozens of long docs stays light. Hover is sticky until the pointer leaves.
   const [hovered, setHovered] = useState(false);
-  const full = selected || hovered;
+  const fullRender = selected || hovered;
   const scrollerRef = useRef(null);
   const [more, setMore] = useState(false); // is there more text below the visible part
 
@@ -92,7 +93,7 @@ export default function DocCard({ element }) {
       el.removeEventListener('wheel', onWheel);
       ro?.disconnect();
     };
-  }, [measure, collapsed, markdown, full]);
+  }, [measure, collapsed, markdown, fullRender]);
 
   // Keyed on the id list, not the elements array, so moving or editing an element does not rebuild it (and re-render bodies).
   const idSig = (elements || []).map((e) => e.id).join('\u0001');
@@ -115,8 +116,15 @@ export default function DocCard({ element }) {
   );
 
   return (
-    <div style={S.card} data-testid="doc-card" data-doc-id={element.id} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <div style={S.bar}>
+    <div
+      style={isFull ? { ...S.card, background: 'transparent', border: 0, boxShadow: 'none', borderRadius: 0, overflow: 'visible', color: ctx.theme?.palette?.text || 'inherit' } : S.card}
+      data-testid="doc-card"
+      data-display={isFull ? 'full' : 'card'}
+      data-doc-id={element.id}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {!isFull && <div style={S.bar}>
         <DocIcon />
         <div style={S.title} title={title}>{title}</div>
         {editable && (
@@ -127,18 +135,18 @@ export default function DocCard({ element }) {
         <button type="button" style={S.btn} onMouseDown={stop} onClick={(e) => { e.stopPropagation(); openDoc(element.id); }} aria-label="Open doc" title={editable ? 'Open and edit' : 'Open'}>
           <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M5 2H2v10h10V9M8 2h4v4M12 2L6.5 7.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
-      </div>
-      {!collapsed && (
-        <div style={S.body} data-excerpt-lines={lines}>
-          <div ref={scrollerRef} style={S.scroller} data-testid="doc-card-scroll" data-more={more ? 'true' : 'false'} onScroll={measure}>
+      </div>}
+      {(!collapsed || isFull) && (
+        <div style={isFull ? { ...S.body, overflow: 'visible' } : S.body} data-excerpt-lines={lines}>
+          <div ref={scrollerRef} style={isFull ? { ...S.scroller, padding: 0, overflow: 'visible' } : S.scroller} data-testid="doc-card-scroll" data-more={more ? 'true' : 'false'} onScroll={measure}>
             {markdown.trim() ? (
-              <DocMarkdown markdown={markdown} knownIds={knownIds} onElementLink={followElementLink} maxChars={full ? 20000 : 4000} maxBlocks={full ? 150 : 14} />
+              <DocMarkdown markdown={markdown} knownIds={knownIds} onElementLink={followElementLink} maxChars={fullRender || isFull ? 20000 : 4000} maxBlocks={fullRender || isFull ? 150 : 14} baseSize={isFull ? (Number.isFinite(element.fontSize) ? element.fontSize : 20) : undefined} />
             ) : (
               <div style={S.empty}>{editable ? 'Empty doc. Double-click to write.' : 'Empty doc.'}</div>
             )}
             <div style={{ height: 12 }} />
           </div>
-          {more && <div style={S.fade} data-testid="doc-card-fade" />}
+          {more && !isFull && <div style={S.fade} data-testid="doc-card-fade" />}
         </div>
       )}
     </div>

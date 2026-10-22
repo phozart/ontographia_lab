@@ -22,13 +22,8 @@ export default function Document() {
         <meta name="theme-color" content="#0d0d1a" />
         <meta name="msapplication-TileColor" content="#7A8EE8" />
 
-        {/* Fonts */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=TASA+Explorer:wght@400..800&display=swap"
-          rel="stylesheet"
-        />
+        {/* Fonts are self-hosted (styles/fonts.css, public/fonts): no request to a font CDN */}
+        <link rel="preload" href="/fonts/inter-latin-400-normal.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </Head>
       <body>
         <Main />

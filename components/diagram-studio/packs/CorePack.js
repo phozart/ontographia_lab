@@ -5,6 +5,8 @@ import React from 'react';
 import { stencils, connectionTypes } from './catalog/core';
 import TableNode from '../elements/table/TableNode';
 import DocCard from '../elements/doc/DocCard';
+import TextPresetNode from '../elements/text/TextPresetNode';
+import { isPresetText } from '../../../lib/present/textPreset';
 
 // ============ STENCILS ============
 
@@ -211,7 +213,7 @@ function DiamondNode({ element, stencil, isSelected, outlined = false }) {
 
 // Main render function
 // Returns undefined for basic shapes (rectangle, circle, diamond, etc.) to use default rendering
-function renderNode(element, stencil, isSelected) {
+function renderNode(element, stencil, isSelected, edit) {
   const type = element.type;
 
   switch (type) {
@@ -225,6 +227,9 @@ function renderNode(element, stencil, isSelected) {
       return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} />;
     case 'doc':
       return <DocCard element={element} />;
+    case 'text-block':
+      // ADR-0007 P2: a text preset; a legacy text-block (no data.text) keeps the default renderer
+      return isPresetText(element) ? <TextPresetNode element={element} edit={edit} /> : undefined;
     default:
       // Return undefined (not null) to allow default rendering for basic shapes
       // like rectangle, circle, text-block, divider
