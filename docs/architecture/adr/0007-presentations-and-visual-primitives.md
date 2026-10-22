@@ -445,6 +445,8 @@ P1 alone already answers "Miro-style present and PDF". P1 to P3 together answer 
 
 ## 12. Open questions for the owner (each with a recommended default)
 
+> **Decision (2026-10-22):** the product owner approved this ADR with all recommended defaults, including the new dependencies (pptxgenjs MIT, saxes ISC, Lucide icon paths ISC copied into the repo, self-hosted OFL fonts), migration `0012_assets` (image storage in Postgres, 100 MB per board / 1 GB per owner) and raising nginx `client_max_body_size` to at least 6 MB on the asset route. Build order P1 → P6.
+
 | #     | Question                                                    | Recommended default                                                                                                                                                                                                          |
 | ----- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Q-P1  | One or many presentations per board?                        | **Many in the model**; the panel shows a deck picker and creates "Presentation 1" on the first "Add slide".                                                                                                                  |
