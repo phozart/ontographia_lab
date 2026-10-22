@@ -300,6 +300,8 @@ One JS source of truth, `lib/text/tokens.js`, which the server needs. It is mirr
 
 ## 13. Open questions (recommended defaults)
 
+> **Decision (2026-10-22):** the product owner approved this ADR with all recommended defaults (default label 14 px, auto-size max width 240 px or 1.6× default, existing boards only via explicit "Fit to text", no hyphenation dictionaries in v1, Latin Extended subsets in T1, drop "Patrick Hand", `layout_apply` re-fit opt-in, top-left anchor when growing, simplified text below 5 screen px). Build order T1 → T4, each verified with screenshots.
+
 | #     | Question                                                                                                                   | Recommended default                                                                                                                       |
 | ----- | -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
 | Q-T1  | Should the default label size go from 13 to 14 px (the `label` role)? It makes boxes about 8% larger.                      | **Yes**. 14 is the smallest size that reads well at the common 70-80% working zoom.                                                       |
