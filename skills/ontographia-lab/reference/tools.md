@@ -29,9 +29,10 @@ Every write needs `id` and `baseRevision` (from your last read). Each call is on
 
 ### `map_structure`
 
-`structure`: `nodes [{key, label?, stencil?, data?, group?, existingId?}]`, `edges [{from, to, label?}]` (node keys), `groups [{key, label}]` (each becomes a frame holding its members). `layout`: tree, radial, mindmap, cluster, flow, grid. `anchor?`: `{near: elementId}`, `{at: {x,y}}` or `{inFrame: frameId}`; default is free space right of existing content. New content never overlaps; nothing else moves.
+`structure`: `nodes [{key, label?, stencil?, data?, group?, existingId?, size? {w, h}}]`, `edges [{from, to, label?}]` (node keys), `groups [{key, label}]` (each becomes a frame holding its members). `layout`: tree, radial, mindmap, cluster, flow, grid. `anchor?`: `{near: elementId}`, `{at: {x,y}}` or `{inFrame: frameId}`; default is free space right of existing content. New content never overlaps; nothing else moves.
 
 - `key`: your handle (letters, digits, `-`, `_`, up to 38 chars). The result returns created ids by key, the new `revision`, `versionId`, `summary`, `counts` and optional `warnings`.
+- Leave `size` out: every new box is measured from its label BEFORE the layout runs, so long labels get bigger boxes and the layout leaves room (a label that hangs outside a small shape, such as a start event, reserves its room too).
 - `existingId` moves a note already on the board (no copy). A note moved without `group` or `anchor.inFrame` joins the frame holding its new centre, or leaves its frame if it lands outside all frames.
 - Limits: 200 nodes, 400 edges, 40 groups.
 
@@ -51,8 +52,9 @@ Every write needs `id` and `baseRevision` (from your last read). Each call is on
 
 `ops` (1-200, all-or-nothing), optional `layout: {direction: "LR" | "TB"}` for new connected groups.
 
-- `add_element {ref?: "@name", type: "pack/stencil", label?, x?, y?, w?, h?, parent?, data?}` (leave x and y out: the server places it clear of content)
-- `update_element {id, label?, x?, y?, w?, h?, parent? (null removes), data? (merged, null deletes a key)}`
+- `add_element {ref?: "@name", type: "pack/stencil", label?, x?, y?, w?, h?, textFit?, parent?, data?}` (leave x and y out: the server places it clear of content; leave w and h out: the box is sized from the label, never below the stencil default; only `w` keeps the width and lets the height follow the text; `textFit` is `auto`, `auto-height`, `shrink` or `fixed`)
+- `update_element {id, label?, x?, y?, w?, h?, textFit? (null resets), parent? (null removes), data? (merged, null deletes a key)}` (a new label re-fits a box that follows its text and only grows a hand-sized one, unless w or h is given)
+- `fit_to_text {ids: [id | @ref] | all: true}`: resize boxes to hug their labels (top-left stays, never below the stencil default size; locked elements (listed in `warnings`) and stencils that keep their size, such as frames, are skipped; the result lists `fitted` with before and after sizes)
 - `remove_element {id}` (also removes its connections)
 - `connect {ref?, from, to, label?, style?: straight|step|curved|arc|smart, connType?, fromPort?, toPort?}`
 - `update_connection {id, label?, style?, connType?}`, `remove_connection {id}`

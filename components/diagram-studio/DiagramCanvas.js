@@ -28,6 +28,10 @@ import Minimap from './Minimap';
 import { resolveLabelColor, withAlpha } from './packs/colorUtils';
 import { resolveElementTokens } from '../../lib/present/themes';
 import { isPresetText } from '../../lib/present/textPreset';
+import { sizeAfterLabelEdit, textFitAfterResize } from '../../lib/text/autoFit';
+import { ElementText } from './text/useTextLayout';
+import { policyFor, textBoxOf } from '../../lib/text/policy';
+import { fontOf, sizeForStencilLabel } from '../../lib/text/fit';
 import { SmartRouter } from './routing/SmartRouter';
 import ConnectionToolbar from './ui/toolbar/ConnectionToolbar';
 import EmptyCanvasWelcome from './ui/EmptyCanvasWelcome';
@@ -343,41 +347,14 @@ function Node({
         onLabelChange?.(element.id, currentLabel);
       }
 
-      // ALWAYS check for auto-resize when editing ends (even if label didn't change)
-      // This ensures existing overflow is fixed
-      if (onAutoResize && !stencil?.isFrame && !stencil?.isContainer && !isPresetText(element)) {
-        const textToMeasure = currentLabel || element.label || element.name || 'Untitled';
-        const measureDiv = document.createElement('div');
-        measureDiv.style.cssText = `
-          position: absolute;
-          visibility: hidden;
-          white-space: pre-wrap;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
-          font-size: ${element.fontSize || 13}px;
-          font-weight: ${element.fontWeight || 'normal'};
-          font-family: ${element.fontFamily || 'system-ui, -apple-system, sans-serif'};
-          padding: 8px;
-          width: ${(element.size?.width || 120) - 16}px;
-          line-height: 1.4;
-        `;
-        measureDiv.textContent = textToMeasure;
-        document.body.appendChild(measureDiv);
-        const measuredHeight = measureDiv.scrollHeight;
-        document.body.removeChild(measureDiv);
-        const minHeight = stencil?.defaultSize?.height || 60;
-        const requiredHeight = Math.max(minHeight, measuredHeight + 16);
-        const currentHeight = element.size?.height || 60;
-        if (requiredHeight > currentHeight) {
-          onAutoResize(element.id, {
-            width: element.size?.width || 120,
-            height: Math.ceil(requiredHeight / 10) * 10,
-          });
-        }
+      // Re-fit by text-fit mode when editing ends (ADR-0008): auto grows and shrinks back, hand-sized boxes only grow
+      if (onAutoResize && !isPresetText(element)) {
+        const next = sizeAfterLabelEdit(element.packId, stencil || { id: element.type }, { ...element, label: currentLabel || element.label || element.name || '' }, element.label || element.name || '');
+        if (next) onAutoResize(element.id, next);
       }
     }
     wasEditingRef.current = isEditingLabel;
-  }, [isEditingLabel, element.id, element.label, element.name, element.fontSize, element.fontWeight, element.fontFamily, element.size, stencil, onLabelChange, onAutoResize]);
+  }, [isEditingLabel, element, stencil, onLabelChange, onAutoResize]);
 
   // Check if this element type supports connections (frames don't)
   const supportsConnections = !stencil?.noConnections && element.type !== 'frame';
@@ -596,49 +573,12 @@ function Node({
     }
   };
 
-  // Auto-resize element to fit text content
+  // Re-fit the element to its new label (ADR-0008: by text-fit mode, via the shared layout module)
   const checkAndAutoResize = useCallback((labelText) => {
-    if (!onAutoResize) return;
-
-    // Skip auto-resize for frames and containers
-    if (stencil?.isFrame || stencil?.isContainer) return;
-
-    const textToMeasure = labelText || localLabel || 'Untitled';
-
-    // Create a temporary element to measure text
-    const measureDiv = document.createElement('div');
-    measureDiv.style.cssText = `
-      position: absolute;
-      visibility: hidden;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      font-size: ${element.fontSize || 13}px;
-      font-weight: ${element.fontWeight || 'normal'};
-      font-family: ${element.fontFamily || 'system-ui, -apple-system, sans-serif'};
-      padding: 8px;
-      width: ${size.width - 16}px;
-      max-width: ${size.width - 16}px;
-      line-height: 1.4;
-    `;
-    measureDiv.textContent = textToMeasure;
-    document.body.appendChild(measureDiv);
-
-    const measuredHeight = measureDiv.scrollHeight;
-    document.body.removeChild(measureDiv);
-
-    // Add padding for the content area
-    const minHeight = stencil?.defaultSize?.height || 60;
-    const requiredHeight = Math.max(minHeight, measuredHeight + 16); // 16px padding total
-
-    // Only resize if we need more height (grow, don't shrink below min)
-    if (requiredHeight > size.height) {
-      onAutoResize(element.id, {
-        width: size.width,
-        height: Math.ceil(requiredHeight / 10) * 10, // Round up to nearest 10
-      });
-    }
-  }, [element.id, element.fontSize, element.fontWeight, element.fontFamily, localLabel, size, stencil, onAutoResize]);
+    if (!onAutoResize || isPresetText(element)) return;
+    const next = sizeAfterLabelEdit(element.packId, stencil || { id: element.type }, { ...element, label: labelText ?? localLabel }, element.label || element.name || '');
+    if (next) onAutoResize(element.id, next);
+  }, [element, localLabel, stencil, onAutoResize]);
 
   const handleLabelKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -665,8 +605,6 @@ function Node({
   // Default node rendering
   const shape = stencil?.shape || 'rect';
   const color = element.color || stencil?.color || '#3b82f6';
-  const fontSize = element.fontSize || 13;
-  const fontWeight = element.fontWeight || 'normal';
   const fontStyle = element.fontStyle || 'normal';
   const textDecoration = element.textDecoration || 'none';
   const textAlign = element.textAlign || 'center';
@@ -705,10 +643,15 @@ function Node({
   // Show quick-create only when a specific handle is hovered and not connecting
   const showQuickCreate = !readOnly && hoveredHandle && !isConnecting && !isConnectMode && !isEditingLabel;
 
+  // ADR-0008: the default renderer draws its label through the shared text layout (wrap, shrink to 11 px, clamp with a
+  // badge) instead of letting the browser flow it. The editor is a textarea: Enter commits, Shift+Enter is a new line.
+  const textPolicy = policyFor(element.packId, stencil || { id: element.type });
+  const textBox = textBoxOf(textPolicy, size);
+  const borderInset = borderStyle === 'none' ? 0 : borderWidth;
+  const labelFont = fontOf(element, textPolicy);
   const labelContent = isEditingLabel ? (
-    <input
+    <textarea
       ref={inputRef}
-      type="text"
       className="ds-node-label-input"
       value={localLabel}
       onChange={(e) => setLocalLabel(e.target.value)}
@@ -716,29 +659,42 @@ function Node({
       onBlur={handleLabelBlur}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
+      aria-label="Label"
       style={{
-        fontSize,
-        fontWeight,
+        position: 'absolute',
+        left: textBox.x - borderInset,
+        top: textBox.y - borderInset,
+        width: textBox.width,
+        height: textBox.height,
+        boxSizing: 'border-box',
+        resize: 'none',
+        overflow: 'auto',
+        fontSize: labelFont.size,
+        fontWeight: labelFont.weight,
+        lineHeight: `${Math.round(labelFont.size * labelFont.lineHeight * 100) / 100}px`,
         fontStyle,
         textDecoration,
         fontFamily: fontFamily || 'inherit',
         textAlign,
         color: textColor,
-        width: '100%',
         border: 'none',
         background: 'transparent',
         outline: 'none',
-        padding: '2px 4px',
+        padding: 0,
+        margin: 0,
         caretColor: 'var(--accent, #3b82f6)',
       }}
     />
-  ) : element.showLabel === false ? null : (
-    <span
-      className="ds-node-label"
-      style={{ fontSize, fontWeight, fontStyle, textDecoration, fontFamily: fontFamily || 'inherit', textAlign, color: textColor, width: '100%' }}
-    >
-      {element.label || element.name || 'Untitled'}
-    </span>
+  ) : element.showLabel === false ? null : ( // ADR-0007: decorative shapes (the slide accent bar) draw no label
+    <ElementText
+      element={element}
+      stencil={stencil}
+      kind={textPolicy.slot === 'external' ? 'external' : 'inside'}
+      text={element.label || element.name || 'Untitled'}
+      color={textColor}
+      offsetX={-borderInset}
+      offsetY={-borderInset}
+    />
   );
 
   // Check if using custom renderer - must actually return content, not just exist
@@ -820,7 +776,7 @@ function Node({
         {customContent ||
          (shape === 'diamond' ? (
           <div className="ds-node-inner">
-            {labelContent}
+            <span className="ds-node-label" style={{ fontSize: labelFont.size, fontWeight: labelFont.weight, color: textColor, textAlign: 'center' }}>{element.label || element.name || 'Untitled'}</span>
           </div>
         ) : (
           labelContent
@@ -849,7 +805,7 @@ function Node({
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 style={{
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: 600,
                   textAlign: 'left',
                   width: 'auto',
@@ -884,9 +840,10 @@ function Node({
                 zIndex: 10,
               }}
             >
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
+                rows={3}
+                aria-label="Label"
                 className="ds-node-label-input"
                 value={localLabel}
                 onChange={(e) => setLocalLabel(e.target.value)}
@@ -899,6 +856,9 @@ function Node({
                   fontWeight: 500,
                   textAlign: 'center',
                   width: '90%',
+                  height: '70%',
+                  resize: 'none',
+                  lineHeight: 1.3,
                   border: 'none',
                   background: 'transparent',
                   outline: 'none',
@@ -2069,6 +2029,7 @@ export default function DiagramCanvas({
           x: newX,
           y: newY,
           size: { width: newWidth, height: newHeight },
+          ...(resizing.textFit !== undefined ? { textFit: resizing.textFit } : {}),
         }, { coalesceKey: `resize:${resizing.elementId}` }); // one undo entry per resize gesture
       }
     };
@@ -3017,6 +2978,7 @@ export default function DiagramCanvas({
         x: Math.max(0, newX),
         y: Math.max(0, newY),
         size: { width: newWidth, height: newHeight },
+        ...(resizing.textFit !== undefined ? { textFit: resizing.textFit } : {}),
       }, { coalesceKey: `resize:${elementId}` }); // one undo entry per resize gesture
       return;
     }
@@ -3154,7 +3116,8 @@ export default function DiagramCanvas({
         const pos = placeAtPoint({ x: drawing.startX, y: drawing.startY }, { width: DEFAULT_STICKY_SIZE, height: DEFAULT_STICKY_SIZE }, GRID_SIZE);
         placeSticky(pos.x, pos.y, DEFAULT_STICKY_SIZE);
       } else if (selectedStencil) {
-        const size = selectedStencil.defaultSize || DEFAULT_STENCIL_SIZE;
+        // ADR-0008: the size follows the default label (never below the stencil default)
+        const size = sizeForStencilLabel(selectedStencil.packId, selectedStencil, selectedStencil.defaultLabel ?? selectedStencil.name, DEFAULT_STENCIL_SIZE);
         const pos = placeAtPoint({ x: drawing.startX, y: drawing.startY }, size, GRID_SIZE);
         const newElement = {
           id: generateId('el'),
@@ -3557,6 +3520,8 @@ export default function DiagramCanvas({
             startSize: { ...size },
             startPos: { x: element.x, y: element.y },
             aspect: frameAspectOf(element), // ADR-0007: slide frames keep their ratio
+            // ADR-0008 resize rule: a width handle turns auto into auto-height, a height or corner handle turns it into fixed
+            textFit: textFitAfterResize(element.packId, stencil || { id: element.type }, element, direction),
           });
         }
       }
@@ -3841,9 +3806,10 @@ export default function DiagramCanvas({
         const stencil = pack?.stencils?.find(s => s.id === data.stencilId);
 
         if (stencil) {
-          // Center the element on the drop point
-          const snappedX = snapToGrid(x - (stencil.defaultSize?.width || 60) / 2);
-          const snappedY = snapToGrid(y - (stencil.defaultSize?.height || 30) / 2);
+          // Center the element on the drop point (the size follows the default label, ADR-0008)
+          const dropSize = sizeForStencilLabel(data.packId || activePack, stencil, stencil.defaultLabel ?? stencil.name);
+          const snappedX = snapToGrid(x - dropSize.width / 2);
+          const snappedY = snapToGrid(y - dropSize.height / 2);
 
           const dropped = addElement({
             type: stencil.id,
@@ -3852,7 +3818,7 @@ export default function DiagramCanvas({
             label: stencil.defaultLabel ?? stencil.name,
             x: snappedX, // Allow any coordinate on infinite canvas
             y: snappedY,
-            size: stencil.defaultSize || { width: 120, height: 60 },
+            size: dropSize,
             color: stencil.color,
             ...docDefaults(stencil),
           });

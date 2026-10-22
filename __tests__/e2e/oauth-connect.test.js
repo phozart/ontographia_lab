@@ -13,6 +13,7 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
 jest.setTimeout(180000);
@@ -47,7 +48,7 @@ describe('Connect Claude through OAuth (O2)', () => {
       return res.end();
     });
     await new Promise((r) => clientServer.listen(CLIENT_PORT, '127.0.0.1', r));
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     // A cold `next dev` compiles each route on its first hit (tens of seconds under load), which made the first tests time out
     // waiting for the consent form. Touch the routes once so the tests measure behavior, not compilation.
     for (const route of ['/login', '/oauth/authorize', '/api/oauth/consent', '/api/oauth/token', '/account', '/api/mcp', '/.well-known/oauth-authorization-server']) {

@@ -29,7 +29,7 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
         ],
       },
-      // self-hosted theme fonts (ADR-0007 P2): file names are versioned by content, so they can be cached for a year
+      // self-hosted theme fonts (ADR-0007 P2): cached for a year (immutable): file names are NOT content-hashed, so a new font version must use a NEW file name, never an in-place edit
       {
         source: '/fonts/:file*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],

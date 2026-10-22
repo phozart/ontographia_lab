@@ -1,6 +1,6 @@
 # ADR-0008: Text layout and autosizing (one shared text-layout module for canvas, exports, diagram_show and agents)
 
-- Status: **Proposed** (2026-10-22). Awaiting owner approval of the defaults in section 13.
+- Status: **Accepted** (2026-10-22).
 - Evidence: [text rendering audit](../investigations/text-rendering-audit.md) (1,870 nodes per creation path, 187 stencils × 10 label variants).
   - 57% of the cells have a defect.
   - Editor and MCP produce identical sizes.
@@ -339,3 +339,76 @@ Optional, behind a later owner decision: hyphenation patterns (Q-T4).
 - **Risks.**
   - Complex scripts (Arabic shaping, Indic) are over-estimated, giving roomy boxes. That is acceptable and visible, never clipped.
   - System fallback fonts differ between macOS and Windows. The generator calibrates on both and keeps the larger value.
+
+## 16. As-built: slice T1 (2026-10-22)
+
+Branch `feat/t1-text-layout`. T1 is the pure `lib/text/` module, the shared text component, the migrated default renderer, Core, StickyNotes, ProcessFlow and MindMap, server sizing for agents, `fit_to_text`, and the editor rules. T2 to T4 are untouched.
+
+### 16.1 What shipped
+
+| Area | Files |
+| ---- | ----- |
+| Engine (pure, isomorphic) | `lib/text/{tokens,fonts,segment,layout,policy,fit,autoFit}.js`, `lib/text/metrics/inter.json` |
+| Metric generator | `scripts/build-font-metrics.js` (`--check` compares the font hashes); fonts `public/fonts/inter-latin-ext-{400,500,600,700}-normal.woff2` are new files (the font directory is served `immutable`, so new files never overwrite old ones) and are declared in `styles/fonts.css` with `unicode-range` |
+| Canvas | `components/diagram-studio/text/{TextBlock,useTextLayout,fitActions}.js`, `styles/diagram-studio.css` (`.ds-text*`), `styles/diagram-studio-tokens.css` (`--ds-text-*`) |
+| Renderers | `DiagramCanvas.js` default renderer and the `<textarea>` editors, `CorePack`, `ProcessFlowPack`, `StickyNotesPack`, `MindMapPack`, `NodeLabels` |
+| Agents | `lib/mcp/{ops,structure,placement,server,guide}.js`, the `ontographia-lab` skill |
+| P2 | `lib/present/textLayout.js` delegates to `lib/text/layout.js` (interface kept; the 0.52 em estimate is gone) |
+
+### 16.2 Deviations from the design
+
+1. **CJK breaks are rule based, not `Intl.Segmenter` word granularity.** ICU dictionaries differ between Node and Chrome, which would break the parity rule. Ideographs and kana break between any two characters with basic kinsoku. `Intl.Segmenter` is used for graphemes and, only for Thai, Lao, Khmer and Myanmar, for word boundaries.
+2. **One table file for Inter** (400, 500, 600, 700; Latin and Latin Extended, 822 glyphs per weight, 15 KB, about 5 KB gzip). Which glyphs the font has comes from its `cmap` (parsed from the woff2), so system-fallback glyphs never enter the table (a first version that guessed from measurements did). Other families map to Inter plus 4% (sans, serif) or 0.6 em (mono). The fallback classes (CJK 1.0 em, emoji 1.15, Arabic 0.59 ...) were calibrated on macOS Chrome 148 only; Windows is not calibrated yet.
+3. **Slash and hyphen breaks need three more characters after them**, so `req/s` is never split into `req/` and `s`.
+4. **External labels** (events, gateway markers, data objects, markers, a divider's label) wrap at `max(2w, 120)` and at most 3 lines, and **widen up to 240 px for one long word** instead of breaking it. Only a word beyond 240 px is broken, with a hyphen.
+5. **Inscribed shapes grow proportionally** (circle, ellipse, diamond keep their ratio; the smallest scale whose text rectangle holds the text at full size). The diamond text rectangle is the ADR's 0.5 x 0.5; pill topics use a 16 px side inset and a corner radius of at most 32.
+6. **Creation.** `sizeForNewElement` is the one rule for `add_element`, `map_structure` and the editor. Only `w` given keeps the width and lets the height follow. `shrink` stencils (sticky notes) keep their size when the text fits at 11 px or more and grow only when it cannot.
+7. **Label edits** re-fit a box that is "auto managed" (its size equals the auto fit of the previous label) in both directions and only grow a hand-sized box. This keeps the ADR's "never shrink a person's box" without storing a flag.
+8. **`map_structure`** measures every new node before layout and reserves the footprint of an external label (the shape is centered above it). A node may pass `size {w, h}`. Explicit sizes go to the applier only when they differ from the stencil default (a 2 px divider is below the applier's minimum explicit size).
+9. **`fit_to_text {ids | all: true}`** and `textFit` on `add_element` / `update_element`. `layout_apply fitToText` is not in T1 (`fit_to_text` then `layout_apply` does the same in two calls).
+10. **Editor.** Both default editors are `<textarea>`s (Enter commits, Shift+Enter is a newline; the frame title stays a single-line input). The resize rule (width handle: auto to auto-height; height or corner: fixed; sticky notes stay shrink) is applied while dragging. "Fit to text" is a button in the contextual toolbar and two command-palette entries (selection, all, one undo step, a toast with the count). The board-menu entry is T4. The toolbar's font-size stepper stops at 11.
+11. **Drawing.** `TextBlock` draws one block per label with one pinned `white-space: pre` span per line. Font, color and line height are set once on the block; the static rules live in the stylesheet. The text content keeps a space between lines. Decorative shapes with `showLabel: false` (the slide accent bar) still draw no label.
+12. **Copy blocks on slides** (`lib/present/compose.js`): a copied shape's label font is the label role (14, not the old 13) times the copy scale, and never below 0.75 x the body preset (24 at 1080) so slide labels are comparable to body text; the shared layout shrinks or clamps inside a small box. This fixed the owner's complaint that copied boxes carried 11 px labels beside 32 px bullets.
+13. **Review follow-ups.** (M1) Circles and ellipses hold a 0.78 x 0.58 text rectangle (the corner sits on the outline) and a single line may use 0.85 of the width, so "Approve" or "Inventory" stay whole in the default 80 px circle; a lone word is shrunk before it is hyphenated. (M2) Stored font sizes are clamped to 512 and `shrink` is a bisection on integer sizes (a 1e7 px font lays out in under 5 ms). (Perf) A left-to-right label is now a `div` with ONE text node (lines joined by newlines, `white-space: pre`), the weight and the role line height are classes, only per-node values are inline (position, width, font size, first-line offset, color), and the overflow popover exists only while the badge has focus; right-to-left lines keep a block span each. (A11y) The badge is a focusable button with the full text on focus, white on `#1f6f89` (5.6:1), and labels can be selected and copied. (Agents) `fit_to_text` with `ids` skips a locked element with a warning instead of failing the batch.
+14. **Initial render of a 5,000-element board went from about 36 s to about 50 to 54 s** with T1 (about 60% more DOM per node). Both numbers are unacceptable and the regression is recorded as a separate performance item (virtualization or one pre-formatted block per label), not only T4.
+15. `window.__dsTextStats()` exposes the layout cache counters for the performance checks.
+
+### 16.3 Verification
+
+**Defect matrix** (the audit harness re-run on the four T1 packs: 49 stencils x 10 label variants = 490 nodes per path, 1379 x 985 headless Chrome; `core/table` and `core/doc` excluded as in the audit).
+
+| Path | Before (audit rules) | After |
+| ---- | -------------------- | ----- |
+| Editor, label typed (box sized by the editor rule) | 287 of 490 with a defect | **0** |
+| MCP `map_structure`, no sizes | 287 | **0** |
+| MCP `add_element`, no w/h | 287 | **0** |
+| Legacy boards (stencil default sizes, render-time layout only) | 287 | **0** |
+
+Before, by code: OV 152, NW 166, BL 80, ML 39, PD 19, SM 20, MW 15, CL 4, EL 4. After, there are zero of every code. Fonts after: 11 to 18 px, none below 11 (before: 9 and 10 px on 20 nodes). A clamp is no longer a defect: 51 cells (161 on legacy default sizes) end in an ellipsis with the badge and the full text as a tooltip ("indicated", the IN column of the harness). Under the audit's original, stricter definitions (any external label wider than its shape is BL, any ellipsis is TR) the editor, `map_structure` and `add_element` paths show 130 cells, which are the bounded external labels, the indicated clamps and the mind-map summary label beside its bracket; CL, EL, MW, ML, SM and PD are 0.
+
+Screenshots (before from the audit run, after from this build): `t1/before/` and `t1/after/` in the session scratchpad, named `<path>-<pack>-z100-NN.png`.
+
+**Parity.** `__tests__/e2e/text-layout.test.js` compares the lines Chrome drew with the lines `layoutForElement` computes in Node for the same stored element (equal). `__tests__/e2e/text-metrics.test.js` compares the tables with Chrome `measureText` for four weights and four sizes on ten strings including Polish, Czech, Turkish and German: worst case 0.50% (limit 1%).
+
+**Acceptance (section 12, T1).** (a) `map_structure` with the 10 variants gives text-sized boxes that pass the gallery assertions; (b) the editor and the MCP path give the same size for the same label (unit test); (c) the parity test is green; (d) the default-renderer overflow is 0, also on legacy default sizes; (e) opening a legacy board writes nothing (no new revision and identical content after 6 s).
+
+**Performance** (production build, headless Chrome shell, throwaway database, a busy laptop; numbers are for comparison, not absolute).
+
+| Measure | Budget | Result |
+| ------- | ------ | ------ |
+| Layout of one label, cold | 0.05 ms median | 0.014 ms median, 0.036 ms p95 (Node) |
+| 5,000 distinct labels, cold / cached | 60 ms | 119 ms / 10 ms (Node, jest transform); a real board has repeated labels |
+| Layout calls while panning and zooming 5,000 elements | 0 | **0** (5,000 calls at load, 99.8% cache hits) |
+| Server sizing of 1,000 nodes | 20 ms | 18 ms |
+| Bundle | 45 KB gzip | 4.7 KB tables plus about 18 KB of unminified engine and component source (gzip), less after minification |
+| 1,000 elements, time to all nodes | n/a | 223 to 280 ms, same as before (216 to 276 ms) |
+| 5,000 elements, time to all nodes | n/a | 50 to 54 s, before 36 s (the DOM per node grows by about 60%: 4,270 to 6,870 elements per 1,000 rectangles) |
+| Pan and zoom frame time, 5,000 elements | 16.7 ms p95 | about 300 ms median, same as before: the cost is the number of DOM nodes, not text; level of detail is T4 |
+
+The 5,000-element initial render is slower in this environment because each label is now a few pinned spans. If that matters before T4, the next step is one pre-formatted block per label. It was not done because the per-line spans make the parity and geometry assertions exact.
+
+### 16.4 Not verified or not done
+
+- Windows and Safari font fallbacks (the CJK, emoji and Arabic class widths). Arabic and emoji boxes are roomy by design.
+- A real claude.ai session driving `fit_to_text`.
+- T2 packs keep their own text drawing; they only get the sizing rules (`policyFor` gives a generic policy of their shape).

@@ -32,6 +32,8 @@ import {
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import LockIcon from '@mui/icons-material/Lock';
+import FitScreenIcon from '@mui/icons-material/FitScreen';
+import { fitElementsToText, fitChangeFor } from '../text/fitActions';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import FlipToFrontIcon from '@mui/icons-material/FlipToFront';
 import FlipToBackIcon from '@mui/icons-material/FlipToBack';
@@ -198,7 +200,7 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
       color: el.color || selectedStencil?.color || '#3b82f6',
       textColor: el.textColor || null, // null means auto (based on variant)
       styleVariant: el.styleVariant || 'floating',
-      fontSize: el.fontSize || 13,
+      fontSize: el.fontSize || 14,
       fontFamily: el.fontFamily || null,
       fontWeight: el.fontWeight || 'normal',
       fontStyle: el.fontStyle || 'normal',
@@ -258,12 +260,12 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
 
   // Font size increment/decrement
   const incrementFontSize = useCallback(() => {
-    const newSize = Math.min((currentStyles.fontSize || 13) + 1, 72);
+    const newSize = Math.min((currentStyles.fontSize || 14) + 1, 72);
     handleStyleChange('fontSize', newSize);
   }, [currentStyles.fontSize, handleStyleChange]);
 
   const decrementFontSize = useCallback(() => {
-    const newSize = Math.max((currentStyles.fontSize || 13) - 1, 8);
+    const newSize = Math.max((currentStyles.fontSize || 14) - 1, 11) /* ADR-0008: nothing below 11 px */;
     handleStyleChange('fontSize', newSize);
   }, [currentStyles.fontSize, handleStyleChange]);
 
@@ -311,6 +313,12 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
     if (!selectedElements?.length) return;
     onEditLabel?.(selectedElements[0].id);
   }, [selectedElements, onEditLabel]);
+
+  // Fit to text: only offered when at least one selected box would change
+  const canFitToText = useMemo(() => (selectedElements || []).some((el) => fitChangeFor(el, packRegistry)), [selectedElements, packRegistry]);
+  const handleFitToText = useCallback(() => {
+    fitElementsToText(selectedElements, packRegistry, updateElement);
+  }, [selectedElements, packRegistry, updateElement]);
 
   // Make Same Size handlers
   const handleMakeSameWidth = useCallback(() => {
@@ -1000,6 +1008,19 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
           title="Edit Label (Double-click)"
         >
           <EditIcon fontSize="small" style={{ fontSize: 16 }} />
+        </button>
+      )}
+
+      {/* Fit to text (ADR-0008): resize the selected boxes to hug their labels */}
+      {canFitToText && (
+        <button
+          className="ds-ct-btn"
+          onClick={handleFitToText}
+          title="Fit to text"
+          aria-label="Fit to text"
+          data-testid="fit-to-text"
+        >
+          <FitScreenIcon fontSize="small" style={{ fontSize: 16 }} />
         </button>
       )}
 

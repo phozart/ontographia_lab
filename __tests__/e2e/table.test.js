@@ -11,6 +11,7 @@
 const path = require('path');
 const fs = require('fs');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
 jest.setTimeout(180000);
@@ -71,7 +72,7 @@ describe('Table element (AI-4)', () => {
   }
 
   beforeAll(async () => {
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     ctx = await browser.createBrowserContext();
     const p = await ctx.newPage();
     await p.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle0' });

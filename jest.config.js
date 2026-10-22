@@ -39,6 +39,7 @@ const dbTests = [
   '<rootDir>/__tests__/scripts/migrate0010.test.js',
   '<rootDir>/__tests__/scripts/migrate0011.test.js',
   '<rootDir>/__tests__/lib/activityRepository.test.js',
+  '<rootDir>/__tests__/lib/textFitToTextDb.test.js',
 ];
 
 // Unit tests configuration

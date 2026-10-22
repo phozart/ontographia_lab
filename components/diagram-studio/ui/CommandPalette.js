@@ -28,6 +28,8 @@ const COMMAND_DEFS = [
 
   // Selection actions
   { id: 'select-all', name: 'Select All', category: 'selection', action: 'select-all' },
+  { id: 'fit-selection-to-text', name: 'Fit Selection to Text', category: 'selection', action: 'fit-selection-to-text' },
+  { id: 'fit-all-to-text', name: 'Fit All to Text', category: 'selection', action: 'fit-all-to-text' },
   { id: 'deselect', name: 'Deselect All', category: 'selection', action: 'deselect' },
   { id: 'delete-selected', name: 'Delete Selected', category: 'selection', action: 'delete' },
   { id: 'duplicate', name: 'Duplicate', category: 'selection', action: 'duplicate' },

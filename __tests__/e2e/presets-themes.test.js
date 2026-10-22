@@ -9,6 +9,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
 jest.setTimeout(300000);
@@ -87,7 +88,7 @@ describe('Presets, themes and layouts (ADR-0007 P2)', () => {
 
   beforeAll(async () => {
     downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'p2-dl-'));
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     context = await browser.createBrowserContext();
     const p = await context.newPage();
     await p.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle0', timeout: 90000 });
@@ -243,6 +244,10 @@ describe('Presets, themes and layouts (ADR-0007 P2)', () => {
     // originals are untouched (a copy block is a snapshot)
     expect(stored.elements.find((e) => e.id === 'a1').size).toEqual({ width: 300, height: 110 });
     expect(stored.elements.filter((e) => e.origin?.copiedFrom).length).toBeGreaterThanOrEqual(5);
+    // ADR-0008: copied shapes carry slide-readable labels (at least 0.7 x the 32 px body preset), not 11 px
+    const copied = stored.elements.filter((e) => e.origin?.copiedFrom && e.type !== 'table' && e.label);
+    expect(copied.length).toBeGreaterThan(0);
+    for (const e of copied) expect([e.label, e.fontSize >= 0.7 * 32]).toEqual([e.label, true]);
     const versions = (await call(A, 'GET', `/api/diagrams/${agentDiagram.id}/versions`)).body;
     expect((versions.items || []).filter((v) => v.createdVia === 'agent' || v.created_via === 'agent').length).toBeGreaterThanOrEqual(3);
 
@@ -258,6 +263,11 @@ describe('Presets, themes and layouts (ADR-0007 P2)', () => {
       await sleep(700);
       await shot(A, `p2-deck-slide-${i}.png`);
       expect(await A.$$eval('[data-testid="present-stage"] [data-testid="text-preset"]', (e) => e.length)).toBeGreaterThanOrEqual(1);
+      if (i === 3) { // the rendered label font size, in board units, is comparable to the body text beside it
+        const r = await A.$$eval('[data-testid="present-stage"] [data-text-block="inside"]', (bs) => bs.map((b) => parseFloat(b.getAttribute('data-font-size'))));
+        expect(r.length).toBeGreaterThan(0);
+        for (const f of r) expect(f).toBeGreaterThanOrEqual(0.7 * 32 * 0.9); // shrink may step down a little inside a small box
+      }
       if (i < 5) { await A.keyboard.press('ArrowRight'); await sleep(300); }
     }
     await A.keyboard.press('Escape');

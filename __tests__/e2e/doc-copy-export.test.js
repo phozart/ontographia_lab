@@ -7,6 +7,7 @@
 const path = require('path');
 const os = require('os');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
@@ -61,7 +62,7 @@ describe('Doc copy and export', () => {
 
   beforeAll(async () => {
     downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'docexport-dl-'));
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     ctx = await browser.createBrowserContext();
     await ctx.overridePermissions(BASE_URL, ['clipboard-read', 'clipboard-write', 'clipboard-sanitized-write']);
     const p = await ctx.newPage();

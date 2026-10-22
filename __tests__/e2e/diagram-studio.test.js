@@ -16,6 +16,7 @@
 
 const path = require('path');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
 // Set Jest timeout for all tests (E2E tests need more time)
@@ -27,7 +28,7 @@ let DIAGRAM_URL = null;
 
 // Test configuration
 const CONFIG = {
-  headless: process.env.HEADLESS !== 'false', // Set HEADLESS=false to see browser
+  headless: headlessMode(), // HEADLESS=false shows the browser
   slowMo: process.env.SLOWMO ? parseInt(process.env.SLOWMO) : 0, // SLOWMO=100 for debugging
   defaultTimeout: 30000,
   testTimeout: 60000,

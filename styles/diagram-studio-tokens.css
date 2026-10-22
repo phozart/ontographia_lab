@@ -10,6 +10,27 @@
   --ds-blur: 16px;
   --ds-blur-strong: 24px;
 
+  /* ============ NODE TEXT (ADR-0008): mirrored from lib/text/tokens.js, kept equal by __tests__/lib/textMetrics.test.js ============ */
+  --ds-text-label-size: 14px;
+  --ds-text-label-weight: 500;
+  --ds-text-label-line: 1.3;
+  --ds-text-title-size: 14px;
+  --ds-text-title-weight: 600;
+  --ds-text-title-line: 1.25;
+  --ds-text-caption-size: 12px;
+  --ds-text-caption-weight: 500;
+  --ds-text-caption-line: 1.3;
+  --ds-text-meta-size: 11px;
+  --ds-text-meta-weight: 500;
+  --ds-text-meta-line: 1.25;
+  --ds-text-emphasis-size: 18px;
+  --ds-text-emphasis-weight: 600;
+  --ds-text-emphasis-line: 1.25;
+  --ds-text-min-size: 11px;
+  --ds-text-pad-s: 6px;
+  --ds-text-pad-m: 10px;
+  --ds-text-pad-l: 14px;
+
   /* ============ SHADOWS ============ */
   /* Ambient soft shadows for floating elements */
   --ds-shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);

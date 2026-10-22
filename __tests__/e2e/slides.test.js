@@ -10,6 +10,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
 jest.setTimeout(240000);
@@ -100,7 +101,7 @@ describe('Slides and presentations (ADR-0007 P1)', () => {
 
   beforeAll(async () => {
     downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'p1-dl-'));
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     await login('a', process.env.QA_ADMIN_EMAIL, process.env.QA_ADMIN_PASSWORD);
     await login('b', process.env.QA_USER_EMAIL, process.env.QA_USER_PASSWORD);
     const session = await browser.target().createCDPSession();

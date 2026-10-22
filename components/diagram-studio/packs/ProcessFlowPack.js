@@ -5,6 +5,10 @@ import { StyledRectRenderer, getVariantTextColor } from '../styling';
 import { withBelowLabel, labelOf } from './NodeLabels';
 import { pickLabelColor, DARK_TEXT } from './colorUtils';
 import { stencils, connectionTypes } from './catalog/process-flow';
+import { useMemo } from 'react';
+import { ElementText } from '../text/useTextLayout';
+import { policyFor } from '../../../lib/text/policy';
+import { layoutForElement } from '../../../lib/text/fit';
 
 // ============ STENCILS ============
 
@@ -300,6 +304,9 @@ function TaskNode({ element, stencil, isSelected }) {
   const color = element.color || stencil?.color || '#3b82f6';
   const variant = element.styleVariant || 'floating';
   const taskType = element.data?.taskType || 'manual';
+  const base = useMemo(() => policyFor(element.packId || 'process-flow', stencil || { id: element.type }), [element.packId, element.type, stencil]);
+  const taskPolicy = useMemo(() => (taskType !== 'manual' ? { ...base, inset: { ...base.inset, r: base.inset.r + 20 } } : base), [base, taskType]);
+  const labelInset = element.borderStyle === 'none' ? 0 : element.borderWidth ?? 1;
 
   // Get text color - use element's textColor if set, otherwise calculate from variant
   const textColor = element.textColor || getVariantTextColor(variant, color);
@@ -346,26 +353,8 @@ function TaskNode({ element, stencil, isSelected }) {
         </div>
       )}
 
-      {/* Label */}
-      <div style={{
-        fontSize: element.fontSize || 13,
-        fontFamily: element.fontFamily || 'inherit',
-        fontWeight: element.fontWeight || 500,
-        fontStyle: element.fontStyle || 'normal',
-        textDecoration: element.textDecoration || 'none',
-        color: textColor,
-        textAlign: element.textAlign || 'center',
-        lineHeight: 1.3,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        display: '-webkit-box',
-        WebkitLineClamp: 2,
-        WebkitBoxOrient: 'vertical',
-        paddingRight: taskType !== 'manual' ? 20 : 0,
-        width: '100%',
-      }}>
-        {label}
-      </div>
+      {/* Label: shared text layout; the type icon takes a column on the right */}
+      <ElementText packId="process-flow" element={element} stencil={stencil} policy={taskPolicy} color={textColor} offsetX={-labelInset} offsetY={-labelInset} />
     </StyledRectRenderer>
   );
 }
@@ -455,45 +444,12 @@ function SubprocessNode({ element, stencil }) {
         <line x1={width / 2 - 4} y1={height - 10} x2={width / 2 + 4} y2={height - 10} stroke={color} strokeWidth="1.5" />
       </svg>
 
-      {/* Content layer */}
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        padding: '10px 12px 22px 16px',
-        boxSizing: 'border-box',
-      }}>
-        <div style={{
-          fontSize: 13,
-          fontWeight: 500,
-          color: '#1f2937',
-          textAlign: 'left',
-          lineHeight: 1.3,
-        }}>
-          {label}
-        </div>
-      </div>
+      <ElementText packId="process-flow" element={element} stencil={stencil} text={label} color="#1f2937" />
     </div>
   );
 }
 
 // Gateway (modern diamond shape with internal marker)
-// Rough fit test: does the label fit inside the diamond's inscribed text box?
-export function decisionLabelFits(element, stencil) {
-  const { width, height } = element.size || stencil?.defaultSize || { width: 110, height: 70 };
-  const text = labelOf(element);
-  const fs = element.fontSize || 12;
-  const innerW = width * 0.56;
-  const innerH = height * 0.56;
-  const lines = Math.ceil((text.length * fs * 0.55) / Math.max(1, innerW));
-  const longestWord = Math.max(0, ...text.split(/\s+/).map((w) => w.length));
-  return lines * fs * 1.15 <= innerH && longestWord * fs * 0.55 <= innerW;
-}
-
 function GatewayNode({ element, stencil, gatewayType, labelInside = true }) {
   const { width, height } = element.size || stencil?.defaultSize || { width: 50, height: 50 };
   const cx = width / 2;
@@ -568,29 +524,7 @@ function GatewayNode({ element, stencil, gatewayType, labelInside = true }) {
         {!label && getMarker()}
       </svg>
       {label && (
-        <div style={{
-          position: 'absolute',
-          top: '22%',
-          left: '22%',
-          width: '56%',
-          height: '56%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          overflow: 'hidden',
-          overflowWrap: 'anywhere',
-          lineHeight: 1.15,
-          fontSize: element.fontSize || 12,
-          fontWeight: element.fontWeight || 500,
-          fontStyle: element.fontStyle || 'normal',
-          textDecoration: element.textDecoration || 'none',
-          color: element.textColor || pickLabelColor(fill, DARK_TEXT),
-          pointerEvents: 'none',
-          userSelect: 'none',
-        }}>
-          {label}
-        </div>
+        <ElementText packId="process-flow" element={element} stencil={stencil} text={label} color={element.textColor || pickLabelColor(fill, DARK_TEXT)} />
       )}
     </div>
   );
@@ -630,27 +564,8 @@ function SwimLaneNode({ element, stencil, isPool }) {
         <line x1={headerWidth} y1="1" x2={headerWidth} y2={height - 1} stroke={color} strokeWidth="1" />
       </svg>
 
-      {/* Vertical label */}
-      <div style={{
-        position: 'absolute',
-        left: 0,
-        top: 0,
-        width: headerWidth,
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <div style={{
-          transform: 'rotate(-90deg)',
-          whiteSpace: 'nowrap',
-          fontSize: 12,
-          fontWeight: 600,
-          color: isPool ? 'white' : '#374151',
-        }}>
-          {label}
-        </div>
-      </div>
+      {/* Vertical title: one line in the 30 px header, ellipsis + badge when it does not fit */}
+      <ElementText packId="process-flow" element={element} stencil={stencil} kind="title" text={label} color={isPool ? 'white' : '#374151'} />
     </div>
   );
 }
@@ -680,17 +595,6 @@ function DataObjectNode({ element, stencil }) {
         />
       </svg>
 
-      <div style={{
-        position: 'absolute',
-        bottom: 4,
-        left: 0,
-        right: 0,
-        textAlign: 'center',
-        fontSize: 9,
-        color: '#374151',
-      }}>
-        {label}
-      </div>
     </div>
   );
 }
@@ -721,23 +625,12 @@ function DataStoreNode({ element, stencil }) {
         />
       </svg>
 
-      <div style={{
-        position: 'absolute',
-        top: '55%',
-        left: 0,
-        right: 0,
-        textAlign: 'center',
-        fontSize: 10,
-        color: '#374151',
-      }}>
-        {label}
-      </div>
     </div>
   );
 }
 
 // Annotation (bracket with text)
-function AnnotationNode({ element }) {
+function AnnotationNode({ element, stencil }) {
   const label = element.label || '';
   const { width, height } = element.size || { width: 150, height: 60 };
 
@@ -752,20 +645,7 @@ function AnnotationNode({ element }) {
         />
       </svg>
 
-      <div style={{
-        position: 'absolute',
-        left: 14,
-        top: 0,
-        bottom: 0,
-        right: 0,
-        display: 'flex',
-        alignItems: 'center',
-        fontSize: 12,
-        color: '#6b7280',
-        fontStyle: 'italic',
-      }}>
-        {label}
-      </div>
+      <ElementText packId="process-flow" element={element} stencil={stencil} color="#6b7280" />
     </div>
   );
 }
@@ -786,11 +666,12 @@ function renderNode(element, stencil, isSelected) {
     case 'subprocess':
       return <SubprocessNode element={element} stencil={stencil} />;
     case 'exclusive-gateway': {
-      // Small stored Decisions (e.g. legacy 50x50) show the label (and marker) below instead of clipping it
-      if (decisionLabelFits(element, stencil)) {
+      // A Decision whose label cannot fit inside its diamond (small stored sizes) shows the label below instead (ADR-0008)
+      const { layout } = layoutForElement(element, policyFor(element.packId || 'process-flow', stencil || { id: element.type }));
+      if (!layout.overflow && layout.breaks.emergency === 0) {
         return <GatewayNode element={element} stencil={stencil} gatewayType="exclusive" />;
       }
-      return withBelowLabel(<GatewayNode element={element} stencil={stencil} gatewayType="exclusive" labelInside={false} />, element);
+      return withBelowLabel(<GatewayNode element={element} stencil={stencil} gatewayType="exclusive" labelInside={false} />, element, true);
     }
     case 'parallel-gateway':
       return withBelowLabel(<GatewayNode element={element} stencil={stencil} gatewayType="parallel" />, element);
@@ -803,11 +684,11 @@ function renderNode(element, stencil, isSelected) {
     case 'lane':
       return <SwimLaneNode element={element} stencil={stencil} isPool={false} />;
     case 'data-object':
-      return <DataObjectNode element={element} stencil={stencil} />;
+      return withBelowLabel(<DataObjectNode element={element} stencil={stencil} />, element);
     case 'data-store':
-      return <DataStoreNode element={element} stencil={stencil} />;
+      return withBelowLabel(<DataStoreNode element={element} stencil={stencil} />, element);
     case 'annotation':
-      return <AnnotationNode element={element} />;
+      return <AnnotationNode element={element} stencil={stencil} />;
     default:
       return null;
   }

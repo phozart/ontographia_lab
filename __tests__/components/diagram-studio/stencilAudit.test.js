@@ -3,6 +3,7 @@
  * default size with its label visible (the model drives the rendering).
  */
 import React from 'react';
+import { sizeForText } from '../../../lib/text/fit';
 import { render } from '@testing-library/react';
 import { createDefaultRegistry } from '../../../components/diagram-studio/packs';
 
@@ -48,7 +49,10 @@ describe('stencil audit', () => {
 
   test.each(cases)('%s renders its label', (n, p, s) => {
     if (LABEL_EXEMPT.has(n)) return;
-    const el = { id: 'n1', type: s.id, label: 'UniqueLbl42', name: 'UniqueLbl42', x: 0, y: 0, size: { ...s.defaultSize } };
+    // a stored element has the size the editor/MCP gave it, which follows the text (ADR-0008)
+    const el = { id: 'n1', type: s.id, packId: p.id, label: 'UniqueLbl42', name: 'UniqueLbl42', x: 0, y: 0, size: { ...s.defaultSize } };
+    const fit = sizeForText(p.id, s, 'UniqueLbl42');
+    el.size = { width: fit.width, height: fit.height };
     const node = p.renderNode ? p.renderNode(el, s, false) : null;
     // null/undefined => the canvas falls back to its default label renderer
     if (node === null || node === undefined) return;
