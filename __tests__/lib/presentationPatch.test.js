@@ -1,6 +1,6 @@
 import { applyPresentationPatch } from '../../lib/present/presentationPatch';
 import {
-  resolveDeck, lockedSize, coverSize, aspectRatio, nextSlidePosition, frameAspectOf, SLIDE_SIZES, SLIDE_GAP, frameTitleOf,
+  resolveDeck, lockedSize, resizeWithAspect, coverSize, aspectRatio, nextSlidePosition, frameAspectOf, SLIDE_SIZES, SLIDE_GAP, frameTitleOf,
 } from '../../lib/present/presentationModel';
 import { MAX_PRESENTATIONS, MAX_SLIDES } from '../../lib/diagramLimits';
 
@@ -100,6 +100,17 @@ describe('presentationModel', () => {
     expect(lockedSize('16:9', { width: 1900, height: 540 }, { width: 1920, height: 1080 })).toEqual({ width: 960, height: 540 });
     expect(lockedSize('free', { width: 10, height: 20 })).toEqual({ width: 10, height: 20 });
     expect(lockedSize('1:1', { width: 300, height: 100 }, { width: 100, height: 100 })).toEqual({ width: 300, height: 300 });
+  });
+
+  it('resizeWithAspect keeps the ratio and the edge opposite the handle', () => {
+    const start = { x: 100, y: 100, width: 1920, height: 1080 };
+    expect(resizeWithAspect('16:9', 'se', start, { x: 100, y: 100, width: 960, height: 900 })).toEqual({ x: 100, y: 100, width: 960, height: 540 });
+    // dragging the west edge by 480 keeps the right edge (x + width = 2020) fixed and the height follows
+    expect(resizeWithAspect('16:9', 'w', start, { x: 580, y: 100, width: 1440, height: 1080 })).toEqual({ x: 580, y: 100, width: 1440, height: 810 });
+    // north-west: both anchored edges are right and bottom
+    expect(resizeWithAspect('16:9', 'nw', start, { x: 580, y: 180, width: 1440, height: 1000 })).toEqual({ x: 580, y: 370, width: 1440, height: 810 });
+    expect(resizeWithAspect('free', 'se', start, { x: 1, y: 2, width: 3, height: 4 })).toEqual({ x: 1, y: 2, width: 3, height: 4 });
+    expect(resizeWithAspect(null, 'se', start, { x: 1, y: 2, width: 3, height: 4 })).toEqual({ x: 1, y: 2, width: 3, height: 4 });
   });
 
   it('coverSize grows to the ratio without shrinking', () => {
