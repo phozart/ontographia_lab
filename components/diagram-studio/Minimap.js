@@ -14,28 +14,19 @@ const CANVAS_CENTER = INFINITE_CANVAS_SIZE / 2; // Elements are centered around 
 
 export default function Minimap({ packRegistry, containerSize = { width: 1200, height: 800 } }) {
   const { elements, connections } = useDiagram();
+  const elementsById = useMemo(() => new Map(elements.map(el => [el.id, el])), [elements]);
   const { viewport, setViewport } = useDiagramViewport();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const minimapRef = useRef(null);
 
-  // Calculate bounds of all elements (including current viewport area)
-  const bounds = useMemo(() => {
-    // Start with the current viewport area (what's visible on screen)
-    const viewportWidth = containerSize.width / viewport.scale;
-    const viewportHeight = containerSize.height / viewport.scale;
-    const viewportLeft = -viewport.x;
-    const viewportTop = -viewport.y;
-    const viewportRight = viewportLeft + viewportWidth;
-    const viewportBottom = viewportTop + viewportHeight;
-
-    // Default to viewport bounds if no elements
-    let minX = viewportLeft;
-    let minY = viewportTop;
-    let maxX = viewportRight;
-    let maxY = viewportBottom;
-
-    // Expand bounds to include all elements
+  // Extent of all elements. Only when the elements change (board-load performance: this was recomputed, with a stencil
+  // lookup per element, on every pan/zoom frame).
+  const elementExtent = useMemo(() => {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
     elements.forEach(el => {
       const pack = packRegistry?.get?.(el.packId);
       const stencil = pack?.stencils?.find(s => s.id === el.type);
@@ -46,22 +37,19 @@ export default function Minimap({ packRegistry, containerSize = { width: 1200, h
       maxX = Math.max(maxX, el.x + size.width);
       maxY = Math.max(maxY, el.y + size.height);
     });
+    return { minX, minY, maxX, maxY };
+  }, [elements, packRegistry]);
 
-    // Add padding
-    minX -= MINIMAP_PADDING * 10;
-    minY -= MINIMAP_PADDING * 10;
-    maxX += MINIMAP_PADDING * 10;
-    maxY += MINIMAP_PADDING * 10;
-
-    return {
-      minX,
-      minY,
-      maxX,
-      maxY,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
-  }, [elements, packRegistry, viewport, containerSize]);
+  // Bounds of all elements including the current viewport area; the object keeps its identity while the numbers do not move
+  const viewportLeft = -viewport.x;
+  const viewportTop = -viewport.y;
+  const viewportRight = viewportLeft + containerSize.width / viewport.scale;
+  const viewportBottom = viewportTop + containerSize.height / viewport.scale;
+  const minX = Math.min(viewportLeft, elementExtent.minX) - MINIMAP_PADDING * 10;
+  const minY = Math.min(viewportTop, elementExtent.minY) - MINIMAP_PADDING * 10;
+  const maxX = Math.max(viewportRight, elementExtent.maxX) + MINIMAP_PADDING * 10;
+  const maxY = Math.max(viewportBottom, elementExtent.maxY) + MINIMAP_PADDING * 10;
+  const bounds = useMemo(() => ({ minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY }), [minX, minY, maxX, maxY]);
 
   // Calculate scale to fit all elements in minimap
   const scale = useMemo(() => {
@@ -197,6 +185,81 @@ export default function Minimap({ packRegistry, containerSize = { width: 1200, h
     };
   }, [isDragging, toDiagramCoords, containerSize, viewport.scale, setViewport]);
 
+  // The 1 element = 1 rect drawing: rebuilt only when elements, connections or the minimap scale change, not on every pan frame
+  const minimapShapes = useMemo(() => (
+    <>
+    {/* Connections */}
+    {connections.map(conn => {
+      const sourceEl = elementsById.get(conn.sourceId);
+      const targetEl = elementsById.get(conn.targetId);
+      if (!sourceEl || !targetEl) return null;
+
+      const sourcePack = packRegistry?.get?.(sourceEl.packId);
+      const sourceStencil = sourcePack?.stencils?.find(s => s.id === sourceEl.type);
+      const sourceSize = sourceEl.size || sourceStencil?.defaultSize || { width: 120, height: 60 };
+
+      const targetPack = packRegistry?.get?.(targetEl.packId);
+      const targetStencil = targetPack?.stencils?.find(s => s.id === targetEl.type);
+      const targetSize = targetEl.size || targetStencil?.defaultSize || { width: 120, height: 60 };
+
+      const sourceCenter = toMinimapCoords(
+        sourceEl.x + sourceSize.width / 2,
+        sourceEl.y + sourceSize.height / 2
+      );
+      const targetCenter = toMinimapCoords(
+        targetEl.x + targetSize.width / 2,
+        targetEl.y + targetSize.height / 2
+      );
+
+      return (
+        <line
+          key={conn.id}
+          x1={sourceCenter.x}
+          y1={sourceCenter.y}
+          x2={targetCenter.x}
+          y2={targetCenter.y}
+          stroke="var(--text-muted)"
+          strokeWidth="1"
+          opacity="0.5"
+        />
+      );
+    })}
+
+    {/* Elements */}
+    {elements.map(el => {
+      const pack = packRegistry?.get?.(el.packId);
+      const stencil = pack?.stencils?.find(s => s.id === el.type);
+      const size = el.size || stencil?.defaultSize || { width: 120, height: 60 };
+      const color = el.color || stencil?.color || '#0e74a3';
+
+      const pos = toMinimapCoords(el.x, el.y);
+      const scaledWidth = size.width * scale;
+      const scaledHeight = size.height * scale;
+
+      // Minimum size for visibility
+      const minSize = 3;
+      const displayWidth = Math.max(scaledWidth, minSize);
+      const displayHeight = Math.max(scaledHeight, minSize);
+
+      return (
+        <rect
+          key={el.id}
+          x={pos.x}
+          y={pos.y}
+          width={displayWidth}
+          height={displayHeight}
+          fill={color}
+          stroke="none"
+          rx="1"
+          opacity="0.8"
+          style={{ cursor: 'pointer' }}
+          onDoubleClick={(e) => handleElementDoubleClick(e, el)}
+        />
+      );
+    })}
+    </>
+  ), [connections, elements, elementsById, packRegistry, toMinimapCoords, scale, handleElementDoubleClick]);
+
   if (isCollapsed) {
     return (
       <div className="ds-minimap ds-minimap-collapsed" onClick={() => setIsCollapsed(false)}>
@@ -226,75 +289,7 @@ export default function Minimap({ packRegistry, containerSize = { width: 1200, h
       >
         {/* Render scaled elements */}
         <svg width={MINIMAP_WIDTH} height={MINIMAP_HEIGHT}>
-          {/* Connections */}
-          {connections.map(conn => {
-            const sourceEl = elements.find(el => el.id === conn.sourceId);
-            const targetEl = elements.find(el => el.id === conn.targetId);
-            if (!sourceEl || !targetEl) return null;
-
-            const sourcePack = packRegistry?.get?.(sourceEl.packId);
-            const sourceStencil = sourcePack?.stencils?.find(s => s.id === sourceEl.type);
-            const sourceSize = sourceEl.size || sourceStencil?.defaultSize || { width: 120, height: 60 };
-
-            const targetPack = packRegistry?.get?.(targetEl.packId);
-            const targetStencil = targetPack?.stencils?.find(s => s.id === targetEl.type);
-            const targetSize = targetEl.size || targetStencil?.defaultSize || { width: 120, height: 60 };
-
-            const sourceCenter = toMinimapCoords(
-              sourceEl.x + sourceSize.width / 2,
-              sourceEl.y + sourceSize.height / 2
-            );
-            const targetCenter = toMinimapCoords(
-              targetEl.x + targetSize.width / 2,
-              targetEl.y + targetSize.height / 2
-            );
-
-            return (
-              <line
-                key={conn.id}
-                x1={sourceCenter.x}
-                y1={sourceCenter.y}
-                x2={targetCenter.x}
-                y2={targetCenter.y}
-                stroke="var(--text-muted)"
-                strokeWidth="1"
-                opacity="0.5"
-              />
-            );
-          })}
-
-          {/* Elements */}
-          {elements.map(el => {
-            const pack = packRegistry?.get?.(el.packId);
-            const stencil = pack?.stencils?.find(s => s.id === el.type);
-            const size = el.size || stencil?.defaultSize || { width: 120, height: 60 };
-            const color = el.color || stencil?.color || '#0e74a3';
-
-            const pos = toMinimapCoords(el.x, el.y);
-            const scaledWidth = size.width * scale;
-            const scaledHeight = size.height * scale;
-
-            // Minimum size for visibility
-            const minSize = 3;
-            const displayWidth = Math.max(scaledWidth, minSize);
-            const displayHeight = Math.max(scaledHeight, minSize);
-
-            return (
-              <rect
-                key={el.id}
-                x={pos.x}
-                y={pos.y}
-                width={displayWidth}
-                height={displayHeight}
-                fill={color}
-                stroke="none"
-                rx="1"
-                opacity="0.8"
-                style={{ cursor: 'pointer' }}
-                onDoubleClick={(e) => handleElementDoubleClick(e, el)}
-              />
-            );
-          })}
+          {minimapShapes}
 
           {/* Viewport rectangle */}
           <rect

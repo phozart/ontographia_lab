@@ -1,51 +1,47 @@
 // components/diagram-studio/hooks/useThumbnailCapture.js
-// After a save, render a small PNG preview of the live canvas (lazy-loaded export capture) and
-// store it via the normal PUT path as the diagram's `thumbnail` for the dashboard cards.
-// Throttled to once per THUMBNAIL_INTERVAL_MS; failures are silent (the dashboard falls back to the logo).
+// After an EDIT (never on open), render a small PNG preview from the board's content and store it via the normal PUT
+// path as the diagram's `thumbnail` for the dashboard cards. WHEN is decided by lib/thumbnail's scheduler (baseline on
+// open, debounced + idle after an edit-save, throttled); HOW is renderThumbnailPng (SVG from content, no DOM cloning).
+// Failures are silent (the dashboard falls back to the logo).
 
 import { useEffect, useRef } from 'react';
-import { isValidThumbnail, shouldCaptureThumbnail, THUMBNAIL_WIDTH } from '../../../lib/thumbnail';
+import { createThumbnailScheduler, isValidThumbnail } from '../../../lib/thumbnail';
 
-export function useThumbnailCapture({ diagramId, lastSaved, elements, connections, readOnly = false }) {
-  const lastCapturedRef = useRef(new Map()); // diagramId -> ms timestamp
-  const latestRef = useRef({ elements, connections });
-  latestRef.current = { elements, connections };
+export function useThumbnailCapture({ diagramId, lastSaved, elements, connections, theme, readOnly = false }) {
+  const latestRef = useRef({ elements, connections, theme });
+  latestRef.current = { elements, connections, theme };
   const mountedRef = useRef(true);
+  const schedulerRef = useRef(null);
+
+  if (!schedulerRef.current) {
+    schedulerRef.current = createThumbnailScheduler({
+      capture: async (id) => {
+        try {
+          const { elements: els, connections: conns, theme: th } = latestRef.current;
+          if (!mountedRef.current || !els?.length) return;
+          const { renderThumbnailPng } = await import('../export/thumbnailRenderer');
+          const dataUrl = await renderThumbnailPng({ elements: els, connections: conns, theme: th });
+          if (!mountedRef.current || !isValidThumbnail(dataUrl)) return;
+          await fetch(`/api/diagrams/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ thumbnail: dataUrl }),
+          });
+        } catch {
+          // Best effort only
+        }
+      },
+    });
+  }
+
   useEffect(() => {
     mountedRef.current = true;
-    return () => { mountedRef.current = false; };
+    const scheduler = schedulerRef.current;
+    return () => { mountedRef.current = false; scheduler.cancel(); };
   }, []);
 
   useEffect(() => {
-    if (!diagramId || !lastSaved || readOnly) return undefined;
-    if (!latestRef.current.elements?.length) return undefined;
-    if (!shouldCaptureThumbnail(lastCapturedRef.current.get(diagramId))) return undefined;
-
-    // Claim the slot immediately so overlapping saves cannot start a second capture
-    lastCapturedRef.current.set(diagramId, Date.now());
-
-    (async () => {
-      try {
-        const { renderPreview, nextFrames } = await import('../export/exportRenderer');
-        await nextFrames(2);
-        if (!mountedRef.current) return;
-        const { elements: els, connections: conns } = latestRef.current;
-        // renderPreview renders at 2x of maxSide, so THUMBNAIL_WIDTH / 2 yields a <= 320px PNG
-        const { dataUrl } = await renderPreview(
-          { scope: 'canvas', elements: els, connections: conns, background: 'white' },
-          THUMBNAIL_WIDTH / 2
-        );
-        if (!mountedRef.current || !isValidThumbnail(dataUrl)) return;
-        await fetch(`/api/diagrams/${diagramId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ thumbnail: dataUrl }),
-        });
-      } catch {
-        // Best effort only
-      }
-    })();
-
-    return undefined;
+    if (!diagramId || !lastSaved || readOnly) return;
+    schedulerRef.current.observe(diagramId, lastSaved);
   }, [diagramId, lastSaved, readOnly]);
 }

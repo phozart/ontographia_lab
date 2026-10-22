@@ -1580,9 +1580,10 @@ export function buildMindMapHierarchy(elements, connections) {
 
   // Build hierarchy from connections
   // In mind maps, the source is typically the parent and target is the child
+  const byId = new Map(elements.map(el => [el.id, el])); // (board-load performance: find() per connection was O(connections x elements))
   connections.forEach(conn => {
-    const sourceEl = elements.find(el => el.id === conn.sourceId);
-    const targetEl = elements.find(el => el.id === conn.targetId);
+    const sourceEl = byId.get(conn.sourceId);
+    const targetEl = byId.get(conn.targetId);
 
     if (sourceEl && targetEl && isMindMapElement(sourceEl) && isMindMapElement(targetEl)) {
       // Determine parent-child relationship based on hierarchy level

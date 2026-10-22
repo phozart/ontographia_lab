@@ -9,6 +9,8 @@ import { getFontEmbedCSS } from '../export/fontEmbed';
 import { clampPixelRatio } from '../export/exportUtils';
 import { sanitizeFilename } from '../export/diagramJson';
 import { nextFrames } from '../export/exportRenderer';
+import { suspendCulling, rectOfFrame } from '../canvasCulling';
+import { unionFrameRect } from './slideRect';
 import { pruneToFrame } from './slideClone';
 import { frameBackground } from '../../../lib/present/themes';
 
@@ -66,6 +68,9 @@ export async function exportDeckPdf({ slides, elements, connections, title, them
   const htmlToImage = await import('html-to-image');
   const { jsPDF } = await import('jspdf');
   const fontEmbedCSS = await getFontEmbedCSS();
+  // slides are cloned from the live canvas, which mounts only what is near the viewport: keep the slides' frames mounted
+  const release = await suspendCulling(unionFrameRect(slides.map((s) => s.frame)));
+  try {
   let doc = null;
   for (let i = 0; i < slides.length; i += 1) {
     if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
@@ -85,13 +90,22 @@ export async function exportDeckPdf({ slides, elements, connections, title, them
   }
   onProgress?.(slides.length, slides.length);
   return { format: 'pdf', content: doc.output('blob'), mimeType: 'application/pdf', filename: `${sanitizeFilename(title, 'presentation')}.pdf`, pages: slides.length };
+  } finally {
+    release();
+  }
 }
 
 /** One slide as a PNG (2x by default, clamped like every export). */
 export async function exportSlidePng({ slide, elements, connections, title, theme, scale = 2, number }) {
   const htmlToImage = await import('html-to-image');
   const fontEmbedCSS = await getFontEmbedCSS();
-  const shot = await captureSlide(htmlToImage, slide, { elements, connections, fontEmbedCSS, scale, theme });
+  const release = await suspendCulling(rectOfFrame(slide.frame));
+  let shot;
+  try {
+    shot = await captureSlide(htmlToImage, slide, { elements, connections, fontEmbedCSS, scale, theme });
+  } finally {
+    release();
+  }
   const suffix = number ? `-slide-${number}` : '-slide';
   return { format: 'png', content: dataUrlToBlob(shot.dataUrl), mimeType: 'image/png', filename: `${sanitizeFilename(title, 'presentation')}${suffix}.png`, width: shot.width, height: shot.height };
 }

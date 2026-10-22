@@ -435,10 +435,12 @@ export default function Connection({
   onMouseLeave,
   dragState, // For real-time updates during element dragging
   readOnly = false,
+  elementsById, // optional Map id -> element and obstacleRects (shared, built once by the canvas): the board-load fast path, same result
+  obstacleRects,
 }) {
   // Find source and target elements
-  const sourceRaw = elements.find(e => e.id === connection.sourceId);
-  const targetRaw = elements.find(e => e.id === connection.targetId);
+  const sourceRaw = elementsById ? elementsById.get(connection.sourceId) : elements.find(e => e.id === connection.sourceId);
+  const targetRaw = elementsById ? elementsById.get(connection.targetId) : elements.find(e => e.id === connection.targetId);
 
   // Apply drag offset if elements are being dragged
   const source = sourceRaw && dragState?.ids?.has(sourceRaw.id)
@@ -519,6 +521,16 @@ export default function Connection({
   const obstacles = useMemo(() => {
     if (!source || !target) return [];
 
+    if (obstacleRects) {
+      // the canvas already turned every non-frame element into a rectangle once; here only source/target are left out
+      const out = [];
+      for (const o of obstacleRects) {
+        if (o.id === source.id || o.id === target.id) continue;
+        out.push(activeDrag?.ids?.has(o.id) ? { ...o, x: o.x + activeDrag.offset.x, y: o.y + activeDrag.offset.y } : o);
+      }
+      return out;
+    }
+
     return elements
       .filter(el => {
         if (!el || el.id === source.id || el.id === target.id) return false;
@@ -551,7 +563,7 @@ export default function Connection({
         };
       })
       .filter(Boolean);
-  }, [elements, source, target, packRegistry, activeDrag]);
+  }, [elements, obstacleRects, source, target, packRegistry, activeDrag]);
 
   // Calculate label position based on actual path points
   const labelPos = useMemo(() => {
