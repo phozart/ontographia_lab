@@ -22,7 +22,8 @@ import ConnectionLabel from './labels/ConnectionLabel';
 import EndpointLabel from './labels/EndpointLabel';
 
 // Geometry
-import { calculateMidLabelPosition } from './geometry/labelPositioning';
+import { calculateMidLabelPosition, findNonOverlappingLabelPosition } from './geometry/labelPositioning';
+import { connectionLabelLayout } from '../../../lib/text/connectionLabel';
 import { buildOrthogonalPath } from './geometry/orthogonalRouting';
 import { resolveConnectionPorts } from './geometry/autoPorts';
 
@@ -601,6 +602,17 @@ export default function Connection({
     return calculateMidLabelPosition(sourcePos, targetPos, connection.waypoints || []);
   }, [sourcePos, targetPos, connection.waypoints, lineStyle, isSharp, effectivePorts.sourcePort, effectivePorts.targetPort, sourceBounds, targetBounds]);
 
+  // ADR-0008 5 (T2): the label is measured (wrapped, at most 200 px) and kept clear of the nodes it would sit on, the two
+  // endpoints included. Only a connection with a label pays for this.
+  const labelBox = useMemo(() => (connection.label ? connectionLabelLayout(connection.label) : null), [connection.label]);
+  const placedLabelPos = useMemo(() => {
+    if (!labelBox || !labelPos) return labelPos;
+    // a margin around every node keeps the label off the shape edges (and off an arrow head at the endpoints)
+    const grow = (b, m) => ({ x: b.x - m, y: b.y - m, width: b.width + 2 * m, height: b.height + 2 * m });
+    const nodes = [sourceBounds && grow(sourceBounds, 14), targetBounds && grow(targetBounds, 14), ...obstacles.map((o) => grow(o, 6))].filter(Boolean);
+    return findNonOverlappingLabelPosition(labelPos, nodes, { width: labelBox.width, height: labelBox.height });
+  }, [labelBox, labelPos, sourceBounds, targetBounds, obstacles]);
+
   // Event handlers
   const handleClick = useCallback((e) => {
     e.stopPropagation();
@@ -667,7 +679,8 @@ export default function Connection({
       {/* Mid-section label - inline editable per CLAUDE.md spec */}
       <ConnectionLabel
         value={connection.label || ''}
-        position={labelPos}
+        position={placedLabelPos}
+        labelBox={labelBox}
         isSelected={isSelected}
         isEditing={isEditingLabel}
         onDoubleClick={handleLabelDoubleClick}

@@ -1,8 +1,11 @@
 // components/diagram-studio/connections/labels/EndpointLabel.js
 // Endpoint label component for connections (source/target labels - toolbar only per CLAUDE.md spec)
+// ADR-0008 T2: the lines come from the shared layout (11 px meta role); the background is the measured text plus padding.
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { calculateEndpointLabelPosition } from '../geometry/labelPositioning';
+import SvgTextBlock from '../../text/SvgTextBlock';
+import { endpointLabelLayout } from '../../../../lib/text/connectionLabel';
 
 /**
  * Endpoint label for connections (source or target)
@@ -20,6 +23,8 @@ export default function EndpointLabel({
   showOnHover = true,
   isHovered = false,
 }) {
+  const box = useMemo(() => endpointLabelLayout(value), [value]);
+
   // Don't render if no value
   if (!value) return null;
 
@@ -28,13 +33,14 @@ export default function EndpointLabel({
   // Calculate offset position based on port direction
   const offset = calculateEndpointLabelPosition(position, port, 12);
 
-  // Calculate label dimensions
-  const labelWidth = Math.max(24, value.length * 7);
-  const labelHeight = 16;
+  // Measured label dimensions
+  const { layout, width: labelWidth, height: labelHeight, textBox } = box;
 
   // Opacity based on selection/hover state
   // Per spec: 70-80% opacity when not selected
   const opacity = isSelected ? 0.95 : (isHovered && showOnHover) ? 0.85 : 0.7;
+  const x0 = offset.x - labelWidth / 2;
+  const y0 = offset.y - labelHeight / 2;
 
   return (
     <g
@@ -43,8 +49,8 @@ export default function EndpointLabel({
     >
       {/* Background rectangle */}
       <rect
-        x={offset.x - labelWidth / 2}
-        y={offset.y - labelHeight / 2}
+        x={x0}
+        y={y0}
         width={labelWidth}
         height={labelHeight}
         rx={3}
@@ -54,16 +60,13 @@ export default function EndpointLabel({
       />
 
       {/* Label text - smaller font than mid-label */}
-      <text
-        x={offset.x}
-        y={offset.y + 4}
-        textAnchor="middle"
-        fontSize={11}
+      <SvgTextBlock
+        layout={layout}
+        x={x0 + textBox.x}
+        y={y0 + textBox.y}
         fill={isSelected ? 'var(--accent)' : 'var(--text-muted)'}
-        style={{ pointerEvents: 'none' }}
-      >
-        {value}
-      </text>
+        testId="endpoint-label"
+      />
     </g>
   );
 }

@@ -136,17 +136,22 @@ export function findNonOverlappingLabelPosition(preferredPosition, obstacles, la
     return preferredPosition;
   }
 
-  // Try different offsets
-  const offsets = [
-    { x: 0, y: -30 },  // above
-    { x: 0, y: 30 },   // below
-    { x: 30, y: 0 },   // right
-    { x: -30, y: 0 },  // left
-    { x: 30, y: -30 }, // top-right
-    { x: -30, y: -30 }, // top-left
-    { x: 30, y: 30 },  // bottom-right
-    { x: -30, y: 30 }, // bottom-left
+  // Try different offsets: the small ring first (a 30 px nudge keeps a short label near its line), then rings scaled to the
+  // label's real size (ADR-0008 5: a wrapped, 3-line label needs a bigger move than a 20 px chip to clear a node).
+  const ring = (dx, dy) => [
+    { x: 0, y: -dy },   // above
+    { x: 0, y: dy },    // below
+    { x: dx, y: 0 },    // right
+    { x: -dx, y: 0 },   // left
+    { x: dx, y: -dy },  // top-right
+    { x: -dx, y: -dy }, // top-left
+    { x: dx, y: dy },   // bottom-right
+    { x: -dx, y: dy },  // bottom-left
   ];
+  const stepX = labelSize.width + 12;
+  const stepY = labelSize.height + 12;
+  const offsets = [...ring(30, 30)];
+  for (let k = 1; k <= 4; k++) offsets.push(...ring(Math.max(30, k * stepX * 0.6), Math.max(30, k * stepY * 0.6)));
 
   for (const offset of offsets) {
     const testPos = {
