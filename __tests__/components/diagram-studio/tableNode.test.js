@@ -33,6 +33,7 @@ const mk = (over = {}) => {
 function Harness({ initial = mk(), selected = true, access, others = [], selection }) {
   const [el, setEl] = useState(initial);
   const updates = (Harness.updates = Harness.updates || []);
+  Harness.set = setEl;
   mockCtx = {
     updateElement: (id, patch, opts) => { updates.push({ patch, opts }); setEl((cur) => ({ ...cur, ...patch })); },
     diagram: access ? { access } : { access: undefined },
@@ -317,14 +318,41 @@ describe('size follows resize', () => {
   test('after the element is resized wider, columns scale proportionally and the height settles', () => {
     jest.useFakeTimers();
     try {
-      const el = mk();
-      el.size = { width: tableElementSize(el.data.table).width * 2, height: 50 };
-      render(<Harness initial={el} />);
+      render(<Harness />);
+      act(() => { jest.advanceTimersByTime(400); });
+      expect(Harness.updates).toHaveLength(0);
+      act(() => { Harness.set((cur) => ({ ...cur, size: { width: tableElementSize(cur.data.table).width * 2, height: 50 } })); });
       act(() => { jest.advanceTimersByTime(400); });
       const w = table().columns.map((c) => c.width);
       expect(w[0]).toBeGreaterThan(250);
       expect(Math.abs(Harness.current.size.width - tableElementSize(table()).width)).toBeLessThanOrEqual(1);
       expect(Harness.current.size.height).toBe(tableElementSize(table()).height);
+    } finally { jest.useRealTimers(); }
+  });
+  test('opening a table whose stored size is off does not write (no spurious revision)', () => {
+    jest.useFakeTimers();
+    try {
+      const el = mk();
+      el.size = { width: tableElementSize(el.data.table).width * 2, height: 50 };
+      render(<Harness initial={el} />);
+      act(() => { jest.advanceTimersByTime(5000); });
+      expect(Harness.updates).toHaveLength(0);
+    } finally { jest.useRealTimers(); }
+  });
+  test('a user edit on a table opened with an off size still persists the fitted size', () => {
+    jest.useFakeTimers();
+    try {
+      const el = mk();
+      el.size = { width: tableElementSize(el.data.table).width, height: 50 };
+      render(<Harness initial={el} />);
+      act(() => { jest.advanceTimersByTime(1000); });
+      expect(Harness.updates).toHaveLength(0);
+      act(() => { editCell(0, 0); });
+      act(() => { type('A much longer value'); });
+      act(() => { fireEvent.keyDown(editor(), { key: 'Enter' }); });
+      act(() => { jest.advanceTimersByTime(1000); });
+      expect(Harness.updates.length).toBeGreaterThan(0);
+      expect(Harness.current.size).toEqual(tableElementSize(table()));
     } finally { jest.useRealTimers(); }
   });
   test('a table without data.table gets one (shape sidebar path)', () => {
