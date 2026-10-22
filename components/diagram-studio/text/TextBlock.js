@@ -12,7 +12,7 @@ import { memo, useState } from 'react';
 
 // The overflow badge: hover shows the title, keyboard focus shows the full text in a popover (rendered only while focused,
 // so a board full of clamped labels carries no hidden popover DOM).
-function OverflowBadge({ text, pill }) {
+export function OverflowBadge({ text, pill }) {
   const [focused, setFocused] = useState(false);
   return (
     <span
@@ -31,7 +31,7 @@ function OverflowBadge({ text, pill }) {
   );
 }
 
-function TextBlockImpl({ layout, box, color, fontFamily, fontStyle, textDecoration, offsetX = 0, offsetY = 0, rotate, pill, className, testId }) {
+function TextBlockImpl({ layout, box, color, fontFamily, fontStyle, textDecoration, offsetX = 0, offsetY = 0, rotate, pill, className, testId, hideBadge }) {
   if (!layout || !box) return null;
   const { lines, lineHeight, fontSize, weight, overflow } = layout;
   // Only per-node values are inline (position, width, size, first-line offset, color). Everything static is in the
@@ -65,7 +65,7 @@ function TextBlockImpl({ layout, box, color, fontFamily, fontStyle, textDecorati
             </span>
           ))
         : lines.map((l) => l.text).join('\n') /* one text node: the lines are pre-broken, white-space: pre keeps them */}
-      {overflow ? <OverflowBadge text={layout.text} pill={pill} /> : null}
+      {overflow && !hideBadge ? <OverflowBadge text={layout.text} pill={pill} /> : null}
     </div>
   );
 }

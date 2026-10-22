@@ -2,6 +2,9 @@
 // Shared helpers for stencils whose shape is a small marker/notation primitive
 // (events, gateways, UML pseudo-states): the label must still be visible, so it
 // is drawn just below the shape instead of being dropped.
+//
+// ADR-0008 T2: every such label goes through the shared layout (wrapped to max(2w, 120), at most 3 lines, widened for one
+// long word, overflow badge with the full text). There is no separate legacy single-line `nowrap` path any more.
 
 import React from 'react';
 import { policyFor, externalPolicy } from '../../../lib/text/policy';
@@ -11,52 +14,22 @@ export function labelOf(element) {
   return element?.label || element?.name || '';
 }
 
-const BELOW_STYLE = {
-  position: 'absolute',
-  top: '100%',
-  left: '50%',
-  transform: 'translateX(-50%)',
-  marginTop: 4,
-  whiteSpace: 'nowrap',
-  lineHeight: 1.2,
-  textAlign: 'center',
-  pointerEvents: 'none',
-  userSelect: 'none',
-};
-
-// HTML label centered under the node box. Stencils whose text policy is `external` (ADR-0008: events, gateway markers,
-// data objects, markers) draw it through the shared layout (wrapped to max(2w, 120), at most 3 lines, badge on clamp);
-// `forceExternal` does the same for a label that cannot fit inside. Other packs keep the legacy single line until T2.
+// HTML label centered under the node box. Stencils whose text policy is `external` use their own policy; for any other
+// stencil (a label that cannot fit inside a small stored size, `forceExternal`) the generic external policy applies.
 export function BelowLabel({ element, forceExternal = false }) {
   const label = labelOf(element);
   if (!label) return null;
   const stencilLike = { id: element.type };
-  const policy = forceExternal ? externalPolicy(stencilLike) : policyFor(element.packId, stencilLike);
-  if (policy.slot === 'external') {
-    return (
-      <ElementText
-        element={element}
-        kind="external"
-        policy={policy}
-        className="ds-node-label-below"
-        color={element.textColor || 'var(--text, #1f2937)'}
-      />
-    );
-  }
+  const own = forceExternal ? null : policyFor(element.packId, stencilLike);
+  const policy = own && own.slot === 'external' ? own : externalPolicy(stencilLike);
   return (
-    <div
+    <ElementText
+      element={element}
+      kind="external"
+      policy={policy}
       className="ds-node-label-below"
-      style={{
-        ...BELOW_STYLE,
-        fontSize: element.fontSize || 12,
-        fontWeight: element.fontWeight || 500,
-        fontStyle: element.fontStyle || 'normal',
-        textDecoration: element.textDecoration || 'none',
-        color: element.textColor || 'var(--text, #1f2937)',
-      }}
-    >
-      {label}
-    </div>
+      color={element.textColor || 'var(--text, #1f2937)'}
+    />
   );
 }
 
@@ -68,26 +41,5 @@ export function withBelowLabel(node, element, forceExternal = false) {
       {node}
       <BelowLabel element={element} forceExternal={forceExternal} />
     </div>
-  );
-}
-
-// SVG variant for packs that render inside an <svg> frame.
-export function SvgBelowLabel({ element, width, height }) {
-  const label = labelOf(element);
-  if (!label) return null;
-  return (
-    <text
-      x={width / 2}
-      y={height + 16}
-      textAnchor="middle"
-      fontSize={element.fontSize || 12}
-      fontWeight={element.fontWeight || 500}
-      fontStyle={element.fontStyle || 'normal'}
-      textDecoration={element.textDecoration || 'none'}
-      fill={element.textColor || 'var(--text, #1f2937)'}
-      style={{ userSelect: 'none' }}
-    >
-      {label}
-    </text>
   );
 }

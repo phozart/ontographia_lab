@@ -148,7 +148,7 @@ function pickTextColor(bg) {
   return lum > 0.6 ? '#1f2937' : '#ffffff';
 }
 
-function DiamondNode({ element, stencil, isSelected, outlined = false }) {
+function DiamondNode({ element, stencil, isSelected, outlined = false, packId }) {
   const { width, height } = element.size || stencil?.defaultSize || { width: 80, height: 80 };
   const color = element.color || stencil?.color || '#f59e0b';
   // Outlined (ERD Chen) style: panel fill, accent stroke, dark label unless the user sets colors
@@ -180,6 +180,7 @@ function DiamondNode({ element, stencil, isSelected, outlined = false }) {
       <ElementText
         element={element}
         stencil={stencil}
+        packId={packId}
         text={label}
         color={element.textColor || (useOutline ? 'var(--text, #1f2937)' : pickTextColor(fill))}
       />

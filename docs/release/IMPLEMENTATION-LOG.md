@@ -315,3 +315,15 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Results (best of 3, production build, load average 9 to 31):** nodes exist from navigation start 300 elements 3.4 s to 0.3 s, 500 5.9 s to 0.34 s, 2,000 30.8 s to 0.6 s, 5,000 20 s render plus 100 s thumbnail clone to 1.25 s; heap at 5,000 2.2 GB to 63 MB; no thumbnail request while opening.
 - **Not verified:** Safari and Firefox; boards with more than 5,000 elements (the API limit).
 - **Tests:** unit (`viewportCulling`, `thumbnailScheduler`, `useThumbnailCapture`), component (`canvasCulling`), e2e `board-load-perf.test.js` (6 tests) plus the text-layout, presets-themes, slides, table, doc-copy-export, doc-card, live-merge and live-highlight suites.
+
+## Slice T2 — Text layout: the remaining packs, connection labels and table cells (ADR-0008)
+
+- **PR title:** `feat(text): slice T2 TOGAF, ITIL, CapabilityMap, ProductDesign, ERD, UML and CLD renderers, connection labels and table cells on the shared text layout`
+- **Refs:** `docs/architecture/adr/0008-text-layout-and-autosizing.md` sections 4, 5, 7, 8 and 12 (T2), as-built in section 17. Personas: AI/MCP agent (sizes for every pack), Solution Architect (TOGAF, ArchiMate, ERD, UML, capability maps), CX/UX (product design cards), PM.
+- **Branch:** `feat/t2-text-layout`
+- **Files changed:** `lib/text/{policy,policyKit,fit,tokens,connectionLabel}.js`, `lib/text/policies/*.js` (new, one per T2 pack), `components/diagram-studio/text/{useTextLayout,SvgTextBlock}.js`, `components/diagram-studio/packs/{TOGAF,ITIL,CapabilityMap,ProductDesign,ERD,UMLClass,CLD}Pack.js`, `NodeLabels.js`, `StickyNotesPack.js`, `MindMapPack.js`, `CorePack.js`, `components/diagram-studio/connections/{Connection,labels/*,geometry/labelPositioning}.js`, `components/diagram-studio/elements/table/TableNode.js`, `lib/table/{tableModel,tableSvg}.js`, `lib/mcp/guide.js`, the `ontographia-lab` skill, `styles/diagram-studio.css`.
+- **Deviations from the design:** see ADR-0008 section 17.2 (per-pack policy files, compartment policies, icon columns, 14 px labels, SVG connection labels with `<title>`, hyphenated emergency breaks in table cells). No new dependency, no migration.
+- **Verification:** the audit harness on the seven packs, 1,380 nodes per path: 355 (editor), 421 (`map_structure`) and 660 (legacy default sizes) defective cells before, 0 after; no text under 11 px; clamps carry a badge or tooltip; TOGAF and ITIL labels clear the bottom border (70 and 30 within 6 px before, 0 after). 500-element mixed board: +1.6% time to all nodes (noise about 8%).
+- **Not verified:** Windows and Safari fallbacks; a real claude.ai session; PNG/PDF export parity (T3).
+- **Tests:** unit and component (`textSlot`, `textT2Sizing`, `textT2Structure`, `textTitleSlots`, `packsTypeScale`, `connectionLabelText` x2, `tableCellText`, `textUml`, `textTogafItil`, `textProductCap`, `textCldErd`, updated `tableNode`, `reviewFixes`, `stencilTemplates`, `textBlock`), e2e `text-t2` (10 tests).
+

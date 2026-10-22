@@ -22,7 +22,8 @@ import ConnectionLabel from './labels/ConnectionLabel';
 import EndpointLabel from './labels/EndpointLabel';
 
 // Geometry
-import { calculateMidLabelPosition } from './geometry/labelPositioning';
+import { calculateMidLabelPosition, placeMidLabel, placeEndpointLabel } from './geometry/labelPositioning';
+import { connectionLabelLayout, endpointLabelLayout } from '../../../lib/text/connectionLabel';
 import { buildOrthogonalPath } from './geometry/orthogonalRouting';
 import { resolveConnectionPorts } from './geometry/autoPorts';
 
@@ -613,6 +614,50 @@ export default function Connection({
     return calculateMidLabelPosition(sourcePos, targetPos, connection.waypoints || []);
   }, [sourcePos, targetPos, connection.waypoints, lineStyle, isSharp, effectivePorts.sourcePort, effectivePorts.targetPort, sourceBounds, targetBounds]);
 
+  // ADR-0008 5 (T2): the label is measured (wrapped, at most 200 px) and kept clear of the nodes it would sit on, the two
+  // endpoints included. Only a connection with a label pays for this.
+  const gap = sourcePos && targetPos ? Math.round(Math.hypot(targetPos.x - sourcePos.x, targetPos.y - sourcePos.y)) : null;
+  const labelBox = useMemo(() => (connection.label ? connectionLabelLayout(connection.label, gap === null ? undefined : gap - 8) : null), [connection.label, gap]);
+  // endpoint (cardinality) labels: beside the line, capped by the room between the nodes, never over a node or each other
+  const endpointNodes = useMemo(() => [sourceBounds, targetBounds, ...obstacles].filter(Boolean), [sourceBounds, targetBounds, obstacles]);
+  const endpointPlaced = useMemo(() => {
+    if (!sourcePos || !targetPos || (!connection.sourceLabel && !connection.targetLabel)) return { source: null, target: null, rects: [] };
+    const room = Math.hypot(targetPos.x - sourcePos.x, targetPos.y - sourcePos.y);
+    const maxW = Math.max(40, room - 8);
+    const rects = [];
+    const one = (value, end, other) => {
+      if (!value) return null;
+      const box = endpointLabelLayout(value, maxW);
+      const center = placeEndpointLabel(end, other, { width: box.width, height: box.height }, [...endpointNodes, ...rects]);
+      rects.push({ x: center.x - box.width / 2 - 2, y: center.y - box.height / 2 - 2, width: box.width + 4, height: box.height + 4 });
+      return { box, center };
+    };
+    const source = one(connection.sourceLabel, sourcePos, targetPos);
+    const target = one(connection.targetLabel, targetPos, sourcePos);
+    return { source, target, rects };
+  }, [connection.sourceLabel, connection.targetLabel, sourcePos, targetPos, endpointNodes]);
+  const placedLabel = useMemo(() => {
+    if (!labelBox || !labelPos) return { position: labelPos, leader: null };
+    // a margin around every node keeps the label off the shape edges (and off an arrow head at the endpoints)
+    const grow = (b, m) => ({ x: b.x - m, y: b.y - m, width: b.width + 2 * m, height: b.height + 2 * m });
+    const size = { width: labelBox.width, height: labelBox.height };
+    const clearOf = (pos, list) => !list.some((n) => pos.x - size.width / 2 < n.x + n.width && pos.x + size.width / 2 > n.x && pos.y - size.height / 2 < n.y + n.height && pos.y + size.height / 2 > n.y);
+    // the line point the label speaks for is the midpoint (labelPos sits 15 px above it)
+    const linePoint = { x: labelPos.x, y: labelPos.y + 15 };
+    // margins around the nodes first (off the shape edges and arrow heads), then none (a tight gap between two nodes),
+    // always clear of the endpoint labels
+    let result = null;
+    for (const [mEnd, mOther] of [[14, 6], [0, 0]]) {
+      const nodes = [sourceBounds && grow(sourceBounds, mEnd), targetBounds && grow(targetBounds, mEnd), ...obstacles.map((o) => grow(o, mOther)), ...endpointPlaced.rects].filter(Boolean);
+      result = placeMidLabel(labelPos, linePoint, nodes, size);
+      if (clearOf(result.position, nodes)) return result;
+    }
+    // a gap too tight for the label: keep it off the other labels at least (it may touch a node edge)
+    const last = placeMidLabel(labelPos, linePoint, endpointPlaced.rects, size);
+    return clearOf(last.position, endpointPlaced.rects) ? last : result;
+  }, [labelBox, labelPos, sourceBounds, targetBounds, obstacles, endpointPlaced]);
+  const placedLabelPos = placedLabel.position;
+
   // Event handlers
   const handleClick = useCallback((e) => {
     e.stopPropagation();
@@ -679,7 +724,9 @@ export default function Connection({
       {/* Mid-section label - inline editable per CLAUDE.md spec */}
       <ConnectionLabel
         value={connection.label || ''}
-        position={labelPos}
+        position={placedLabelPos}
+        labelBox={labelBox}
+        leader={placedLabel.leader}
         isSelected={isSelected}
         isEditing={isEditingLabel}
         onDoubleClick={handleLabelDoubleClick}
@@ -694,6 +741,9 @@ export default function Connection({
         position={sourcePos}
         port={effectivePorts.sourcePort}
         type="source"
+        otherPos={targetPos}
+        nodes={endpointNodes}
+        placed={endpointPlaced.source}
         isSelected={isSelected}
         isHovered={isHovered}
       />
@@ -704,6 +754,9 @@ export default function Connection({
         position={targetPos}
         port={effectivePorts.targetPort}
         type="target"
+        otherPos={sourcePos}
+        nodes={endpointNodes}
+        placed={endpointPlaced.target}
         isSelected={isSelected}
         isHovered={isHovered}
       />

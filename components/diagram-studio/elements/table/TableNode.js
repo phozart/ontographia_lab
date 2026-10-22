@@ -13,7 +13,7 @@ import { canWrite } from '../../sharing/accessMode';
 import { downloadExport } from '../../export/ExportManager';
 import { exportFilename } from '../../export/exportUtils';
 import {
-  TableError, LAYOUT, cellText, tableMetrics, tableElementSize, createEmptyTable, setCell, addRow, removeRow, moveRow, addColumn,
+  TableError, LAYOUT, cellText, cellLayout, tableMetrics, tableElementSize, createEmptyTable, setCell, addRow, removeRow, moveRow, addColumn,
   removeColumn, moveColumn, renameColumn, setColumnType, setColumnWidth, sortByColumn, setRowLink, setHeaderRow, pasteGrid,
   columnWidths, COLUMN_TYPES, MIN_COLUMN_WIDTH,
 } from '../../../../lib/table/tableModel';
@@ -37,7 +37,11 @@ const HTTP_URL = /^https?:\/\/\S+$/i;
 
 // ---------------------------------------------------------------- cells
 
-function CellValue({ column, value }) {
+// Cell text is drawn from the shared layout (lib/table/tableModel cellLayout): pre-broken lines, one text node, no browser
+// wrapping or CSS clamp. A clamped cell ends in an ellipsis and carries the full text as its tooltip (never silent).
+const CHIP_PAD = 18; // chip padding (2 x 8) plus its border (2 x 1)
+
+function CellValue({ column, value, width }) {
   if (value === undefined) return null;
   if (column.type === 'boolean') {
     return <span className={`ds-tbl-check${value ? ' on' : ''}`} role="img" aria-label={value ? 'Yes' : 'No'}>{value ? '✓' : ''}</span>;
@@ -45,12 +49,20 @@ function CellValue({ column, value }) {
   const text = cellText(value);
   if (column.type === 'select') {
     const opt = Array.isArray(column.options) ? column.options.find((o) => o.value === value) : null;
-    return <span className="ds-tbl-chip" style={opt?.color ? { background: `${opt.color}55`, borderColor: opt.color } : undefined}>{text}</span>;
+    const lay = cellLayout(text, width - CHIP_PAD, { maxLines: 1 });
+    return (
+      <span className="ds-tbl-chip" title={lay.overflow ? text : undefined} data-text-overflow={lay.overflow ? 'true' : undefined} style={opt?.color ? { background: `${opt.color}55`, borderColor: opt.color } : undefined}>
+        {lay.lines.map((l) => l.text).join('')}
+      </span>
+    );
   }
+  const lay = cellLayout(text, width, { align: column.type === 'number' ? 'end' : 'start' });
+  const shown = lay.lines.map((l) => l.text).join('\n');
+  const flag = lay.overflow ? { title: text, 'data-text-overflow': 'true' } : null;
   if (column.type === 'text' && HTTP_URL.test(text.trim())) {
-    return <a className="ds-tbl-text" href={text.trim()} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()}>{text}</a>;
+    return <a className="ds-tbl-text" href={text.trim()} target="_blank" rel="noopener noreferrer" onMouseDown={(e) => e.stopPropagation()} {...flag}>{shown}</a>;
   }
-  return <span className="ds-tbl-text">{text}</span>;
+  return <span className="ds-tbl-text" {...flag}>{shown}</span>;
 }
 
 const Row = memo(function Row({ row, index, columns, widths, height, linkLabel, linkLive, selected, canEdit, activeColId, editingColId, h }) {
@@ -93,7 +105,7 @@ const Row = memo(function Row({ row, index, columns, widths, height, linkLabel, 
                 onPasteText={(text) => h.pasteText(row.id, col.id, text)}
               />
             ) : (
-              <CellValue column={col} value={row.cells?.[col.id]} />
+              <CellValue column={col} value={row.cells?.[col.id]} width={widths[ci]} />
             )}
           </div>
         );
@@ -532,8 +544,9 @@ function TableStyles() {
       .ds-tbl-cell.active { outline: 2px solid var(--selection, #4FB3CE); outline-offset: -2px; }
       .ds-tbl-hname { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .ds-tbl-type { color: #64748b; font-weight: 400; font-size: 11px; }
-      .ds-tbl-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: ${LAYOUT.maxLines}; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; min-width: 0; }
-      .ds-tbl-chip { display: inline-block; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+      .ds-tbl-text { display: block; white-space: pre; user-select: text; min-width: 0; }
+      .ds-tbl-cell.t-number .ds-tbl-text { text-align: end; }
+      .ds-tbl-chip { display: inline-block; padding: 0 8px; border: 1px solid #cbd5e1; border-radius: 10px; white-space: pre; max-width: 100%; }
       .ds-tbl-check { display: inline-flex; width: 16px; height: 16px; border: 1.5px solid #94a3b8; border-radius: 3px; align-items: center; justify-content: center; font-size: 12px; line-height: 1; margin-top: 0; }
       .ds-tbl-check.on { background: var(--selection, #4FB3CE); border-color: var(--selection, #4FB3CE); color: #fff; }
       .ds-tbl-mini { all: unset; box-sizing: border-box; cursor: pointer; min-width: 16px; height: 18px; padding: 0 3px; border-radius: 3px; text-align: center; color: #475569; font-size: 12px; line-height: 18px; }

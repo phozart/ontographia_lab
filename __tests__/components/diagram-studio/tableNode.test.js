@@ -7,7 +7,7 @@ jest.mock('../../../components/diagram-studio/export/ExportManager', () => ({ do
 
 import TableNode, { REVEAL_EVENT } from '../../../components/diagram-studio/elements/table/TableNode';
 import { downloadExport } from '../../../components/diagram-studio/export/ExportManager';
-import { tableElementSize } from '../../../lib/table/tableModel';
+import { tableElementSize, cellLayout } from '../../../lib/table/tableModel';
 
 const seqTable = () => ({
   headerRow: true,
@@ -65,8 +65,32 @@ describe('rendering', () => {
     const el = mk();
     el.data.table.rows[0].cells['col-a'] = '<img src=x onerror=alert(1)><script>alert(2)</script>';
     const { container } = render(<Harness initial={el} selected={false} />);
-    expect(cell(0, 0)).toHaveTextContent('<img src=x onerror=alert(1)><script>alert(2)</script>');
+    // drawn as the shared layout's pinned lines (a word wider than the column is broken with a hyphen)
+    const lines = cellLayout('<img src=x onerror=alert(1)><script>alert(2)</script>', Harness.current.data.table.columns[0].width || 160).lines.map((l) => l.text);
+    expect(cell(0, 0).querySelector('.ds-tbl-text').textContent).toBe(lines.join('\n'));
+    expect(cell(0, 0)).toHaveTextContent('<img src=x onerror=alert(1)>');
     expect(container.querySelector('img, script')).toBeNull();
+  });
+  test('ADR-0008 T2: a long cell is drawn as the pinned lines of the shared layout; a clamped cell shows an ellipsis and the full text as its tooltip', () => {
+    const el = mk();
+    const long = 'Aggregate all inbound partner shipment notifications, reconcile them against open purchase orders and flag any discrepancies for review. '.repeat(3);
+    el.data.table.rows[0].cells['col-a'] = long;
+    el.data.table.rows[1].cells['col-a'] = 'Order Service';
+    el.size = tableElementSize(el.data.table);
+    const { container } = render(<Harness initial={el} selected={false} />);
+    const clamped = cell(0, 0).querySelector('.ds-tbl-text');
+    expect(clamped.getAttribute('title')).toBe(long);
+    expect(clamped.getAttribute('data-text-overflow')).toBe('true');
+    expect(clamped.textContent.split('\n')).toHaveLength(5);
+    expect(clamped.textContent.endsWith('…')).toBe(true);
+    const plain = cell(1, 0).querySelector('.ds-tbl-text');
+    expect(plain.getAttribute('title')).toBeNull();
+    expect(plain.textContent).toBe('Order Service');
+    // no CSS clamp and no browser wrapping any more
+    const src = require('fs').readFileSync(require('path').join(__dirname, '../../../components/diagram-studio/elements/table/TableNode.js'), 'utf8');
+    expect(src).not.toMatch(/line-clamp/);
+    expect(src).not.toMatch(/overflow-wrap:\s*anywhere/);
+    expect(container.querySelector('.ds-tbl-text')).not.toBeNull();
   });
   test('an http(s) value is a safe link, other schemes are text', () => {
     const el = mk();
