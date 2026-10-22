@@ -1,9 +1,12 @@
 // components/diagram-studio/packs/ERDPack.js
 // Entity Relationship Diagram pack with fields, keys, and cardinality
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { DiamondNode } from './CorePack';
-import { normalizeFields, visibleRows } from './erdFields';
+import { normalizeFields, visibleRows, ERD_HEADER_H, ERD_ROW_H, ERD_INDEX_H } from './erdFields';
+import { ElementText, SlotText } from '../text/useTextLayout';
+import TextBlock from '../text/TextBlock';
+import { layoutForSlot } from '../../../lib/text/fit';
 import { stencils, connectionTypes } from './catalog/erd';
 
 // ============ STENCILS ============
@@ -320,81 +323,101 @@ const nodeProperties = [
 
 // ============ CUSTOM RENDERERS ============
 
-const KEY_BADGE = {
-  fontSize: 9,
-  fontWeight: 700,
-  padding: '0 4px',
-  borderRadius: 3,
-  background: 'rgba(79, 179, 206, 0.18)',
-  color: 'var(--text, #1f2937)',
-  lineHeight: '14px',
-};
+// Geometry of the entity card (px). The name header and every attribute row are text slots laid out by the shared module
+// (ADR-0008 T2): the header holds the name (own font, up to 8 lines, the card's header grows with it), each row is two
+// pinned mono 11 px blocks (name left, type right) that clamp with the badge, never cut silently.
+const BADGE_COL = { view: 52, junction: 76 }; // the VIEW / JUNCTION tag at the left of the header (same numbers as the text policy)
+const TYPE_SHARE = 0.4; // share of the row width the type column gets
+const NAME_PAD_X = 12;
+
+// The header of an entity: the name laid out in the header strip. Returns the layout and the header height, which grows
+// with the number of name lines (a 1 or 2 line name fits the 40 px strip).
+function useEntityHeader(element, label, innerW, badgeW, maxH) {
+  const w = Math.max(20, innerW - 2 * NAME_PAD_X - badgeW);
+  return useMemo(() => {
+    const probe = layoutForSlot(element, { text: label, box: { x: 0, y: 0, width: w, height: 8 * 17.5 }, role: 'title', own: true, maxLines: 8, valign: 'top' });
+    const need = Math.ceil(probe.layout.lines.length * probe.layout.lineHeight) + 12;
+    const headerH = Math.min(Math.max(ERD_HEADER_H, need), Math.max(ERD_HEADER_H, maxH)); // never taller than the card leaves room for one row: a legacy small card clamps with the badge
+    const box = { x: NAME_PAD_X + badgeW, y: 0, width: w, height: headerH };
+    const { layout } = layoutForSlot(element, { text: label, box, role: 'title', own: true, maxLines: 8, valign: 'middle' });
+    return { layout, box, headerH };
+  }, [element, label, w, badgeW, maxH]);
+}
+
+// A field row: a pk/fk tinted strip with the key icons, then the name and the type as slots in the row
+function FieldRow({ element, field, y, innerW }) {
+  const typeW = Math.floor(innerW * TYPE_SHARE);
+  const nameX = 10 + 20 + 6;
+  const nameW = Math.max(20, innerW - nameX - 10 - typeW - 6);
+  const keys = `${field.isPrimaryKey ? 'PK ' : ''}${field.isForeignKey ? 'FK ' : ''}`;
+  const type = `${keys}${field.dataType || ''}${field.isNullable === false ? ' *' : ''}`.trim();
+  return (
+    <div className={`erd-field ${field.isPrimaryKey ? 'pk' : ''} ${field.isForeignKey ? 'fk' : ''}`} style={{ top: y }}>
+      <span className="erd-field-icons">
+        {field.isPrimaryKey && <span className="erd-pk-icon" title="Primary Key">🔑</span>}
+        {field.isForeignKey && <span className="erd-fk-icon" title="Foreign Key">🔗</span>}
+        {!field.isPrimaryKey && !field.isForeignKey && <span className="erd-field-spacer">•</span>}
+      </span>
+      <SlotText element={element} text={field.name || ''} box={{ x: nameX, y: 0, width: nameW, height: ERD_ROW_H }} role="meta" mono align="start" maxLines={1} color="var(--text, #1f2937)" testId="field" />
+      <SlotText element={element} text={type} box={{ x: innerW - 10 - typeW, y: 0, width: typeW, height: ERD_ROW_H }} role="meta" mono align="end" maxLines={1} color="var(--text-muted, #6b7280)" testId="field-type" />
+    </div>
+  );
+}
 
 // ERD Entity Renderer with fields
-function ERDEntityRenderer({ element, stencil, isSelected }) {
+function ERDEntityRenderer({ element, stencil }) {
   const { label, data } = element;
   // Ensure fields and indexes are always arrays
   // data.fields may be structured rows, legacy strings, or a free-text block
   const fields = normalizeFields(data?.fields);
   const indexes = Array.isArray(data?.indexes) ? data.indexes : [];
+  const width = element.size?.width || stencil?.defaultSize?.width || 200;
   const height = element.size?.height || stencil?.defaultSize?.height || 160;
-  const { shown, hidden } = visibleRows(height, fields.length, indexes.length);
   const isWeakEntity = element.type === 'weak-entity';
   const isJunction = element.type === 'junction';
   const isView = element.type === 'view';
+  const bw = isWeakEntity ? 4 : 2; // the card's border; slots are positioned inside it
+  const innerW = width - 2 * bw;
+  const badgeW = BADGE_COL[element.type] || 0;
+  const header = useEntityHeader(element, label || 'Untitled', innerW, badgeW, height - 2 * bw - ERD_ROW_H - 12);
+  const extra = header.headerH - ERD_HEADER_H; // a long name pushes the rows down
+  const { shown, hidden } = visibleRows(height - extra, fields.length, indexes.length);
 
   // Get color from stencil
   const color = element.color || stencil?.color || '#3b82f6';
+  const rowsTop = header.headerH + 6;
+  const idxH = 8 + indexes.length * ERD_INDEX_H;
 
   return (
     <div className={`erd-entity-node ${isWeakEntity ? 'weak' : ''} ${isView ? 'view' : ''}`} style={{ borderColor: color }}>
-      {/* Header */}
-      <div className="erd-entity-header" style={{ backgroundColor: color }}>
+      {/* Header: the name through the shared layout */}
+      <div className="erd-entity-header" style={{ backgroundColor: color, height: header.headerH }}>
         {isView && <span className="erd-entity-badge">VIEW</span>}
         {isJunction && <span className="erd-entity-badge">JUNCTION</span>}
-        <span className="erd-entity-name">{label || 'Untitled'}</span>
+        <TextBlock layout={header.layout} box={header.box} color="#ffffff" fontFamily={element.fontFamily} fontStyle={element.fontStyle} textDecoration={element.textDecoration} testId="name" />
       </div>
 
       {/* Fields section */}
-      <div className="erd-entity-fields">
-        {fields.length > 0 ? (
-          fields.slice(0, shown).map((field, idx) => (
-            <div key={idx} className={`erd-field ${field.isPrimaryKey ? 'pk' : ''} ${field.isForeignKey ? 'fk' : ''}`}>
-              <span className="erd-field-icons">
-                {field.isPrimaryKey && <span className="erd-pk-icon" title="Primary Key">🔑</span>}
-                {field.isForeignKey && <span className="erd-fk-icon" title="Foreign Key">🔗</span>}
-                {!field.isPrimaryKey && !field.isForeignKey && <span className="erd-field-spacer">•</span>}
-              </span>
-              <span className="erd-field-name" style={{ minWidth: 48 }}>{field.name}</span>
-              {(field.isPrimaryKey || field.isForeignKey) && (
-                <span className="erd-field-keys" style={{ display: 'inline-flex', gap: 2 }}>
-                  {field.isPrimaryKey && <span className="erd-key-badge" style={KEY_BADGE}>PK</span>}
-                  {field.isForeignKey && <span className="erd-key-badge" style={KEY_BADGE}>FK</span>}
-                </span>
-              )}
-              <span
-                className="erd-field-type"
-                title={field.dataType || undefined}
-                style={{ maxWidth: '45%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-              >
-                {field.dataType}
-              </span>
-              {field.isNullable === false && <span className="erd-field-notnull" title="NOT NULL">*</span>}
-            </div>
-          ))
-        ) : (
-          <div className="erd-field empty">No fields defined</div>
-        )}
-        {hidden > 0 && <div className="erd-field more" style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>+{hidden} more</div>}
-      </div>
+      {fields.length > 0 ? (
+        fields.slice(0, shown).map((field, idx) => <FieldRow key={idx} element={element} field={field} y={rowsTop + idx * ERD_ROW_H} innerW={innerW} />)
+      ) : (
+        <div className="erd-field empty" style={{ top: rowsTop }}>
+          <SlotText element={element} text="No fields defined" box={{ x: 10, y: 0, width: innerW - 20, height: ERD_ROW_H }} role="meta" align="center" maxLines={1} color="var(--text-muted, #6b7280)" testId="field" />
+        </div>
+      )}
+      {hidden > 0 && (
+        <div className="erd-field more" style={{ top: rowsTop + shown * ERD_ROW_H }}>
+          <SlotText element={element} text={`+${hidden} more`} box={{ x: 36, y: 0, width: innerW - 46, height: ERD_ROW_H }} role="meta" align="start" maxLines={1} color="var(--text-muted, #6b7280)" testId="field" />
+        </div>
+      )}
 
       {/* Indexes section (if present) */}
       {indexes.length > 0 && (
-        <div className="erd-entity-indexes">
+        <div className="erd-entity-indexes" style={{ height: idxH }}>
           {indexes.map((idx, i) => (
-            <div key={i} className="erd-index">
+            <div key={i} className="erd-index" style={{ top: 4 + i * ERD_INDEX_H }}>
               <span className="erd-index-icon">⇢</span>
-              <span>{idx}</span>
+              <SlotText element={element} text={String(idx)} box={{ x: 28, y: 0, width: Math.max(20, innerW - 38), height: ERD_INDEX_H }} role="meta" mono align="start" maxLines={1} color="var(--text-muted, #6b7280)" testId="index" />
             </div>
           ))}
         </div>
@@ -403,19 +426,20 @@ function ERDEntityRenderer({ element, stencil, isSelected }) {
   );
 }
 
-// Chen notation attribute renderer
+// Chen notation attribute renderer (an ellipse; the label is the shared layout inside its inscribed rectangle)
 function ERDAttributeRenderer({ element, stencil }) {
   const isPk = element.data?.isPrimaryKey;
   const isMultivalued = element.data?.isMultivalued;
   const isDerived = element.data?.isDerived;
   const color = element.color || stencil?.color || '#22c55e';
+  const styled = useMemo(() => (isPk && !element.textDecoration ? { ...element, textDecoration: 'underline' } : element), [element, isPk]);
 
   return (
     <div
       className={`erd-attribute-node ${isPk ? 'pk' : ''} ${isMultivalued ? 'multivalued' : ''} ${isDerived ? 'derived' : ''}`}
       style={{ borderColor: color }}
     >
-      <span className={isPk ? 'underline' : ''}>{element.label}</span>
+      <ElementText element={styled} stencil={stencil} packId="erd" text={element.label || ''} color={element.textColor || 'var(--text, #1f2937)'} offsetX={isMultivalued ? -4 : -2} offsetY={isMultivalued ? -4 : -2} />
     </div>
   );
 }
@@ -432,7 +456,7 @@ function renderNode(element, stencil, isSelected) {
       return <ERDAttributeRenderer element={element} stencil={stencil} />;
     case 'relationship-chen':
       // Chen relationship: SVG diamond on bbox midpoints (same renderer as Core diamond)
-      return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} outlined />;
+      return <DiamondNode element={element} stencil={stencil} isSelected={isSelected} outlined packId="erd" />;
     default:
       return null;
   }

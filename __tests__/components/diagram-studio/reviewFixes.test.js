@@ -70,13 +70,13 @@ describe('ERD row capacity', () => {
     expect(container.textContent).not.toMatch(/more/);
     expect(container.querySelectorAll('.erd-field').length).toBe(9);
   });
-  test('long type has a tooltip and ellipsis; name cell keeps a min width', () => {
+  test('long type is clamped by the shared layout with the full text on the badge; the name keeps its own column', () => {
     const f = [{ name: 'id', dataType: 'x'.repeat(80) }];
     const { container } = render(<div>{ERDPack.renderNode({ ...el(160), data: { fields: f } }, stencil, false)}</div>);
-    const type = container.querySelector('.erd-field-type');
-    expect(type.getAttribute('title')).toBe('x'.repeat(80));
-    expect(type.style.textOverflow).toBe('ellipsis');
-    expect(container.querySelector('.erd-field-name').style.minWidth).not.toBe('');
+    const type = container.querySelector('[data-text-block="field-type"]');
+    expect(type.getAttribute('data-overflow')).toBe('true');
+    expect(type.querySelector('.ds-text-badge').getAttribute('title')).toBe('x'.repeat(80));
+    expect(container.querySelector('[data-text-block="field"]').textContent).toBe('id');
   });
 });
 
@@ -112,7 +112,11 @@ describe('TOGAF Business Actor label vs icon', () => {
     const stencil = TOGAFPack.stencils.find((s) => s.id === 'business-actor');
     const el = { id: 'a', type: 'business-actor', label: 'Customer', size: { ...stencil.defaultSize } };
     const { container } = render(<div>{TOGAFPack.renderNode(el, stencil, false)}</div>);
-    expect([...container.querySelectorAll('div')].some((d) => d.style.paddingRight === '34px')).toBe(true);
+    // ADR-0008 T2: the label's text area (from the stencil policy) ends 34 px before the right edge, clear of the figure
+    const { policyFor, textBoxOf } = require('../../../lib/text/policy');
+    const box = textBoxOf(policyFor('togaf', stencil), el.size);
+    expect(el.size.width - (box.x + box.width)).toBeGreaterThanOrEqual(34);
+    expect(container.querySelector('[data-text-block]').textContent).toBe('Customer');
   });
 });
 

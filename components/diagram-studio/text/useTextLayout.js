@@ -4,7 +4,7 @@
 
 import { useMemo } from 'react';
 import { policyFor } from '../../../lib/text/policy';
-import { layoutForElement, layoutForExternal, layoutForSlot, layoutForTitle, labelOf } from '../../../lib/text/fit';
+import { layoutForElement, layoutForExternal, layoutForList, layoutForSlot, layoutForTitle, labelOf } from '../../../lib/text/fit';
 import { MONO_FAMILY } from '../../../lib/text/tokens';
 import TextBlock from './TextBlock';
 
@@ -82,4 +82,20 @@ export function SlotText({ element, text, box, role, mode, maxLines, align, vali
       testId={testId}
     />
   );
+}
+
+/**
+ * A member list (UML attributes and operations, enum values): one mono line per item, each cut with an ellipsis, items
+ * beyond the box hidden behind the overflow badge (layoutForList in lib/text/fit.js). Memoized on the item text.
+ */
+export function ListText({ element, items, box, role, mono, align, color, testId = 'list', className }) {
+  const list = items || [];
+  const key = `${list.length}\u0001${list.join('\u0001')}`;
+  const { layout, box: b } = useMemo(
+    () => layoutForList(element, { items: list, box: { x: box.x, y: box.y, width: box.width, height: box.height }, role, mono, align }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [element, key, box.x, box.y, box.width, box.height, role, mono, align],
+  );
+  if (!layout.lines.length) return null;
+  return <TextBlock layout={layout} box={b} color={color} fontFamily={mono === false ? undefined : MONO_FAMILY} className={className} testId={testId} />;
 }

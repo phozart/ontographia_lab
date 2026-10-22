@@ -1,6 +1,12 @@
-import { stencils, connectionTypes } from './catalog/togaf';
 // components/diagram-studio/packs/TOGAFPack.js
 // TOGAF/ArchiMate Enterprise Architecture pack
+
+import { stencils, connectionTypes } from './catalog/togaf';
+import { ElementText, SlotText } from '../text/useTextLayout';
+
+// Stencils that draw their own figure at the right edge instead of an icon column, and the oval motivation shapes
+const NO_ICON = new Set(['business-actor', 'stakeholder', 'application-component', 'system-software']);
+const ELLIPSE_TYPES = new Set(['driver', 'assessment', 'goal', 'outcome']);
 
 // ============ STENCILS ============
 
@@ -818,63 +824,40 @@ function ArchiMateNode({ element, stencil, isSelected }) {
     );
   };
 
+  const hasIcon = !NO_ICON.has(type);
+  const iconSize = 20;
+  // where the icon column starts: the elliptical motivation shapes and chevrons curve in, so the icon sits further in
+  const iconLeft = ELLIPSE_TYPES.has(type) ? 12 : type === 'value-stream' ? 23 : 8;
+  const labelColor = element.textColor || '#1f2937';
+
   return (
-    <div
-      className="archimate-node"
-      style={{
-        width: '100%',
-        height: '100%',
-        position: 'relative',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: isContainer ? 'flex-start' : 'center',
-        padding: isContainer ? '6px 8px' : '4px',
-      }}
-    >
+    <div className="archimate-node" style={{ width: '100%', height: '100%', position: 'relative' }}>
       {/* Shape background */}
       {getShape()}
 
-      {/* Content */}
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        display: 'flex',
-        flexDirection: isContainer ? 'row' : 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 4,
-        width: '100%',
-        padding: isContainer ? '0 4px' : '0',
-        marginTop: isContainer ? 2 : 0,
-        // keep the label clear of the stick figure drawn at the right edge
-        paddingRight: ['business-actor', 'stakeholder'].includes(type) ? 34 : undefined,
-      }}>
-        {/* Icon */}
-        {!['business-actor', 'stakeholder', 'application-component', 'system-software'].includes(type) && (
-          <div style={{ flexShrink: 0 }}>
-            {getIcon()}
-          </div>
-        )}
-
-        {/* Label */}
-        <div style={{
-          fontSize: isContainer ? 12 : 11,
-          fontWeight: 600,
-          color: '#1f2937',
-          textAlign: 'center',
-          lineHeight: 1.2,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          display: '-webkit-box',
-          WebkitLineClamp: isContainer ? 1 : 2,
-          WebkitBoxOrient: 'vertical',
-          wordBreak: 'break-word',
-          maxWidth: '90%',
-        }}>
-          {label}
+      {/* Icon: its own column at the left (containers: in the header), never stacked over the label */}
+      {hasIcon && (
+        <div style={{ position: 'absolute', left: iconLeft, top: isContainer ? 4 : Math.max(2, (height - iconSize) / 2), zIndex: 1 }}>
+          {getIcon()}
         </div>
-      </div>
+      )}
+
+      {/* Label: the shared text layout, in the slot the stencil policy reserves (ADR-0008) */}
+      {isContainer ? (
+        <SlotText
+          element={element}
+          text={label}
+          box={{ x: iconLeft + (hasIcon ? iconSize + 6 : 0), y: type === 'node' ? 8 : 4, width: Math.max(20, width - iconLeft - (hasIcon ? iconSize + 6 : 0) - 8), height: 22 }}
+          role="title"
+          maxLines={1}
+          align="start"
+          own
+          color={labelColor}
+          testId="title"
+        />
+      ) : (
+        <ElementText packId="togaf" element={element} stencil={stencil} color={labelColor} />
+      )}
     </div>
   );
 }

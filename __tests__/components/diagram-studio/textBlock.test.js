@@ -160,8 +160,8 @@ describe('migrated renderNodes', () => {
     const m = draw('sticky-notes', 'circle-marker', 'Flag');
     expect(m.container.querySelector('.ds-node-label-below')).not.toBeNull();
     const l = draw('sticky-notes', 'link-card', 'Docs', { data: { url: 'https://example.com/a/very/long/url' } });
-    expect(lineSpans(l)).toHaveLength(1);
-    expect(l.container.querySelector('[title="https://example.com/a/very/long/url"]')).not.toBeNull();
+    expect(lineSpans(l)).toHaveLength(2); // the title and the URL line (a shared-layout slot, ellipsis + badge with the full URL)
+    expect(l.container.querySelector('[data-text-block="url"] [title="https://example.com/a/very/long/url"], [title="https://example.com/a/very/long/url"]')).not.toBeNull();
   });
 
   test.each(['central-topic', 'main-topic', 'sub-topic', 'floating-topic', 'topic-red', 'callout', 'boundary', 'summary'])('MindMap %s: shape in an svg, label in HTML lines, min 11 px', (id) => {

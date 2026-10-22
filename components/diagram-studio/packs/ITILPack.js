@@ -3,6 +3,8 @@
 
 import { pickLabelColor } from './colorUtils';
 import { stencils, connectionTypes } from './catalog/itil';
+import { ElementText, SlotText } from '../text/useTextLayout';
+import { layoutForSlot } from '../../../lib/text/fit';
 
 // ============ STENCILS ============
 
@@ -64,31 +66,43 @@ const templates = [
 ];
 
 // ============ CUSTOM RENDERERS ============
+// Labels go through the shared text layout (ADR-0008 T2): the stencil policy (lib/text/policies/itil.js) reserves the
+// text area, the renderer draws the card and the icon. Header texts (service type, priority, status) are meta slots.
+
+const CARD = { width: '100%', height: '100%', borderRadius: 8, boxSizing: 'border-box' };
+const ICON_CENTER = (height, size) => Math.max(2, (height - size) / 2);
+const sizeOfElement = (element, stencil, fallback) => element.size || stencil?.defaultSize || fallback;
+
+// Header strip of a card (status, priority, type): a colored band with a meta text and an optional badge at the right
+function HeaderStrip({ element, width, band, color, text, badge, badgeColor }) {
+  const badgeText = badge || '';
+  // the badge is as wide as its text plus padding (measured with the shared tables, not guessed)
+  const bw = badgeText ? Math.ceil(layoutForSlot(element, { text: badgeText, box: { x: 0, y: 0, width: 200, height: 16 }, role: 'meta', weight: 600 }).layout.width) + 12 : 0;
+  const textW = Math.max(20, width - 20 - (bw ? bw + 6 : 0));
+  return (
+    <>
+      <SlotText element={element} text={text} box={{ x: 10, y: 2 + (band - 14) / 2, width: textW, height: 14 }} role="meta" weight={600} align="start" maxLines={1} color={color} testId="meta" />
+      {bw > 0 && (
+        <div style={{ position: 'absolute', left: width - 8 - bw, top: 2 + (band - 16) / 2, width: bw, height: 16, borderRadius: 4, background: badgeColor }}>
+          <SlotText element={element} text={badgeText} box={{ x: 0, y: 1, width: bw, height: 14 }} role="meta" weight={600} maxLines={1} color={pickLabelColor(badgeColor)} testId="meta" />
+        </div>
+      )}
+    </>
+  );
+}
 
 // Service Value Chain Activity Renderer
 function SVCActivityRenderer({ element, stencil }) {
   const color = element.color || stencil?.color || '#3b82f6';
   const icon = stencil?.icon || '⚙️';
+  const { height } = sizeOfElement(element, stencil, { height: 70 });
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: `linear-gradient(135deg, ${color}15, ${color}30)`,
-      border: `2px solid ${color}`,
-      borderRadius: 8,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
-      padding: 8,
-      boxSizing: 'border-box',
-    }}>
-      <span style={{ fontSize: 20 }}>{icon}</span>
-      <span style={{ fontSize: 12, fontWeight: 600, textAlign: 'center', color: 'var(--text)' }}>
-        {element.label || stencil?.name}
-      </span>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div style={{ ...CARD, background: `linear-gradient(135deg, ${color}15, ${color}30)`, border: `2px solid ${color}` }} />
+      {/* ds-allow-text-style: icon glyph, not text */}
+      <span style={{ position: 'absolute', left: 8, top: ICON_CENTER(height, 24), fontSize: 20, lineHeight: '24px' }}>{icon}</span>
+      <ElementText packId="itil" element={element} stencil={stencil} text={element.label || stencil?.name || ''} color={element.textColor || 'var(--text)'} />
     </div>
   );
 }
@@ -98,59 +112,24 @@ function ServiceRenderer({ element, stencil }) {
   const color = element.color || stencil?.color || '#3b82f6';
   const serviceType = element.data?.serviceType || 'business';
   const criticality = element.data?.criticality;
-
-  const critColors = {
-    critical: '#ef4444',
-    high: '#f59e0b',
-    medium: '#22c55e',
-    low: '#6b7280',
-  };
+  const { width } = sizeOfElement(element, stencil, { width: 160 });
+  const critColors = { critical: '#ef4444', high: '#f59e0b', medium: '#22c55e', low: '#6b7280' };
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: 'white',
-      border: `2px solid ${color}`,
-      borderRadius: 8,
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        background: color,
-        color: pickLabelColor(color),
-        padding: '6px 10px',
-        fontSize: 11,
-        fontWeight: 600,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        <span>⚙️ {serviceType.toUpperCase()}</span>
-        {criticality && (
-          <span style={{
-            background: critColors[criticality],
-            padding: '2px 6px',
-            borderRadius: 4,
-            fontSize: 9,
-          }}>
-            {criticality.toUpperCase()}
-          </span>
-        )}
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div style={{ ...CARD, background: 'white', border: `2px solid ${color}`, overflow: 'hidden' }}>
+        <div style={{ background: color, height: 24 }} />
       </div>
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 8,
-        fontSize: 13,
-        fontWeight: 500,
-        textAlign: 'center',
-      }}>
-        {element.label || 'Service'}
-      </div>
+      <HeaderStrip
+        element={element}
+        width={width}
+        band={24}
+        color={pickLabelColor(color)}
+        text={`⚙️ ${serviceType.toUpperCase()}`}
+        badge={criticality ? criticality.toUpperCase() : ''}
+        badgeColor={critColors[criticality]}
+      />
+      <ElementText packId="itil" element={element} stencil={stencil} text={element.label || 'Service'} color={element.textColor || undefined} />
     </div>
   );
 }
@@ -158,50 +137,17 @@ function ServiceRenderer({ element, stencil }) {
 // Incident Renderer
 function IncidentRenderer({ element, stencil }) {
   const priority = element.data?.priority || 'p3';
-  const colors = {
-    p1: '#ef4444',
-    p2: '#f59e0b',
-    p3: '#3b82f6',
-    p4: '#6b7280',
-  };
+  const colors = { p1: '#ef4444', p2: '#f59e0b', p3: '#3b82f6', p4: '#6b7280' };
   const color = colors[priority];
+  const { width } = sizeOfElement(element, stencil, { width: 140 });
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: `linear-gradient(135deg, ${color}15, ${color}30)`,
-      border: `2px solid ${color}`,
-      borderRadius: 8,
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        background: color,
-        color: pickLabelColor(color),
-        padding: '4px 8px',
-        fontSize: 10,
-        fontWeight: 600,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 4,
-      }}>
-        <span>⚠️</span>
-        <span>{priority.toUpperCase()}</span>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div style={{ ...CARD, background: `linear-gradient(135deg, ${color}15, ${color}30)`, border: `2px solid ${color}`, overflow: 'hidden' }}>
+        <div style={{ background: color, height: 20 }} />
       </div>
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 6,
-        fontSize: 12,
-        fontWeight: 500,
-        textAlign: 'center',
-      }}>
-        {element.label || 'Incident'}
-      </div>
+      <HeaderStrip element={element} width={width} band={20} color={pickLabelColor(color)} text={`⚠️ ${priority.toUpperCase()}`} />
+      <ElementText packId="itil" element={element} stencil={stencil} text={element.label || 'Incident'} color={element.textColor || undefined} />
     </div>
   );
 }
@@ -209,50 +155,17 @@ function IncidentRenderer({ element, stencil }) {
 // Problem Renderer
 function ProblemRenderer({ element, stencil }) {
   const status = element.data?.status || 'open';
-  const statusColors = {
-    open: '#ef4444',
-    investigating: '#f59e0b',
-    'known-error': '#6b7280',
-    resolved: '#22c55e',
-  };
+  const statusColors = { open: '#ef4444', investigating: '#f59e0b', 'known-error': '#6b7280', resolved: '#22c55e' };
   const color = statusColors[status];
+  const { width } = sizeOfElement(element, stencil, { width: 140 });
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: 'white',
-      border: `2px solid ${color}`,
-      borderRadius: 8,
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        background: color,
-        color: pickLabelColor(color),
-        padding: '4px 8px',
-        fontSize: 10,
-        fontWeight: 600,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 4,
-      }}>
-        <span>🔍</span>
-        <span>{status.replace('-', ' ').toUpperCase()}</span>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div style={{ ...CARD, background: 'white', border: `2px solid ${color}`, overflow: 'hidden' }}>
+        <div style={{ background: color, height: 20 }} />
       </div>
-      <div style={{
-        flex: 1,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 6,
-        fontSize: 12,
-        fontWeight: 500,
-        textAlign: 'center',
-      }}>
-        {element.label || 'Problem'}
-      </div>
+      <HeaderStrip element={element} width={width} band={20} color={pickLabelColor(color)} text={`🔍 ${status.replace('-', ' ').toUpperCase()}`} />
+      <ElementText packId="itil" element={element} stencil={stencil} text={element.label || 'Problem'} color={element.textColor || undefined} />
     </div>
   );
 }
@@ -261,61 +174,56 @@ function ProblemRenderer({ element, stencil }) {
 function CIRenderer({ element, stencil }) {
   const ciType = element.data?.ciType || 'hardware';
   const color = element.color || stencil?.color || '#8b5cf6';
-  const icons = {
-    hardware: '🖥️',
-    software: '💿',
-    network: '🌐',
-    document: '📄',
-    service: '⚙️',
-  };
+  const icons = { hardware: '🖥️', software: '💿', network: '🌐', document: '📄', service: '⚙️' };
+  const { width, height } = sizeOfElement(element, stencil, { width: 140, height: 70 });
 
   return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      background: `linear-gradient(135deg, ${color}10, ${color}25)`,
-      border: `2px solid ${color}`,
-      borderRadius: 8,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
-      padding: 8,
-      boxSizing: 'border-box',
-    }}>
-      <span style={{ fontSize: 18 }}>{icons[ciType]}</span>
-      <span style={{ fontSize: 11, fontWeight: 600, textAlign: 'center', color: 'var(--text)' }}>
-        {element.label || 'CI'}
-      </span>
-      <span style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-        {ciType}
-      </span>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div style={{ ...CARD, background: `linear-gradient(135deg, ${color}10, ${color}25)`, border: `2px solid ${color}` }} />
+      {/* ds-allow-text-style: icon glyph, not text */}
+      <span style={{ position: 'absolute', left: 8, top: ICON_CENTER(height - 14, 22), fontSize: 18, lineHeight: '22px' }}>{icons[ciType]}</span>
+      <ElementText packId="itil" element={element} stencil={stencil} text={element.label || 'CI'} color={element.textColor || 'var(--text)'} />
+      <SlotText element={element} text={ciType.toUpperCase()} box={{ x: 8, y: height - 20, width: width - 16, height: 14 }} role="meta" maxLines={1} color="var(--text-muted)" testId="meta" />
     </div>
   );
 }
 
-// Stakeholder Renderer (stick figure)
+// CMDB container: a one-line title in the header band (ellipsis and badge when it does not fit); the members sit below
+function CMDBRenderer({ element, stencil }) {
+  const color = element.color || stencil?.color || '#06b6d4';
+  const { width } = sizeOfElement(element, stencil, { width: 200 });
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <div style={{ ...CARD, background: `${color}12`, border: `2px solid ${color}`, overflow: 'hidden' }}>
+        <div style={{ background: `${color}30`, height: 28 }} />
+      </div>
+      {/* ds-allow-text-style: icon glyph, not text */}
+      <span style={{ position: 'absolute', left: 8, top: 5, fontSize: 16, lineHeight: '20px' }}>{stencil?.icon || '🗄️'}</span>
+      <SlotText element={element} text={element.label || 'CMDB'} box={{ x: 32, y: 5, width: Math.max(20, width - 40), height: 20 }} role="title" maxLines={1} align="start" own color={element.textColor || 'var(--text)'} testId="title" />
+    </div>
+  );
+}
+
+// Stakeholder Renderer (stick figure with the label under it)
 function StakeholderRenderer({ element, stencil }) {
   const color = element.color || stencil?.color || '#3b82f6';
 
   return (
-    <svg width="100%" height="100%" viewBox="0 0 80 100" style={{ overflow: 'visible' }}>
-      {/* Head */}
-      <circle cx="40" cy="18" r="14" fill="none" stroke={color} strokeWidth="2" />
-      {/* Body */}
-      <line x1="40" y1="32" x2="40" y2="60" stroke={color} strokeWidth="2" />
-      {/* Arms */}
-      <line x1="20" y1="45" x2="60" y2="45" stroke={color} strokeWidth="2" />
-      {/* Left leg */}
-      <line x1="40" y1="60" x2="25" y2="85" stroke={color} strokeWidth="2" />
-      {/* Right leg */}
-      <line x1="40" y1="60" x2="55" y2="85" stroke={color} strokeWidth="2" />
-      {/* Label */}
-      <text x="40" y="98" textAnchor="middle" fontSize="10" fill="var(--text)">
-        {element.label || 'Stakeholder'}
-      </text>
-    </svg>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <svg width="100%" height={58} viewBox="0 0 80 85" preserveAspectRatio="xMidYMid meet" style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible' }}>
+        {/* Head */}
+        <circle cx="40" cy="18" r="14" fill="none" stroke={color} strokeWidth="2" />
+        {/* Body */}
+        <line x1="40" y1="32" x2="40" y2="60" stroke={color} strokeWidth="2" />
+        {/* Arms */}
+        <line x1="20" y1="45" x2="60" y2="45" stroke={color} strokeWidth="2" />
+        {/* Left leg */}
+        <line x1="40" y1="60" x2="25" y2="85" stroke={color} strokeWidth="2" />
+        {/* Right leg */}
+        <line x1="40" y1="60" x2="55" y2="85" stroke={color} strokeWidth="2" />
+      </svg>
+      <ElementText packId="itil" element={element} stencil={stencil} text={element.label || 'Stakeholder'} color={element.textColor || 'var(--text)'} />
+    </div>
   );
 }
 
@@ -338,6 +246,8 @@ function renderNode(element, stencil, isSelected) {
       return <ProblemRenderer element={element} stencil={stencil} />;
     case 'ci':
       return <CIRenderer element={element} stencil={stencil} />;
+    case 'cmdb':
+      return <CMDBRenderer element={element} stencil={stencil} />;
     case 'stakeholder':
       return <StakeholderRenderer element={element} stencil={stencil} />;
     default:

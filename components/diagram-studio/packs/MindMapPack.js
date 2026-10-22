@@ -229,7 +229,7 @@ function CollapsedBadge({ x, y, count, color }) {
         textAnchor="middle"
         dominantBaseline="central"
         fill={pickLabelColor(color)}
-        fontSize="10"
+        fontSize="11" /* ds-allow-text-style: collapsed-children count in a 18 px badge, a number not a label */
         fontWeight="600"
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >

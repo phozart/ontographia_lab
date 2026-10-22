@@ -3,60 +3,9 @@
 
 import React from 'react';
 import SvgNodeFrame from './SvgNodeFrame';
-import { SvgBelowLabel } from './NodeLabels';
+import { ElementText } from '../text/useTextLayout';
+import { policyFor } from '../../../lib/text/policy';
 import { stencils, connectionTypes } from './catalog/cld';
-
-// ============ LOOP LABEL FIT ============
-
-const LOOP_FONT_MAX = 14;
-const LOOP_FONT_MIN = 9;
-const LATIN_EM = 0.55; // typical bold sans-serif Latin glyph width in em
-const WIDE_EM = 1.0; // East Asian wide / full-width characters and emoji
-
-// Estimated glyph width in em for one code point (string of one user char).
-function glyphEm(ch) {
-  const cp = ch.codePointAt(0);
-  if (cp === 0x200d || (cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0x300 && cp <= 0x36f)) return 0;
-  if (
-    (cp >= 0x1100 && cp <= 0x115f) ||
-    (cp >= 0x2e80 && cp <= 0xa4cf) ||
-    (cp >= 0xac00 && cp <= 0xd7a3) ||
-    (cp >= 0xf900 && cp <= 0xfaff) ||
-    (cp >= 0xfe30 && cp <= 0xfe6f) ||
-    (cp >= 0xff00 && cp <= 0xff60) ||
-    (cp >= 0xffe0 && cp <= 0xffe6) ||
-    (cp >= 0x20000 && cp <= 0x3fffd) ||
-    /\p{Extended_Pictographic}/u.test(ch)
-  ) {
-    return WIDE_EM;
-  }
-  return LATIN_EM;
-}
-
-// Fit a label inside a loop-marker circle: shrink the font down to a minimum,
-// then truncate with an ellipsis. Returns { text, fontSize, truncated }.
-export function fitLoopLabel(label, diameter) {
-  const raw = String(label ?? '');
-  if (raw.trim() === '') return { text: '', fontSize: LOOP_FONT_MAX, truncated: false };
-  const chars = Array.from(raw);
-  const ems = chars.map(glyphEm);
-  const totalEm = ems.reduce((a, b) => a + b, 0);
-  const available = Math.max(0, diameter * 0.7);
-
-  for (let size = LOOP_FONT_MAX; size >= LOOP_FONT_MIN; size--) {
-    if (totalEm * size <= available) return { text: raw, fontSize: size, truncated: false };
-  }
-  const budget = available / LOOP_FONT_MIN - LATIN_EM; // leave room for the ellipsis
-  let used = 0;
-  let out = '';
-  for (let i = 0; i < chars.length; i++) {
-    if (used + ems[i] > budget) break;
-    used += ems[i];
-    out += chars[i];
-  }
-  if (out === '') out = chars[0];
-  return { text: out.trimEnd() + '…', fontSize: LOOP_FONT_MIN, truncated: true };
-}
 
 // ============ STENCILS ============
 
@@ -243,7 +192,6 @@ function VariableNode({ element, stencil, isSelected }) {
   const width = element.size?.width || stencil.defaultSize.width;
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
-  const label = element.label || '';
 
   return (
     <g>
@@ -258,18 +206,6 @@ function VariableNode({ element, stencil, isSelected }) {
         stroke={isSelected ? 'var(--accent, #0e74a3)' : color}
         strokeWidth={isSelected ? 2.5 : 2}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="#1f2937"
-        fontSize="13"
-        fontWeight="500"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
     </g>
   );
 }
@@ -281,7 +217,6 @@ function StockNode({ element, stencil, isSelected }) {
   const width = element.size?.width || stencil.defaultSize.width;
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
-  const label = element.label || '';
   const inset = 6; // Width of the double-line effect
 
   return (
@@ -314,18 +249,6 @@ function StockNode({ element, stencil, isSelected }) {
         stroke={isSelected ? 'var(--accent, #0e74a3)' : color}
         strokeWidth={1.5}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="#166534"
-        fontSize="12"
-        fontWeight="600"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
     </g>
   );
 }
@@ -337,7 +260,6 @@ function FlowNode({ element, stencil, isSelected }) {
   const width = element.size?.width || stencil.defaultSize.width;
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
-  const label = element.label || '';
 
   // Hourglass/bowtie shape for flow regulator
   const notch = width * 0.25;
@@ -358,18 +280,6 @@ function FlowNode({ element, stencil, isSelected }) {
         stroke={isSelected ? 'var(--accent, #0e74a3)' : color}
         strokeWidth={isSelected ? 2.5 : 2}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="#92400e"
-        fontSize="11"
-        fontWeight="500"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
     </g>
   );
 }
@@ -401,7 +311,6 @@ function CloudNode({ element, stencil, isSelected }) {
       {/* Cloud bumps */}
       <circle cx={cx - width * 0.2} cy={cy - height * 0.1} r={width * 0.12} fill="#f1f5f9" stroke="none" />
       <circle cx={cx + width * 0.15} cy={cy - height * 0.12} r={width * 0.1} fill="#f1f5f9" stroke="none" />
-      <SvgBelowLabel element={element} width={width} height={height} />
     </g>
   );
 }
@@ -413,14 +322,12 @@ function ReinforcingLoopNode({ element, stencil, isSelected }) {
   const width = element.size?.width || stencil.defaultSize.width;
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
-  const label = element.label || 'R';
   const r = Math.min(width, height) / 2 - 2;
-  const fit = fitLoopLabel(label, r * 2);
   const cx = width / 2;
   const cy = height / 2;
 
   // Curved arrow parameters
-  const arrowR = r * 0.65;
+  const arrowR = r - 4; // the arrow runs along the ring so the label has the whole inside
   const arrowStartAngle = -45;
   const arrowEndAngle = 225;
 
@@ -451,20 +358,6 @@ function ReinforcingLoopNode({ element, stencil, isSelected }) {
         strokeWidth={2}
         markerEnd={`url(#cld-arrow-marker-${element.id})`}
       />
-      {/* R label */}
-      <text
-        x={cx}
-        y={cy + 1}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={color}
-        fontSize={fit.fontSize}
-        fontWeight="700"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {fit.truncated && <title>{label}</title>}
-        {fit.text}
-      </text>
       {/* Define arrow marker */}
       <defs>
         <marker
@@ -489,14 +382,12 @@ function BalancingLoopNode({ element, stencil, isSelected }) {
   const width = element.size?.width || stencil.defaultSize.width;
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
-  const label = element.label || 'B';
   const r = Math.min(width, height) / 2 - 2;
-  const fit = fitLoopLabel(label, r * 2);
   const cx = width / 2;
   const cy = height / 2;
 
   // Curved arrow parameters (counter-clockwise)
-  const arrowR = r * 0.65;
+  const arrowR = r - 4; // the arrow runs along the ring so the label has the whole inside
   const arrowStartAngle = 225;
   const arrowEndAngle = -45;
 
@@ -527,20 +418,6 @@ function BalancingLoopNode({ element, stencil, isSelected }) {
         strokeWidth={2}
         markerEnd={`url(#cld-arrow-marker-b-${element.id})`}
       />
-      {/* B label */}
-      <text
-        x={cx}
-        y={cy + 1}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={color}
-        fontSize={fit.fontSize}
-        fontWeight="700"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {fit.truncated && <title>{label}</title>}
-        {fit.text}
-      </text>
       {/* Define arrow marker */}
       <defs>
         <marker
@@ -565,7 +442,6 @@ function ConstantNode({ element, stencil, isSelected }) {
   const width = element.size?.width || stencil.defaultSize.width;
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
-  const label = element.label || '';
 
   return (
     <g>
@@ -580,18 +456,6 @@ function ConstantNode({ element, stencil, isSelected }) {
         stroke={isSelected ? 'var(--accent, #0e74a3)' : color}
         strokeWidth={isSelected ? 2.5 : 2}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="#6d28d9"
-        fontSize="11"
-        fontWeight="600"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
     </g>
   );
 }
@@ -603,11 +467,10 @@ function TableFunctionNode({ element, stencil, isSelected }) {
   const width = element.size?.width || stencil.defaultSize.width;
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
-  const label = element.label || '';
 
   // Mini graph icon
-  const graphPadding = 8;
-  const graphHeight = height * 0.4;
+  const graphPadding = 6; // the sparkline is a fixed 16 px strip at the bottom: the label area above it is the policy inset (lib/text/policies/cld.js)
+  const graphHeight = 16;
   const graphY = height - graphPadding - graphHeight;
 
   return (
@@ -638,19 +501,6 @@ function TableFunctionNode({ element, stencil, isSelected }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      {/* Label */}
-      <text
-        x={width / 2}
-        y={height * 0.28}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="#0891b2"
-        fontSize="10"
-        fontWeight="500"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
     </g>
   );
 }
@@ -662,7 +512,6 @@ function SystemBoundaryNode({ element, stencil, isSelected }) {
   const width = element.size?.width || stencil.defaultSize.width;
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
-  const label = element.label || '';
 
   return (
     <g>
@@ -679,19 +528,6 @@ function SystemBoundaryNode({ element, stencil, isSelected }) {
         strokeWidth={isSelected ? 2.5 : 2}
         strokeDasharray="12,6"
       />
-      {label && (
-        <text
-          x={14}
-          y={22}
-          textAnchor="start"
-          fill="#4b5563"
-          fontSize="12"
-          fontWeight="600"
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
-        >
-          {label}
-        </text>
-      )}
     </g>
   );
 }
@@ -703,7 +539,6 @@ function AnnotationNode({ element, stencil, isSelected }) {
   const width = element.size?.width || stencil.defaultSize.width;
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
-  const label = element.label || '';
   const fold = 12;
 
   return (
@@ -729,18 +564,6 @@ function AnnotationNode({ element, stencil, isSelected }) {
         stroke="#d1d5db"
         strokeWidth={1}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="#374151"
-        fontSize="11"
-        fontWeight="400"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
     </g>
   );
 }
@@ -780,10 +603,34 @@ function renderShape(element, stencil, isSelected) {
   }
 }
 
+// The label of every stencil goes through the shared layout (ADR-0008 T2): pinned lines in the stored box, shrink and a
+// badge instead of truncating in code. Text colors are the ones the shapes were drawn with.
+const TEXT_COLOR = {
+  variable: '#1f2937',
+  stock: '#166534',
+  'table-function': '#0e7490',
+  'system-boundary': '#4b5563',
+  annotation: '#374151',
+};
+
+function CldText({ element, stencil }) {
+  const id = stencil.id;
+  const loop = id === 'reinforcing-loop' || id === 'balancing-loop';
+  const color = element.textColor || (loop ? element.color || stencil.color : TEXT_COLOR[id] || 'var(--text, #1f2937)');
+  const text = element.label || element.name || (id === 'reinforcing-loop' ? 'R' : id === 'balancing-loop' ? 'B' : '');
+  const slot = policyFor('cld', stencil).slot;
+  return <ElementText packId="cld" element={element} stencil={stencil} kind={slot === 'title' ? 'title' : slot === 'external' ? 'external' : 'inside'} text={text} color={color} />;
+}
+
 function renderNode(element, stencil, isSelected) {
   const shape = renderShape(element, stencil, isSelected);
   if (!shape) return shape;
-  return <SvgNodeFrame element={element} stencil={stencil}>{shape}</SvgNodeFrame>;
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <SvgNodeFrame element={element} stencil={stencil}>{shape}</SvgNodeFrame>
+      <CldText element={element} stencil={stencil} />
+    </div>
+  );
 }
 
 // ============ PACK EXPORT ============

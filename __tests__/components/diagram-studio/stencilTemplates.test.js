@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import { render } from '@testing-library/react';
-import CLDPack, { fitLoopLabel } from '../../../components/diagram-studio/packs/CLDPack';
+import CLDPack from '../../../components/diagram-studio/packs/CLDPack';
 import MindMapPack from '../../../components/diagram-studio/packs/MindMapPack';
 import ERDPack from '../../../components/diagram-studio/packs/ERDPack';
 import { createDefaultRegistry } from '../../../components/diagram-studio/packs';
@@ -120,28 +120,6 @@ describe('Starter pack templates', () => {
   });
 });
 
-describe('CLD loop label fit extras', () => {
-  test('"Growth" fits a 50px circle without truncation', () => {
-    const r = fitLoopLabel('Growth', 46);
-    expect(r.truncated).toBe(false);
-    expect(r.text).toBe('Growth');
-    expect(r.fontSize).toBeGreaterThanOrEqual(9);
-  });
-  test('CJK full-width glyphs count as ~1em', () => {
-    expect(fitLoopLabel('成长循环增强', 46).truncated).toBe(true);
-    expect(fitLoopLabel('成长', 46).truncated).toBe(false);
-  });
-  test('emoji are not split into surrogates', () => {
-    const r = fitLoopLabel('🚀🚀🚀🚀🚀🚀🚀', 46);
-    expect(r.truncated).toBe(true);
-    expect(r.text).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
-    expect(r.text.endsWith('…')).toBe(true);
-  });
-  test.each([[''], ['   '], [undefined], [null]])('empty label %p renders empty, not an ellipsis', (v) => {
-    expect(fitLoopLabel(v, 46)).toMatchObject({ text: '', truncated: false });
-  });
-});
-
 describe('Mind map template hierarchy', () => {
   const fs = require('fs');
   const path = require('path');
@@ -162,34 +140,5 @@ describe('Mind map template hierarchy', () => {
     const sp = STARTER_PACKS.find((p) => p.id === 'mind-map-central');
     const children = sp.elements.slice(1).map((e) => e.type);
     expect(new Set(children)).toEqual(new Set([childOf(sp.elements[0].type)]));
-  });
-});
-
-describe('CLD loop label fit', () => {
-  test('short default label keeps 14px and is not truncated', () => {
-    expect(fitLoopLabel('R', 46)).toEqual({ text: 'R', fontSize: 14, truncated: false });
-  });
-
-  test('medium label shrinks but stays >= 9px and untruncated', () => {
-    const r = fitLoopLabel('Growth', 46);
-    expect(r.fontSize).toBeLessThan(14);
-    expect(r.fontSize).toBeGreaterThanOrEqual(9);
-    expect(r.truncated).toBe(false);
-  });
-
-  test('long label truncates with ellipsis at min size', () => {
-    const full = 'Reinforcing customer growth loop';
-    const r = fitLoopLabel(full, 46);
-    expect(r.fontSize).toBe(9);
-    expect(r.truncated).toBe(true);
-    expect(r.text.endsWith('…')).toBe(true);
-    expect(r.text.length).toBeLessThan(full.length);
-  });
-
-  test.each(['reinforcing-loop', 'balancing-loop'])('%s renders full text in <title> when truncated', (id) => {
-    const stencil = CLDPack.stencils.find((s) => s.id === id);
-    const el = makeElement(stencil, 'l1', { label: 'Reinforcing customer growth loop' });
-    const { container } = render(<div>{CLDPack.renderNode(el, stencil, false)}</div>);
-    expect(container.querySelector('title').textContent).toBe('Reinforcing customer growth loop');
   });
 });

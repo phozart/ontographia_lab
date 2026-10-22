@@ -3,6 +3,10 @@
 
 import { withBelowLabel } from './NodeLabels';
 import { stencils, connectionTypes } from './catalog/product-design';
+import { useMemo } from 'react';
+import { ElementText, SlotText } from '../text/useTextLayout';
+import { layoutForSlot } from '../../../lib/text/fit';
+import { policyFor } from '../../../lib/text/policy';
 
 // ============ STENCILS ============
 
@@ -756,40 +760,15 @@ function CardNode({ element, stencil, icon, iconBgColor, accentColor }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 15,
+        fontSize: 15, // ds-allow-text-style: icon glyph, not text
         boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
         gap: 4,
       }}>
         {icon}
       </div>
 
-      {/* Content */}
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px 12px 12px',
-        boxSizing: 'border-box',
-      }}>
-        <div style={{
-          fontSize: 12,
-          fontWeight: 600,
-          color: '#374151',
-          textAlign: 'center',
-          lineHeight: 1.4,
-          overflow: 'hidden',
-          wordBreak: 'break-word',
-          display: '-webkit-box',
-          WebkitLineClamp: 3,
-          WebkitBoxOrient: 'vertical',
-        }}>
-          {label}
-        </div>
-      </div>
+      {/* Content: the shared layout inside the card body (below the icon pill); the paper never grows, text shrinks then clamps */}
+      <ElementText packId="product-design" element={element} stencil={stencil} text={label} color={element.textColor || '#374151'} />
     </div>
   );
 }
@@ -839,40 +818,20 @@ function OSTNode({ element, stencil, icon, borderStyle = 'solid' }) {
         />
       </svg>
 
+      {/* Icon (the label column starts after it: policy inset) */}
       <div style={{
-        position: 'relative',
-        zIndex: 1,
-        width: '100%',
-        height: '100%',
+        position: 'absolute',
+        left: 16,
+        top: 0,
+        bottom: 0,
         display: 'flex',
         alignItems: 'center',
-        padding: '8px 10px 8px 16px',
-        boxSizing: 'border-box',
-        gap: 8,
+        fontSize: 20, // ds-allow-text-style: icon glyph, not text
       }}>
-        {/* Icon */}
-        <div style={{
-          fontSize: 20,
-          flexShrink: 0,
-        }}>
-          {icon}
-        </div>
-
-        {/* Label */}
-        <div style={{
-          fontSize: 12,
-          fontWeight: 600,
-          color: '#1f2937',
-          lineHeight: 1.3,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          display: '-webkit-box',
-          WebkitLineClamp: 2,
-          WebkitBoxOrient: 'vertical',
-        }}>
-          {label}
-        </div>
+        {icon}
       </div>
+
+      <ElementText packId="product-design" element={element} stencil={stencil} text={label} color={element.textColor || '#1f2937'} />
     </div>
   );
 }
@@ -916,20 +875,27 @@ function ZoneNode({ element, stencil }) {
         />
       </svg>
 
-      {/* Label */}
-      <div style={{
-        position: 'absolute',
-        top: 5,
-        left: 10,
-        fontSize: 11,
-        fontWeight: 700,
-        color: '#374151',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-      }}>
-        {label}
-      </div>
+      {/* Title: one fixed line in the header strip, ellipsis + badge when it does not fit */}
+      <ElementText packId="product-design" element={element} stencil={stencil} kind="title" text={label} color={element.textColor || '#374151'} />
     </div>
+  );
+}
+
+// the persona's name (emphasis, up to 3 lines) and the one-line role under it, centered as one block next to the avatar
+function PersonaText({ element, stencil, label }) {
+  const policy = policyFor('product-design', stencil);
+  const { width, height } = element.size || stencil?.defaultSize || { width: 720, height: 120 };
+  const w = Math.max(20, width - policy.inset.l - policy.inset.r);
+  const nameLayout = useMemo(() => layoutForSlot(element, { text: label, box: { x: 0, y: 0, width: w, height: 80 }, role: 'emphasis', maxLines: policy.maxLines, align: 'start', valign: 'top', own: true }).layout, [element, label, w, policy.maxLines]);
+  const roleH = 18;
+  const gap = 4;
+  const nameH = Math.max(nameLayout.height, 22);
+  const top = Math.max(4, (height - (nameH + gap + roleH)) / 2);
+  return (
+    <>
+      <SlotText element={element} text={label} box={{ x: policy.inset.l, y: top, width: w, height: nameH }} role="emphasis" maxLines={policy.maxLines} align="start" valign="top" own color={element.textColor || '#1e40af'} testId="name" />
+      <SlotText element={element} text={element.data?.role || 'Role / Segment'} box={{ x: policy.inset.l, y: top + nameH + gap, width: w, height: roleH }} role="meta" maxLines={1} align="start" valign="top" color="#3b82f6" testId="role" />
+    </>
   );
 }
 
@@ -975,20 +941,16 @@ function PersonaNode({ element, stencil }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 32,
+          fontSize: 32, // ds-allow-text-style: avatar glyph, not text
           flexShrink: 0,
         }}>
           👤
         </div>
 
-        {/* Info */}
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#1e40af' }}>{label}</div>
-          <div style={{ fontSize: 12, color: '#3b82f6', marginTop: 4 }}>
-            {element.data?.role || 'Role / Segment'}
-          </div>
-        </div>
       </div>
+
+      {/* Name (emphasis) and role (meta) through the shared layout */}
+      <PersonaText element={element} stencil={stencil} label={label} />
     </div>
   );
 }
@@ -1018,7 +980,7 @@ function EmotionPointNode({ element, stencil }) {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        fontSize: Math.min(width, height) * 0.5,
+        fontSize: Math.min(width, height) * 0.5, // ds-allow-text-style: emoji glyph, not text
       }}>
         {emoji}
       </div>
@@ -1058,17 +1020,10 @@ function TouchpointNode({ element, stencil }) {
         gap: 8,
         boxSizing: 'border-box',
       }}>
-        <span style={{ fontSize: 20 }}>📱</span>
-        <div style={{
-          fontSize: 11,
-          fontWeight: 500,
-          color: '#1f2937',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}>
-          {label}
-        </div>
+        <span style={{ fontSize: 20 }}>📱</span>{/* ds-allow-text-style: icon glyph, not text */}
       </div>
+
+      <ElementText packId="product-design" element={element} stencil={stencil} text={label} color={element.textColor || '#1f2937'} />
     </div>
   );
 }
@@ -1109,29 +1064,7 @@ function ColoredCardNode({ element, stencil }) {
         />
       </svg>
 
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '10px',
-        boxSizing: 'border-box',
-      }}>
-        <div style={{
-          fontSize: 12,
-          fontWeight: 500,
-          color: '#1f2937',
-          textAlign: 'center',
-          lineHeight: 1.3,
-          overflow: 'hidden',
-          wordBreak: 'break-word',
-        }}>
-          {label}
-        </div>
-      </div>
+      <ElementText packId="product-design" element={element} stencil={stencil} text={label} color={element.textColor || '#1f2937'} />
     </div>
   );
 }
