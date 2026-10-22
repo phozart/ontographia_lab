@@ -15,17 +15,20 @@ export function useThumbnailCapture({ diagramId, lastSaved, elements, connection
 
   if (!schedulerRef.current) {
     schedulerRef.current = createThumbnailScheduler({
-      capture: async (id) => {
+      capture: async (id, opts = {}) => {
         try {
           const { elements: els, connections: conns, theme: th } = latestRef.current;
-          if (!mountedRef.current || !els?.length) return;
+          if ((!opts.flush && !mountedRef.current) || !els?.length) return;
           const { renderThumbnailPng } = await import('../export/thumbnailRenderer');
           const dataUrl = await renderThumbnailPng({ elements: els, connections: conns, theme: th });
-          if (!mountedRef.current || !isValidThumbnail(dataUrl)) return;
+          if ((!opts.flush && !mountedRef.current) || !isValidThumbnail(dataUrl)) return;
+          const body = JSON.stringify({ thumbnail: dataUrl });
           await fetch(`/api/diagrams/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ thumbnail: dataUrl }),
+            body,
+            // a flush may run while the page is going away; keepalive requests are capped at 64 KB
+            ...(opts.flush && body.length < 60000 ? { keepalive: true } : {}),
           });
         } catch {
           // Best effort only
@@ -37,7 +40,18 @@ export function useThumbnailCapture({ diagramId, lastSaved, elements, connection
   useEffect(() => {
     mountedRef.current = true;
     const scheduler = schedulerRef.current;
-    return () => { mountedRef.current = false; scheduler.cancel(); };
+    // leaving the board (route change, tab hidden, page closing) must not lose a thumbnail that is still pending
+    const onHide = () => { if (document.visibilityState === 'hidden') scheduler.flush(); };
+    const onPageHide = () => scheduler.flush();
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+      scheduler.flush();
+      mountedRef.current = false;
+      scheduler.cancel();
+    };
   }, []);
 
   useEffect(() => {

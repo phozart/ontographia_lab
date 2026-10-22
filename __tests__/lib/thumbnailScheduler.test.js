@@ -55,3 +55,23 @@ test('switching boards drops a pending capture and the new board starts from its
   h.advance(THUMBNAIL_DEBOUNCE_MS * 2); h.runIdle();
   expect(h.capture).not.toHaveBeenCalled();
 });
+
+test('flush runs a pending capture now (leaving the board), once, and does nothing when nothing is pending', () => {
+  const h = harness();
+  h.s.observe('d1', 'T0');
+  expect(h.s.flush()).toBe(false);
+  h.s.observe('d1', 'T1');
+  expect(h.s.flush()).toBe(true);
+  expect(h.capture).toHaveBeenCalledWith('d1', { flush: true });
+  h.advance(THUMBNAIL_DEBOUNCE_MS * 2); h.runIdle();
+  expect(h.capture).toHaveBeenCalledTimes(1);
+  expect(h.s.flush()).toBe(false);
+});
+
+test('flush is still throttled', () => {
+  const h = harness();
+  h.s.observe('d1', 'T0'); h.s.observe('d1', 'T1'); h.advance(THUMBNAIL_DEBOUNCE_MS); h.runIdle();
+  h.s.observe('d1', 'T2');
+  expect(h.s.flush()).toBe(false);
+  expect(h.capture).toHaveBeenCalledTimes(1);
+});

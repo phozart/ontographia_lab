@@ -67,10 +67,25 @@ test('skips oversized captures and swallows capture errors', async () => {
   expect(puts()).toHaveLength(0);
 });
 
-test('unmounting cancels a pending capture', async () => {
+test('unmounting with a pending capture flushes it instead of losing it', async () => {
   const { rerender, unmount } = renderHook((p) => useThumbnailCapture(p), { initialProps: { ...base, lastSaved: 's0' } });
   rerender({ ...base, lastSaved: 's1' });
   unmount();
-  await settle(60000);
+  await settle(1000);
+  expect(mockRender).toHaveBeenCalledTimes(1);
+  expect(puts()).toHaveLength(1);
+  expect(puts()[0][1].keepalive).toBe(true);
+});
+
+test('hiding the tab flushes a pending capture; with nothing pending nothing happens', async () => {
+  const { rerender } = renderHook((p) => useThumbnailCapture(p), { initialProps: { ...base, lastSaved: 's0' } });
+  Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+  await settle(100);
   expect(mockRender).not.toHaveBeenCalled();
+  rerender({ ...base, lastSaved: 's1' });
+  await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
+  await settle(100);
+  expect(puts()).toHaveLength(1);
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
 });

@@ -5,6 +5,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { useFloatingPlacement, placePopoverElement } from './positioning';
 import { generateId } from '../utils/ids';
+import { suspendCulling, rectOfFrame } from '../canvasCulling';
 import { useDiagram, useDiagramSelection } from '../DiagramContext';
 import SlideFrameActions from '../present/SlideFrameActions';
 import { alignToSlide, slideFrameOf } from '../../../lib/present/alignToSlide';
@@ -443,7 +444,7 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
   }, [elements]);
 
   // Export frame as SVG
-  const handleExportFrameSvg = useCallback(() => {
+  const exportFrameSvgNow = useCallback(() => {
     if (!selectedElements?.length || !isFrameSelected) return;
     const frame = selectedElements[0];
     const frameX = frame.x || 0;
@@ -511,8 +512,16 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
     URL.revokeObjectURL(url);
   }, [selectedElements, isFrameSelected, elements]);
 
+  // The clone is taken from the live canvas, which mounts only what is near the viewport (viewport culling): hold the
+  // frame's rectangle mounted (its connections included) while cloning.
+  const handleExportFrameSvg = useCallback(async () => {
+    if (!selectedElements?.length || !isFrameSelected) return;
+    const release = await suspendCulling(rectOfFrame(selectedElements[0]));
+    try { exportFrameSvgNow(); } finally { release(); }
+  }, [selectedElements, isFrameSelected, exportFrameSvgNow]);
+
   // Export frame as PNG
-  const handleExportFramePng = useCallback(() => {
+  const exportFramePngNow = useCallback(() => {
     if (!selectedElements?.length || !isFrameSelected) return;
     const frame = selectedElements[0];
     const frameX = frame.x || 0;
@@ -597,6 +606,14 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
   }, [selectedElements, isFrameSelected, elements]);
+
+  // The clone is taken from the live canvas, which mounts only what is near the viewport (viewport culling): hold the
+  // frame's rectangle mounted (its connections included) while cloning.
+  const handleExportFramePng = useCallback(async () => {
+    if (!selectedElements?.length || !isFrameSelected) return;
+    const release = await suspendCulling(rectOfFrame(selectedElements[0]));
+    try { exportFramePngNow(); } finally { release(); }
+  }, [selectedElements, isFrameSelected, exportFramePngNow]);
 
   // Duplicate frame with contents to an empty spot
   const handleDuplicateFrame = useCallback(() => {
