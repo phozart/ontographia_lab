@@ -139,11 +139,13 @@ describe('scroll', () => {
     expect(wheelOwnedByCard(rig(), { deltaY: 40, metaKey: true }, true)).toBe(false);
     expect(wheelOwnedByCard(rig(), { deltaY: 40 }, true)).toBe(true);
   });
-  test('wheelOwnedByCard: a hovered (unselected) card hands off at the edges, a selected card keeps the gesture', () => {
-    expect(wheelOwnedByCard(rig({ scrollTop: 0 }), { deltaY: -10 }, false)).toBe(false);
-    expect(wheelOwnedByCard(rig({ scrollTop: 400 }), { deltaY: 10 }, false)).toBe(false);
-    expect(wheelOwnedByCard(rig({ scrollTop: 0 }), { deltaY: -10 }, true)).toBe(true);
-    expect(wheelOwnedByCard(rig({ scrollTop: 0 }), { deltaY: 10 }, false)).toBe(true);
+  test('wheelOwnedByCard: the edges hand the gesture back to the canvas, selected or not; horizontal pans pass through', () => {
+    expect(wheelOwnedByCard(rig({ scrollTop: 0 }), { deltaY: -10 })).toBe(false);
+    expect(wheelOwnedByCard(rig({ scrollTop: 400 }), { deltaY: 10 })).toBe(false);
+    expect(wheelOwnedByCard(rig({ scrollTop: 0 }), { deltaY: 10 })).toBe(true);
+    expect(wheelOwnedByCard(rig({ scrollTop: 50 }), { deltaY: -10 })).toBe(true);
+    expect(wheelOwnedByCard(rig(), { deltaX: 40, deltaY: 5 })).toBe(false);
+    expect(wheelOwnedByCard(rig(), { deltaX: 5, deltaY: 40 })).toBe(true);
   });
 
   function mount(overflow, selected) {
@@ -184,6 +186,42 @@ describe('scroll', () => {
     sc.scrollTop = 800;
     act(() => { fireEvent.scroll(sc); });
     expect(screen.queryByTestId('doc-card-fade')).toBeNull();
+  });
+});
+
+describe('perf: long doc cards', () => {
+  const longMd = (i) => `See [node](#el=n1) card ${i}\n\n` + Array.from({ length: 150 }, (_, k) => `Paragraph ${k} of card ${i} with some words to fill the line.`).join('\n\n');
+  const cards = Array.from({ length: 50 }, (_, i) => ({ ...newDocElement({ id: 'd' + i, x: i * 10, y: 0, title: 'T' + i, markdown: longMd(i) }), size: { width: 300, height: 200 } }));
+
+  test('an unselected, unhovered card renders only the 4k excerpt; hover or selection renders the full body', () => {
+    const { rerender } = render(<DocCard element={cards[0]} />);
+    const text = () => screen.getByTestId('doc-card-scroll').textContent;
+    expect(text().length).toBeLessThan(4600);
+    expect(text()).not.toContain('Paragraph 148');
+    fireEvent.mouseEnter(screen.getByTestId('doc-card'));
+    expect(text()).toContain('Paragraph 148');
+    fireEvent.mouseLeave(screen.getByTestId('doc-card'));
+    expect(text()).not.toContain('Paragraph 148');
+    global.__selected = ['d0'];
+    rerender(<DocCard element={cards[0]} />);
+    expect(text()).toContain('Paragraph 148');
+  });
+
+  test('50 long cards mount quickly and an unrelated element move does not re-render doc bodies', () => {
+    mockElements = [NODE, ...cards];
+    const has = jest.spyOn(Set.prototype, 'has');
+    const t0 = performance.now();
+    const view = (els) => <>{cards.map((c) => <DocCard key={c.id} element={c} />)}</>;
+    const { rerender } = render(view());
+    const mountMs = performance.now() - t0;
+    expect(mountMs).toBeLessThan(2500);
+    const baseline = has.mock.calls.filter((c) => c[0] === 'n1').length; // one check per rendered element link
+    expect(baseline).toBeGreaterThanOrEqual(50);
+    // move an unrelated element: new elements array, same ids
+    mockElements = [{ ...NODE, x: 99 }, ...cards];
+    rerender(view());
+    expect(has.mock.calls.filter((c) => c[0] === 'n1').length).toBe(baseline);
+    has.mockRestore();
   });
 });
 

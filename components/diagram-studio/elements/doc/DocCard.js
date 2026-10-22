@@ -34,16 +34,17 @@ const DocIcon = () => (
 const stop = (e) => e.stopPropagation();
 
 // Wheel / two-finger scroll over the card body scrolls the card's text instead of panning the canvas, but only when the
-// text overflows. Ctrl/Cmd+wheel still zooms the canvas. A card that is merely hovered (not selected) hands the gesture
+// text overflows. Ctrl/Cmd+wheel still zooms the canvas. At the top / bottom edge (selected or not) the card hands the gesture
 // back to the canvas once its text is at the top / bottom edge, so a big card never traps a pan. The canvas pans from a
 // native non-passive wheel listener on its container, so this must be a native listener too (React's delegated onWheel
 // runs after it).
-export function wheelOwnedByCard(el, e, selected) {
+export function wheelOwnedByCard(el, e) {
   if (!el || e.ctrlKey || e.metaKey) return false;
   const max = el.scrollHeight - el.clientHeight;
   if (max <= 1) return false;
-  if (selected) return true;
   const dy = e.deltaY;
+  if (Math.abs(e.deltaX || 0) > Math.abs(dy || 0)) return false; // a horizontal pan belongs to the canvas
+  // At the top / bottom edge the gesture goes back to the canvas (selected or not), so a big card never traps a pan.
   if (dy < 0 && el.scrollTop <= 0) return false;
   if (dy > 0 && el.scrollTop >= max - 1) return false;
   return true;
@@ -60,8 +61,10 @@ export default function DocCard({ element }) {
   const lines = Number.isInteger(doc.excerptLines) ? doc.excerptLines : DEFAULT_EXCERPT_LINES;
 
   const selected = Boolean(ctx.selection?.nodeIds?.includes(element.id));
-  const selectedRef = useRef(selected);
-  selectedRef.current = selected;
+  // Only a selected or pointed-at card renders its full body (20k chars / 150 blocks); the rest keep the cheap 4k excerpt, so a
+  // board with dozens of long docs stays light. Hover is sticky until the pointer leaves.
+  const [hovered, setHovered] = useState(false);
+  const full = selected || hovered;
   const scrollerRef = useRef(null);
   const [more, setMore] = useState(false); // is there more text below the visible part
 
@@ -74,7 +77,7 @@ export default function DocCard({ element }) {
     const el = scrollerRef.current;
     if (!el) return undefined;
     const onWheel = (e) => {
-      if (!wheelOwnedByCard(el, e, selectedRef.current)) return;
+      if (!wheelOwnedByCard(el, e)) return;
       e.preventDefault();
       e.stopPropagation();
       const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientHeight : 1;
@@ -89,9 +92,11 @@ export default function DocCard({ element }) {
       el.removeEventListener('wheel', onWheel);
       ro?.disconnect();
     };
-  }, [measure, collapsed, markdown]);
+  }, [measure, collapsed, markdown, full]);
 
-  const knownIds = useMemo(() => new Set((elements || []).map((e) => e.id)), [elements]);
+  // Keyed on the id list, not the elements array, so moving or editing an element does not rebuild it (and re-render bodies).
+  const idSig = (elements || []).map((e) => e.id).join('\u0001');
+  const knownIds = useMemo(() => new Set(idSig ? idSig.split('\u0001') : []), [idSig]);
 
   const toggle = useCallback(
     (e) => {
@@ -110,7 +115,7 @@ export default function DocCard({ element }) {
   );
 
   return (
-    <div style={S.card} data-testid="doc-card" data-doc-id={element.id}>
+    <div style={S.card} data-testid="doc-card" data-doc-id={element.id} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
       <div style={S.bar}>
         <DocIcon />
         <div style={S.title} title={title}>{title}</div>
@@ -127,7 +132,7 @@ export default function DocCard({ element }) {
         <div style={S.body} data-excerpt-lines={lines}>
           <div ref={scrollerRef} style={S.scroller} data-testid="doc-card-scroll" data-more={more ? 'true' : 'false'} onScroll={measure}>
             {markdown.trim() ? (
-              <DocMarkdown markdown={markdown} knownIds={knownIds} onElementLink={followElementLink} maxChars={20000} maxBlocks={150} />
+              <DocMarkdown markdown={markdown} knownIds={knownIds} onElementLink={followElementLink} maxChars={full ? 20000 : 4000} maxBlocks={full ? 150 : 14} />
             ) : (
               <div style={S.empty}>{editable ? 'Empty doc. Double-click to write.' : 'Empty doc.'}</div>
             )}

@@ -44,6 +44,12 @@ describe('docToPdf', () => {
     expect(gap).toBeGreaterThan(pdf.getTextWidth(' ') * 0.9);
     expect(gap).toBeLessThan(pdf.getTextWidth(' ') * 1.5);
   });
+  test('a huge unbroken word is split in linear time (few measurements per character)', async () => {
+    const t0 = Date.now();
+    const pdf = await docToPdf({ ...CTX, markdown: 'y'.repeat(60000) });
+    expect(Date.now() - t0).toBeLessThan(4000);
+    expect(pdf.getNumberOfPages()).toBeGreaterThan(1);
+  });
   test('empty doc yields a one page file', async () => {
     expect((await docToPdf({ ...CTX, markdown: '' })).getNumberOfPages()).toBe(1);
   });

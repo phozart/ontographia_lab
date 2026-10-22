@@ -63,6 +63,20 @@ describe('tableToXlsx', () => {
     expect(x.rels).toBeUndefined();
     expect(x.sheet).not.toContain('Element link');
   });
+  test('a non-http origin never becomes a hyperlink (xlsx and clipboard html)', async () => {
+    for (const origin of ['javascript:alert(1)//', 'data:text/html,x', 'file:///x', '//evil.com', 'ftp://x.com']) {
+      const x = await open(table, { origin });
+      expect(x.rels).toBeUndefined();
+      expect(x.sheet).not.toContain('<hyperlink');
+    }
+  });
+  test('the reserved sheet name History gets a suffix; no columns means no <cols>', async () => {
+    expect(sheetName('history')).toBe('History_');
+    expect(sheetName('HISTORY')).toBe('History_');
+    expect(sheetName('History of x')).toBe('History of x');
+    const x = await open({ headerRow: false, columns: [], rows: [] });
+    expect(x.sheet).not.toContain('<cols>');
+  });
   test('header-less table and control characters', async () => {
     const x = await open({ ...table, headerRow: false, rows: [{ id: 'r', cells: { a: 'a\u0000b\u0007c' } }] });
     expect(x.sheet).not.toContain('state="frozen"');

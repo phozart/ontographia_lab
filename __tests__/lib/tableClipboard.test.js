@@ -51,6 +51,9 @@ describe('tableToHtml', () => {
     expect((html.match(/<a /g) || []).length).toBe(1);
     expect(tableToHtml(table)).not.toContain('<a ');
   });
+  test('a non-http origin never becomes a link', () => {
+    for (const origin of ['javascript:alert(1)//', 'data:x', '//evil.com']) expect(tableToHtml(table, { origin, diagramRef: 'LAB-9' })).not.toContain('<a ');
+  });
   test('a forged element id never becomes a link', () => {
     const bad = { ...table, rows: [{ id: 'r', cells: { c1: 'x' }, elementId: '"><script>' }] };
     expect(tableToHtml(bad, CTX)).not.toMatch(/<a |<script/);
