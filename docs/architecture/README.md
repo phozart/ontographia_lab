@@ -12,11 +12,13 @@ Proposed work is in the ADRs and companion docs below; nothing here is implement
 | [adr/0005-mcp-oauth.md](adr/0005-mcp-oauth.md) | MCP sign-in from claude.ai / Desktop / mobile: minimal OAuth AS, connected apps (slices O1–O4) |
 | [adr/0006-live-activity-and-presence.md](adr/0006-live-activity-and-presence.md) | Live activity panel, Claude activity indicator, change highlight (Step 1); presence, live cursors and follow over a WebSocket sidecar (Step 2) |
 | [adr/0007-presentations-and-visual-primitives.md](adr/0007-presentations-and-visual-primitives.md) | Proposed: presentations as ordered slide frames, present mode, text presets and themes, images/icons/charts, PDF/PNG/PPTX export, MCP deck tools (slices P1-P6) |
+| [adr/0008-text-layout-and-autosizing.md](adr/0008-text-layout-and-autosizing.md) | Proposed: one deterministic, isomorphic text-layout module (font-metric tables) for every stencil, frame, connection label, export and `diagram_show`; text-fit modes auto / auto-height / shrink / fixed; server sizes agent-created nodes to their text (slices T1-T4) |
 | [data-model.md](data-model.md) | Proposed DDL, indexes, migration mechanism, retention |
 | [api-contracts.md](api-contracts.md) | REST contracts for B and C, authorization signature, MCP tool sketch |
 | [open-questions.md](open-questions.md) | Decisions that belong to the product owner, each with a recommended default |
 | [delivery-plan.md](delivery-plan.md) | Ordered, independently shippable vertical slices |
 | [investigations/mcp-and-embedding.md](investigations/mcp-and-embedding.md) | Investigation: MCP server for agents, MCP Apps and iframe embedding of diagrams (proposal, not scheduled) |
+| [investigations/text-rendering-audit.md](investigations/text-rendering-audit.md) | Investigation: per-stencil text defect matrix (187 stencils x 10 label variants x editor/MCP paths), canvas vs export vs diagram_show divergence, root causes |
 
 ## 1. System at a glance
 
