@@ -20,8 +20,9 @@ const content = {
 };
 
 describe('fitScale', () => {
-  test('fits, centres in the slot and caps at 1.5x', () => {
-    expect(fitScale({ width: 400, height: 300 }, slot).scale).toBe(1.5);
+  test('fits, centres in the slot and caps at 3x, top-aligned', () => {
+    expect(fitScale({ width: 400, height: 300 }, slot).scale).toBe(2);
+    expect(fitScale({ width: 100, height: 50 }, slot).scale).toBe(3);
     expect(fitScale({ width: 1600, height: 600 }, slot).scale).toBe(0.5);
   });
   test('refuses below 0.35x with a helpful message', () => {
@@ -30,7 +31,7 @@ describe('fitScale', () => {
     expect(r.error).toMatch(/whole frame on its own slide|own slide/);
     expect(fitScale({ width: 800 / 0.35, height: 100 }, slot).ok).toBe(true);
     expect(MIN_SCALE).toBe(0.35);
-    expect(MAX_SCALE).toBe(1.5);
+    expect(MAX_SCALE).toBe(3);
   });
 });
 
@@ -45,7 +46,8 @@ describe('copyIntoSlot', () => {
     expect(a.parentFrameId).toBe('slide-frame');
     expect(b.parentFrameId).toBe('slide-frame');
     // bbox is 800x100 (x 1000..1600? a 1000-1200, b 1400-1600 => 600 wide); scale = min(800/600, 600/100) = 1.333
-    expect(r.scale).toBe(Math.min(1.5, 800 / 600));
+    expect(r.scale).toBe(Math.min(3, 800 / 600));
+    expect(Math.min(a.y, b.y)).toBe(slot.y); // top-aligned
     expect(a.size.width).toBeCloseTo(200 * r.scale, 5);
     expect(a.fontSize).toBeCloseTo(20 * r.scale, 5);
     expect(a.borderWidth).toBeCloseTo(2 * r.scale, 5);

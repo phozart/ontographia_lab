@@ -22,7 +22,7 @@ import { copyTableRich, exportTableXlsx } from '../doc/docActions';
 import CellEditor from './CellEditor';
 import TableMenu from './TableMenu';
 
-// ADR-0007 P2: data.table.scale (0.2 to 2) shrinks or grows the whole table (rows, text, padding) for slides: the layout
+// ADR-0007 P2: data.table.scale (0.2 to 3) shrinks or grows the whole table (rows, text, padding) for slides: the layout
 // stays the natural one and is drawn with a CSS scale, while element.size is the natural size times the scale.
 const tableScaleOf = (t) => (typeof t?.scale === 'number' && Number.isFinite(t.scale) && t.scale > 0 ? t.scale : 1);
 const scaledSize = (t) => {

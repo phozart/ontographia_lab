@@ -212,7 +212,7 @@ describe('Presets, themes and layouts (ADR-0007 P2)', () => {
     const s = await tool('slide_add', {
       id: agentDiagram.id, baseRevision: t.revision, presentationId: c.presentationId,
       slides: [
-        { layout: 'title', title: 'Checkout review', blocks: [{ text: { markdown: 'What we found and what we will do about it' } }], notes: 'Welcome everyone.' },
+        { layout: 'title-center', title: 'Checkout review', blocks: [{ text: { markdown: 'What we found and what we will do about it' } }], notes: 'Welcome everyone.' },
         { layout: 'title-body', title: 'What we found', blocks: [{ text: { markdown: '- Checkout conversion fell by **40%** in two weeks\n- Mobile is the worst affected device class\n- Payment form errors and a missing guest checkout drive it' } }], notes: 'Three findings.' },
         { layout: 'two-column', title: 'The problem on the board', blocks: [{ slot: 'left', copy: { frameId: 'fa' } }, { slot: 'right', text: { markdown: '- Four clusters of complaints\n- Two of them are about payment\n- Fix the form first' } }] },
         { layout: 'big-number', blocks: [{ text: { markdown: '40%' } }, { text: { markdown: 'drop in checkout conversion' } }, { text: { markdown: 'Measured over the last two weeks, mostly on mobile.' } }] },

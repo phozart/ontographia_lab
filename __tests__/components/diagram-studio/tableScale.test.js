@@ -60,7 +60,8 @@ describe('size and svg', () => {
     const ok = (scale) => validateDiagramContent({ elements: [{ id: 't', type: 'table', packId: 'core', x: 0, y: 0, data: { table: { ...base(), scale } } }] }).ok;
     expect(ok(0.5)).toBe(true);
     expect(ok(0.1)).toBe(false);
-    expect(ok(3)).toBe(false);
+    expect(ok(3)).toBe(true);
+    expect(ok(3.5)).toBe(false);
     expect(ok('x')).toBe(false);
   });
 });

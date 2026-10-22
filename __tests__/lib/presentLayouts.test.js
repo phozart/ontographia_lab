@@ -10,9 +10,10 @@ const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h
 
 describe('layout catalogue (ADR 5.2)', () => {
   test('the eight layouts and their slot names', () => {
-    expect(LAYOUT_NAMES).toEqual(['title', 'title-body', 'two-column', 'three-column', 'title-visual', 'visual-caption', 'big-number', 'blank']);
+    expect(LAYOUT_NAMES).toEqual(['title', 'title-center', 'title-body', 'two-column', 'three-column', 'title-visual', 'visual-caption', 'big-number', 'blank']);
     expect(SLOT_NAMES).toEqual({
       title: ['title', 'subtitle'],
+      'title-center': ['title', 'subtitle'],
       'title-body': ['title', 'body'],
       'two-column': ['title', 'left', 'right'],
       'three-column': ['title', 'c1', 'c2', 'c3'],
