@@ -41,6 +41,13 @@ function firstArray(chain, ...keys) {
   return null;
 }
 
+function firstThemeOf(chain) {
+  for (const layer of chain) {
+    if (isObj(layer.theme)) return layer.theme;
+  }
+  return null;
+}
+
 function firstViewport(chain) {
   for (const layer of chain) {
     if (isObj(layer.viewport)) return layer.viewport;
@@ -59,6 +66,7 @@ export function normalizeDiagramContent(content) {
   const layers = firstArray(chain, 'layers');
   const groups = firstArray(chain, 'groups') || [];
   const presentations = firstArray(chain, 'presentations');
+  const theme = firstThemeOf(chain);
   const viewport = firstViewport(chain);
 
   // Duplicate ids (legacy rows) are renamed so merge and the server's unique-id rule hold; nothing is dropped.
@@ -69,6 +77,8 @@ export function normalizeDiagramContent(content) {
     groups: [...groups],
     // ADR-0007: only present when the board has decks, so older content keeps its exact shape
     ...(presentations ? { presentations: [...presentations] } : {}),
+    // ADR-0007 P2: only present when the board has a theme (absent = Ethereal Sky)
+    ...(theme ? { theme: { ...theme } } : {}),
     viewport: viewport ? { ...viewport } : { ...DEFAULT_VIEWPORT },
   });
 }

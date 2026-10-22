@@ -25,7 +25,9 @@ import {
   isValidHierarchyConnection,
 } from './LayoutEngine';
 import Minimap from './Minimap';
-import { resolveLabelColor } from './packs/colorUtils';
+import { resolveLabelColor, withAlpha } from './packs/colorUtils';
+import { resolveElementTokens } from '../../lib/present/themes';
+import { isPresetText } from '../../lib/present/textPreset';
 import { SmartRouter } from './routing/SmartRouter';
 import ConnectionToolbar from './ui/toolbar/ConnectionToolbar';
 import EmptyCanvasWelcome from './ui/EmptyCanvasWelcome';
@@ -287,7 +289,7 @@ function AlignmentToolbar({ selectedElements, onAlign, onDistribute, onMatchSize
 // ============ NODE COMPONENT ============
 
 function Node({
-  element,
+  element: rawElement,
   isSelected,
   isDragging,
   onSelect,
@@ -309,6 +311,9 @@ function Node({
   hasConnections, // Whether this element already has connections
   commentMode, // Whether comment mode is active
 }) {
+  // ADR-0007 P2: theme tokens ("@accent") in colour fields resolve through the board theme before anything is drawn
+  const diagramTheme = useDiagram()?.theme;
+  const element = useMemo(() => resolveElementTokens(rawElement, diagramTheme), [rawElement, diagramTheme]);
   const pack = packRegistry?.get?.(element.packId);
   const stencil = pack?.stencils?.find(s => s.id === element.type);
   const size = element.size || stencil?.defaultSize || { width: 120, height: 60 };
@@ -340,7 +345,7 @@ function Node({
 
       // ALWAYS check for auto-resize when editing ends (even if label didn't change)
       // This ensures existing overflow is fixed
-      if (onAutoResize && !stencil?.isFrame && !stencil?.isContainer) {
+      if (onAutoResize && !stencil?.isFrame && !stencil?.isContainer && !isPresetText(element)) {
         const textToMeasure = currentLabel || element.label || element.name || 'Untitled';
         const measureDiv = document.createElement('div');
         measureDiv.style.cssText = `
@@ -727,7 +732,7 @@ function Node({
         caretColor: 'var(--accent, #3b82f6)',
       }}
     />
-  ) : (
+  ) : element.showLabel === false ? null : (
     <span
       className="ds-node-label"
       style={{ fontSize, fontWeight, fontStyle, textDecoration, fontFamily: fontFamily || 'inherit', textAlign, color: textColor, width: '100%' }}
@@ -737,7 +742,8 @@ function Node({
   );
 
   // Check if using custom renderer - must actually return content, not just exist
-  const customContent = pack?.renderNode?.(element, stencil, isSelected) || renderNode?.(element, stencil, isSelected);
+  const editHandle = { editing: Boolean(isEditingLabel), onDone: (cancelled) => onEditingLabelDone?.(element.id, false, cancelled) };
+  const customContent = pack?.renderNode?.(element, stencil, isSelected, editHandle) || renderNode?.(element, stencil, isSelected, editHandle);
   const hasCustomRenderer = customContent !== undefined && customContent !== null;
 
   // Determine if this node is a valid drop target for connection (not the source)
@@ -800,7 +806,7 @@ function Node({
           borderWidth: borderStyle === 'none' ? 0 : borderWidth,
           borderRadius: borderRadius >= 999 ? '50%' : borderRadius,
           backgroundColor: bgOpacity < 1
-            ? `rgba(255, 255, 255, ${bgOpacity})`
+            ? (withAlpha(element.backgroundColor || element.color, bgOpacity) || `rgba(255, 255, 255, ${bgOpacity})`)
             : (element.backgroundColor || element.color || 'var(--panel)'),
           boxShadow: showShadow
             ? `0 2px 8px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.04)`
@@ -820,7 +826,7 @@ function Node({
           labelContent
         ))}
         {/* Editing overlay for custom rendered nodes */}
-        {isEditingLabel && hasCustomRenderer && (
+        {isEditingLabel && hasCustomRenderer && !isPresetText(element) && (
           element.type === 'frame' ? (
             // Frame: edit title in its display position (top-left, above frame)
             <div

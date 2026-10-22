@@ -22,6 +22,15 @@ import { copyTableRich, exportTableXlsx } from '../doc/docActions';
 import CellEditor from './CellEditor';
 import TableMenu from './TableMenu';
 
+// ADR-0007 P2: data.table.scale (0.2 to 3) shrinks or grows the whole table (rows, text, padding) for slides: the layout
+// stays the natural one and is drawn with a CSS scale, while element.size is the natural size times the scale.
+const tableScaleOf = (t) => (typeof t?.scale === 'number' && Number.isFinite(t.scale) && t.scale > 0 ? t.scale : 1);
+const scaledSize = (t) => {
+  const n = tableElementSize(t);
+  const k = tableScaleOf(t);
+  return k === 1 ? n : { width: n.width * k, height: n.height * k };
+};
+
 export const REVEAL_EVENT = 'ontographia:reveal-elements';
 const TYPE_LABEL = { text: 'Text', number: 'Number', select: 'Select', boolean: 'Yes / no' };
 const HTTP_URL = /^https?:\/\/\S+$/i;
@@ -101,7 +110,8 @@ export default function TableNode({ element, stencil, isSelected }) {
   const table = element.data?.table;
   const canEdit = canWrite(diagram?.access) && !element.locked;
   const interactive = Boolean(isSelected && canEdit);
-  const scale = viewport?.scale || 1;
+  const tscale = tableScaleOf(table);
+  const scale = (viewport?.scale || 1) * tscale; // pointer pixels per table pixel
 
   const rootRef = useRef(null);
   const elRef = useRef(element);
@@ -114,7 +124,7 @@ export default function TableNode({ element, stencil, isSelected }) {
   const [notice, setNotice] = useState('');
   const [titleEdit, setTitleEdit] = useState(false);
 
-  const metrics = useMemo(() => (table ? tableMetrics(table, element.size?.width) : null), [table, element.size?.width]);
+  const metrics = useMemo(() => (table ? tableMetrics(table, element.size?.width / tscale) : null), [table, element.size?.width, tscale]);
 
   // A table created through a generic path (shape sidebar) starts empty: give it a real table before the first save.
   useEffect(() => {
@@ -128,8 +138,8 @@ export default function TableNode({ element, stencil, isSelected }) {
   useEffect(() => {
     if (!table || !canEdit) return undefined;
     const natural = tableMetrics(table);
-    const w = element.size?.width;
-    const hgt = element.size?.height;
+    const w = element.size?.width / tscale;
+    const hgt = element.size?.height / tscale;
     const widthOff = Number.isFinite(w) && Math.abs(w - natural.width) > 1;
     const heightOff = !Number.isFinite(hgt) || Math.abs(hgt - tableMetrics(table, widthOff ? w : undefined).height) > 1;
     if (!widthOff && !heightOff) return undefined;
@@ -137,13 +147,13 @@ export default function TableNode({ element, stencil, isSelected }) {
       const el = elRef.current;
       const t = tableRef.current;
       if (!t) return;
-      const target = el.size?.width;
+      const target = el.size?.width / tableScaleOf(t);
       const widths = Number.isFinite(target) ? columnWidths(t, target) : t.columns.map((c) => c.width);
       const scaled = { ...t, columns: t.columns.map((c, i) => ({ ...c, width: Math.max(MIN_COLUMN_WIDTH / 2, Math.round(widths[i])) })) };
-      updateElement(el.id, { data: { ...(el.data || {}), table: scaled }, size: tableElementSize(scaled) }, { coalesceKey: `table-fit:${el.id}` });
+      updateElement(el.id, { data: { ...(el.data || {}), table: scaled }, size: scaledSize(scaled) }, { coalesceKey: `table-fit:${el.id}` });
     }, 350);
     return () => clearTimeout(timer);
-  }, [table, element.size?.width, element.size?.height, canEdit, updateElement]);
+  }, [table, tscale, element.size?.width, element.size?.height, canEdit, updateElement]);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -159,7 +169,7 @@ export default function TableNode({ element, stencil, isSelected }) {
   // ---- commands ----
   const commit = useCallback((next, options) => {
     const el = elRef.current;
-    updateElement(el.id, { data: { ...(el.data || {}), table: next }, size: tableElementSize(next) }, options);
+    updateElement(el.id, { data: { ...(el.data || {}), table: next }, size: scaledSize(next) }, options);
   }, [updateElement]);
 
   const run = useCallback((fn, options) => {
@@ -407,7 +417,7 @@ export default function TableNode({ element, stencil, isSelected }) {
       data-testid="table-node"
       tabIndex={interactive ? 0 : -1}
       onKeyDown={onKeyDown}
-      style={{ width: metrics.width, height: metrics.height }}
+      style={{ width: metrics.width, height: metrics.height, ...(tscale !== 1 ? { transform: `scale(${tscale})`, transformOrigin: '0 0' } : {}) }}
     >
       {title && (
         titleEdit ? (

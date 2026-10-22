@@ -31,6 +31,8 @@ const TOOL_TEXT = {
   slide_remove: 'removed a slide',
   slide_update: 'updated a slide',
   presentation_get: 'read the presentations',
+  text_add: 'added styled text',
+  theme_apply: 'applied a theme',
 };
 
 /** Plain-language past tense for a tool name; unknown tools are named as is (the name is server-supplied text). */

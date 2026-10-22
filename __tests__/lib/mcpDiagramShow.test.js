@@ -90,7 +90,7 @@ describe('MCP App contract', () => {
     expect(r.contents[0]._meta.ui.csp).toEqual({ connectDomains: [], resourceDomains: [] });
     const html = r.contents[0].text;
     expect(html).toBe(DIAGRAM_VIEW_HTML);
-    expect(html).toMatch(/Content-Security-Policy" content="default-src 'none'; img-src data:;[^"]*connect-src 'none'/);
+    expect(html).toMatch(/Content-Security-Policy" content="default-src 'none'; img-src data:; font-src data:;[^"]*connect-src 'none'/);
     expect(html).not.toMatch(/\bsrc=["']?https?:|<link\b|@import|fetch\(|XMLHttpRequest|WebSocket|innerHTML|eval\(/);
     expect(html).toContain("'ui/initialize'");
     expect(html).toContain("'ui/notifications/initialized'");

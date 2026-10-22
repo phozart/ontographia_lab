@@ -106,7 +106,7 @@ function Blocks({ blocks, ctx }) {
     switch (b.t) {
       case 'heading': {
         const Tag = `h${Math.min(b.level, 6)}`;
-        return <Tag key={i} style={{ ...S.h, fontSize: HEADING_SIZE[b.level] }}><Inline nodes={b.c} ctx={ctx} /></Tag>;
+        return <Tag key={i} style={{ ...S.h, fontSize: ctx.baseSize ? `${(HEADING_SIZE[b.level] / 13).toFixed(3)}em` : HEADING_SIZE[b.level] }}><Inline nodes={b.c} ctx={ctx} /></Tag>;
       }
       case 'p':
         return <p key={i} style={ctx.tight ? S.pTight : S.p}><Inline nodes={b.c} ctx={ctx} /></p>;
@@ -152,15 +152,15 @@ function Blocks({ blocks, ctx }) {
 /**
  * @param {{markdown: string, knownIds?: Set<string>, onElementLink?: (id: string) => void, maxBlocks?: number, maxChars?: number}} props
  */
-function DocMarkdown({ markdown, knownIds, onElementLink, maxBlocks, maxChars, truncationNotice }) {
+function DocMarkdown({ markdown, knownIds, onElementLink, maxBlocks, maxChars, truncationNotice, baseSize }) {
   const { blocks, hidden } = useMemo(() => {
     const src = typeof markdown === 'string' ? (maxChars ? markdown.slice(0, maxChars) : markdown) : '';
     const all = parseMarkdown(src);
     return maxBlocks && all.length > maxBlocks ? { blocks: all.slice(0, maxBlocks), hidden: all.length - maxBlocks } : { blocks: all, hidden: 0 };
   }, [markdown, maxBlocks, maxChars]);
-  const ctx = useMemo(() => ({ knownIds, onElementLink }), [knownIds, onElementLink]);
+  const ctx = useMemo(() => ({ knownIds, onElementLink, baseSize }), [knownIds, onElementLink, baseSize]);
   return (
-    <div style={S.root} data-doc-markdown>
+    <div style={baseSize ? { ...S.root, fontSize: baseSize, color: 'inherit' } : S.root} data-doc-markdown data-base-size={baseSize || undefined}>
       <Blocks blocks={blocks} ctx={ctx} />
       {truncationNotice && hidden > 0 && <p data-testid="doc-preview-truncated" style={{ ...S.p, color: C.muted, fontStyle: 'italic' }}>Preview truncated: {hidden} more blocks. Editing is not affected.</p>}
     </div>

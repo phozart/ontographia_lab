@@ -7,6 +7,7 @@ import { tableProblem } from '../../../lib/table/tableSchema';
 import { isUnsafeUrlValue } from '../../../lib/safeUrl';
 import { validateDocElements } from '../../../lib/doc/docElement';
 import { validatePresentations } from '../../../lib/present/presentationSchema';
+import { validateTheme } from '../../../lib/present/themes';
 import {
   MAX_CONTENT_BYTES, MAX_ELEMENTS, MAX_CONNECTIONS, MAX_COLLECTION, MAX_DEPTH, FORBIDDEN_KEYS, CONTENT_KEYS,
 } from '../../../lib/diagramLimits';
@@ -42,6 +43,7 @@ export function buildExportEnvelope(diagram = {}, now = new Date()) {
   };
   // ADR-0007: decks travel with the board (a slide references its frame by id, so the ids are kept)
   if (Array.isArray(diagram.presentations) && diagram.presentations.length) content.presentations = diagram.presentations;
+  if (diagram.theme) content.theme = diagram.theme; // ADR-0007 P2: the board theme travels with the board
   if (diagram.viewport) content.viewport = diagram.viewport;
   return {
     format: FORMAT_ID,
@@ -199,6 +201,11 @@ export function sanitizeContent(rawContent) {
     const pres = validatePresentations(rawContent.presentations);
     if (pres.ok && pres.presentations && pres.presentations.length) content.presentations = pres.presentations;
     else if (!pres.ok) warnings.push('The presentations in this file were not valid and were skipped.');
+  }
+  if (rawContent.theme !== undefined) {
+    const th = validateTheme(rawContent.theme);
+    if (th.ok && th.theme) content.theme = th.theme;
+    else if (!th.ok) warnings.push('The theme in this file was not valid and was skipped.');
   }
   const viewport = sanitizeViewport(rawContent.viewport);
   if (viewport) content.viewport = viewport;

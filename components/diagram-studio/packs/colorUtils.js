@@ -60,3 +60,12 @@ export function pickLabelColor(fill, fallback = LIGHT_TEXT) {
   const dark = contrastRatio(rgb, parseColor(DARK_TEXT));
   return dark > white ? DARK_TEXT : LIGHT_TEXT;
 }
+
+// A colour with an alpha channel (ADR-0007 P2 shape opacity): rgba(r, g, b, a) for any colour parseColor understands,
+// null otherwise (the caller keeps its own fallback). Alpha is clamped to 0..1.
+export function withAlpha(color, alpha) {
+  const rgb = parseColor(color);
+  if (!rgb || typeof alpha !== 'number' || !Number.isFinite(alpha)) return null;
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a})`;
+}

@@ -22,6 +22,7 @@ import {
 import { assignFrameOnCreate, remapDuplicateParent } from './utils/frameMembership';
 import { ensureTableData } from './elements/table/newTableElement';
 import { applyPresentationPatch } from '../../lib/present/presentationPatch';
+import { applyThemePatch, resolveTheme } from '../../lib/present/themes';
 
 // ============ CONTEXT ============
 
@@ -33,6 +34,7 @@ const DiagramContext = createContext({
   layers: [],
   groups: [],
   presentations: [],
+  theme: resolveTheme(undefined),
 
   // UI state
   viewport: { x: 0, y: 0, scale: 1 },
@@ -135,10 +137,12 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   const [groups, setGroupsRaw] = useState([]);
   // ADR-0007: ordered slide references and notes. Edited through patchPresentation; not part of the undo stack.
   const [presentations, setPresentationsRaw] = useState([]);
+  // ADR-0007 P2: the board theme as stored (undefined = Ethereal Sky); `theme` below is the resolved one. Not part of the undo stack.
+  const [themeStored, setThemeRaw] = useState(undefined);
   // `liveRef` always holds the newest content, including writes queued in this tick that have not rendered yet.
   // Live pickup (AI-2) merges against it, so an edit made just before a pickup lands is never overwritten by a
   // merge computed from a stale render. Functional updaters are resolved against it, like React would.
-  const liveRef = useRef({ elements: [], connections: [], layers: [DEFAULT_LAYER], groups: [], presentations: [] });
+  const liveRef = useRef({ elements: [], connections: [], layers: [DEFAULT_LAYER], groups: [], presentations: [], theme: undefined });
   const makeSetter = (key, raw) => (v) => {
     const next = typeof v === 'function' ? v(liveRef.current[key]) : v;
     liveRef.current[key] = next;
@@ -149,6 +153,8 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
   const setLayersState = useCallback(makeSetter('layers', setLayersRaw), []); // eslint-disable-line react-hooks/exhaustive-deps
   const setGroupsState = useCallback(makeSetter('groups', setGroupsRaw), []); // eslint-disable-line react-hooks/exhaustive-deps
   const setPresentationsState = useCallback(makeSetter('presentations', setPresentationsRaw), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const setThemeState = useCallback(makeSetter('theme', setThemeRaw), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const theme = useMemo(() => resolveTheme(themeStored), [themeStored]);
 
   // UI state - start viewport centered on the canvas origin
   // The infinite canvas is 100000x100000 with the logical origin at center (50000, 50000)
@@ -498,6 +504,19 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     return res;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * Apply one theme patch {preset?, palette?, fonts?} (the same pure function as the MCP theme_apply) to the board theme.
+   * Returns {ok, theme, warnings} or {ok: false, error}.
+   */
+  const applyTheme = useCallback((patch) => {
+    if (!canEditRef.current) return { ok: false, error: 'You do not have permission to edit this board' };
+    const res = applyThemePatch(liveRef.current.theme, patch);
+    if (!res.ok) return res;
+    setThemeState(res.theme);
+    setSaveStatus(prev => ({ ...prev, dirty: true }));
+    return res;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ============ GROUP OPERATIONS ============
 
   const groupElements = useCallback((elementIds) => {
@@ -720,8 +739,8 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       // or from top-level fields (legacy/direct format)
       // normalize first (legacy nodes/edges, nested double-write shape), then upgrade legacy
       // element types; migrateDiagram only looks at top-level elements, so order matters
-      const { elements, connections, layers, groups, presentations } = contentFromDiagram(newDiagram);
-      baseContentRef.current = { elements, connections, layers, groups, presentations };
+      const { elements, connections, layers, groups, presentations, theme: loadedTheme } = contentFromDiagram(newDiagram);
+      baseContentRef.current = { elements, connections, layers, groups, presentations, theme: loadedTheme };
       baseMetaRef.current = { name: newDiagram.name, description: newDiagram.description };
       remoteLogRef.current = emptyRemoteLog();
       pollStoppedRef.current = false;
@@ -735,6 +754,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       setLayersState(layers);
       setGroupsState(groups);
       setPresentationsState(presentations);
+      setThemeState(loadedTheme);
       setActivePack(newDiagram.type || 'process-flow');
       // Reset history when loading new diagram
       setHistoryPast([]);
@@ -914,6 +934,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       setLayersState(m.layers);
       setGroupsState(m.groups);
       setPresentationsState(m.presentations || []);
+      setThemeState(m.theme);
       lastRecordedRef.current = { elements: null, connections: null };
       const alive = new Set([...m.elements.map((e) => e.id), ...m.connections.map((c) => c.id)]);
       setSelection((prev) => ({
@@ -1037,6 +1058,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
         groups,
         // sent when the board has decks, or had them (so deleting the last deck is saved too)
         ...(presentations.length > 0 || baseContentRef.current?.presentations?.length > 0 ? { presentations } : {}),
+        ...(themeStored ? { theme: themeStored } : {}),
         viewport: normalizeDiagramContent(diagram.content).viewport,
       };
 
@@ -1087,18 +1109,18 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       }
 
       const data = await res.json();
-      baseContentRef.current = { elements, connections, layers, groups, presentations };
+      baseContentRef.current = { elements, connections, layers, groups, presentations, theme: themeStored };
       baseMetaRef.current = { name: data.name ?? saveName, description: data.description ?? saveDescription };
       setDiagramState(prev => ({ ...prev, ...data }));
       // An edit made while this PUT was in flight is not in what was sent: it stays dirty and autosaves again.
       const live = liveRef.current;
       const editedDuringSave = live.elements !== elements || live.connections !== connections
-        || live.layers !== layers || live.groups !== groups || live.presentations !== presentations;
+        || live.layers !== layers || live.groups !== groups || live.presentations !== presentations || live.theme !== themeStored;
       setSaveStatus({ dirty: editedDuringSave, saving: false, lastSaved: new Date().toISOString() });
 
       // Call external save callback if provided
       if (onSaveCallback) {
-        onSaveCallback({ elements, connections, layers, groups, presentations, diagram: data });
+        onSaveCallback({ elements, connections, layers, groups, presentations, theme: themeStored, diagram: data });
       }
 
       return data;
@@ -1108,7 +1130,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       setSaveStatus(prev => ({ ...prev, saving: false }));
       return null;
     }
-  }, [diagram, elements, connections, layers, groups, presentations, saveStatus.dirty, onSaveCallback, conflict, pickupRemote, handleAccessDenied]);
+  }, [diagram, elements, connections, layers, groups, presentations, themeStored, saveStatus.dirty, onSaveCallback, conflict, pickupRemote, handleAccessDenied]);
 
   // ============ AUTO-SAVE ============
 
@@ -1224,6 +1246,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
             layers,
             groups,
             ...(presentations.length > 0 ? { presentations } : {}),
+            ...(themeStored ? { theme: themeStored } : {}),
             viewport: normalizeDiagramContent(diagram.content).viewport,
           },
         }),
@@ -1236,7 +1259,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
       setConflictError(e.message);
       setConflictBusy(false);
     }
-  }, [diagram, elements, connections, layers, groups, presentations]);
+  }, [diagram, elements, connections, layers, groups, presentations, themeStored]);
 
   // ============ VERSION RESTORE (ADR-0001, slice 2) ============
 
@@ -1301,6 +1324,8 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     groups,
     presentations,
     patchPresentation,
+    theme,
+    applyTheme,
 
     // UI state
     viewport,
@@ -1395,7 +1420,7 @@ export function DiagramProvider({ children, diagramId: initialDiagramId, default
     createDiagram,
     restoreFromVersion,
   }), [
-    diagram, elements, connections, layers, groups, presentations, patchPresentation,
+    diagram, elements, connections, layers, groups, presentations, patchPresentation, theme, applyTheme,
     viewport, selection, activePack, activeTool, showGrid, gridStyle, selectedStencil, stickyNoteColor, drawingTool, drawingColor, drawingStrokeWidth,
     remoteHighlight, clearRemoteHighlight, agents, remoteUpdate, reviewAgentChange,
     historyPast.length, historyFuture.length,

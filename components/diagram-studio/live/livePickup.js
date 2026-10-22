@@ -23,6 +23,7 @@ export function contentFromDiagram(d) {
     layers: d.layers || content.layers,
     groups: d.groups || content.groups,
     presentations: d.presentations || content.presentations || [],
+    theme: d.theme || content.theme,
   };
 }
 

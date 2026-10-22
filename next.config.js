@@ -29,6 +29,11 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
         ],
       },
+      // self-hosted theme fonts (ADR-0007 P2): file names are versioned by content, so they can be cached for a year
+      {
+        source: '/fonts/:file*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
     ];
   },
 };

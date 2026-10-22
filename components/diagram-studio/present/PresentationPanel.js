@@ -19,6 +19,7 @@ import { MAX_NOTES_BYTES } from '../../../lib/diagramLimits';
 import { ASPECTS } from '../../../lib/present/presentationSchema';
 import { addFramesToDeck, addNewSlide } from './deckActions';
 import { PDF_WARN_SLIDES } from './exportDeck';
+import { ThemePicker, LayoutPicker, TextPresetBar } from './DesignControls';
 
 const NOTES_CHAR_CAP = Math.floor(MAX_NOTES_BYTES / 4); // characters; 4 is the worst case bytes per character
 
@@ -79,6 +80,7 @@ function NotesField({ value, disabled, onCommit, label }) {
 export default function PresentationPanel({
   open, onClose, content, activeId, onActiveChange, canEdit, selectedFrameIds, patchPresentation, addElement, removeElement, getLiveElements,
   onPresent, onExportPdf, onExportPng, onRevealFrame, exporting, onCancelExport, exportError, exportNote,
+  theme, onApplyTheme, onAddSlideWithLayout, onApplyLayout, onAddText,
 }) {
   const panelRef = useRef(null);
   const [expanded, setExpanded] = useState(null); // slide id whose notes are open
@@ -86,6 +88,7 @@ export default function PresentationPanel({
   const [confirmRemove, setConfirmRemove] = useState(null); // slide being removed (frame still exists)
   const [message, setMessage] = useState(null);
   const [confirmBig, setConfirmBig] = useState(false);
+  const [layout, setLayout] = useState('title-body'); // ADR-0007 P2: the layout the next Add slide / Apply uses
   const elements = useDeferredValue(content.elements);
   const connections = useDeferredValue(content.connections);
   const presentations = content.presentations;
@@ -187,6 +190,20 @@ export default function PresentationPanel({
         {message && <p className="pp-error" role="alert">{message}</p>}
 
         {canEdit && (
+          <section className="pp-design" aria-label="Design">
+            <ThemePicker theme={theme} onApply={(patch) => say(onApplyTheme?.(patch))} />
+            <LayoutPicker
+              layout={layout}
+              onLayoutChange={setLayout}
+              onAddSlide={(l) => say(onAddSlideWithLayout?.(l))}
+              onApplyLayout={(l) => say(onApplyLayout?.(l))}
+              canApply={selectedFrameIds.length > 0}
+            />
+            <TextPresetBar onAdd={(preset) => say(onAddText?.(preset))} target={selectedFrameIds.length ? 'Adds to the selected slide frame.' : 'Adds to the middle of the canvas; select a slide frame first to add it there.'} />
+          </section>
+        )}
+
+        {canEdit && (
           <div className="pp-actions">
             <button type="button" className="pp-btn" data-testid="pp-add-slide" onClick={() => say(addNewSlide({ patchPresentation, addElement, presentations, activeId: deck?.id || null, elements: getLiveElements() }))}>Add slide</button>
             <button
@@ -286,6 +303,7 @@ export default function PresentationPanel({
         .pp-badge { font-size: 11px; color: var(--text-muted, #6b7280); }
         .pp-badge.bad { color: #b91c1c; }
         .pp-slide-tools { display: flex; flex-wrap: wrap; gap: 2px; justify-content: flex-end; }
+        .pp-design { display: flex; flex-direction: column; gap: 12px; padding: 10px; border: 1px solid var(--border, #e5e7eb); border-radius: 10px; }
         .pp-confirm { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px; border-radius: 8px; background: #fffbeb; }
         :global(.pp-notes) { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--border, #d1d5db); border-radius: 6px; font: inherit; resize: vertical; background: var(--surface, #fff); color: inherit; }
       `}</style>

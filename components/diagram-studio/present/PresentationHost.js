@@ -11,7 +11,7 @@ import { downloadExport } from '../export/ExportManager';
 import PresentationPanel from './PresentationPanel';
 import PresentMode from './PresentMode';
 import { exportDeckPdf, exportSlidePng } from './exportDeck';
-import { clampIndex } from './deckActions';
+import { clampIndex, addNewSlide, applyLayoutToFrame, addPresetText } from './deckActions';
 import {
   usePresentState, setPresentState, startPresenting, stopPresenting, closePresentationPanel,
   OPEN_PRESENTATIONS_EVENT, START_PRESENTATION_EVENT,
@@ -49,11 +49,16 @@ function writeQuery(presentationId, slideNumber) {
 
 export default function PresentationHost({ containerRef }) {
   const ctx = useDiagram();
-  const { diagram, elements, connections, presentations, patchPresentation, addElement, removeElement } = ctx;
-  const { zoomToFrame } = useDiagramViewport();
+  const { diagram, elements, connections, presentations, patchPresentation, addElement, removeElement, updateElement, theme, applyTheme } = ctx;
+  const { zoomToFrame, viewport } = useDiagramViewport();
   const { selection, selectElement } = useDiagramSelection();
   const state = usePresentState();
   const canEdit = accessCanWrite(diagram?.access);
+  const viewportCenter = () => {
+    const el = containerRef?.current;
+    const scale = viewport?.scale || 1;
+    return { x: -(viewport?.x || 0) + (el?.offsetWidth || 1200) / 2 / scale, y: -(viewport?.y || 0) + (el?.offsetHeight || 800) / 2 / scale };
+  };
   const elementsRef = useRef(elements);
   elementsRef.current = elements;
   const [exporting, setExporting] = useState(null);
@@ -134,11 +139,11 @@ export default function PresentationHost({ containerRef }) {
       if (only) {
         const s = resolved.slides.find((x) => x.slideId === only);
         if (!s || s.missing) throw new Error('That slide has no frame to export.');
-        downloadExport(await exportSlidePng({ slide: s, elements, connections, title, number: s.n }));
+        downloadExport(await exportSlidePng({ slide: s, elements, connections, title, theme, number: s.n }));
       } else {
         setExporting({ done: 0, total: resolved.playable.length });
         const result = await exportDeckPdf({
-          slides: resolved.playable, elements, connections, title, signal: abort.signal,
+          slides: resolved.playable, elements, connections, title, theme, signal: abort.signal,
           onProgress: (done, total) => setExporting({ done, total }),
         });
         downloadExport(result);
@@ -152,7 +157,7 @@ export default function PresentationHost({ containerRef }) {
       setExporting(null);
       abortRef.current = null;
     }
-  }, [content, elements, connections]);
+  }, [content, elements, connections, theme]);
 
   if (!diagram?.id) return null;
   return (
@@ -177,6 +182,11 @@ export default function PresentationHost({ containerRef }) {
         onCancelExport={() => abortRef.current?.abort()}
         exportError={exportError}
         exportNote={exportNote}
+        theme={theme}
+        onApplyTheme={(patch) => { const r = applyTheme(patch); return r.ok ? r : { ok: false, errors: [r.error] }; }}
+        onAddSlideWithLayout={(layout) => addNewSlide({ patchPresentation, addElement, presentations, activeId: state.activeId, elements: elementsRef.current, layout })}
+        onApplyLayout={(layout) => applyLayoutToFrame({ frame: elements.find((e) => e.id === selectedFrameIds[0]), elements: elementsRef.current, layout, addElement, updateElement, removeElement })}
+        onAddText={(preset) => addPresetText({ preset, frame: elements.find((e) => e.id === selectedFrameIds[0]) || null, elements: elementsRef.current, addElement, center: viewportCenter() })}
       />
       {presenting && deck && (
         <PresentMode
@@ -187,6 +197,7 @@ export default function PresentationHost({ containerRef }) {
           onExit={exitPresenting}
           elements={elements}
           connections={connections}
+          theme={theme}
         />
       )}
       {notice && (
