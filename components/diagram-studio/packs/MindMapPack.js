@@ -5,6 +5,7 @@ import React from 'react';
 import SvgNodeFrame from './SvgNodeFrame';
 import { parseColor, pickLabelColor } from './colorUtils';
 import { stencils, connectionTypes } from './catalog/mind-map';
+import { ElementText } from '../text/useTextLayout';
 
 // ============ STENCILS ============
 
@@ -198,6 +199,8 @@ function darkenColor(hex, percent) {
   return `#${(1 << 24 | R << 16 | G << 8 | B).toString(16).slice(1)}`;
 }
 
+const pillRadius = (h) => Math.min(h / 2, 32);
+
 /**
  * Collapsed Badge - Shows when a node has collapsed children
  */
@@ -244,7 +247,7 @@ function CentralTopicNode({ element, stencil, isSelected }) {
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
   const label = element.label || '';
-  const rx = height / 2; // Full pill shape
+  const rx = pillRadius(height);
   const isCollapsed = element.collapsed;
   const collapsedCount = element.collapsedChildCount || 0;
 
@@ -274,18 +277,6 @@ function CentralTopicNode({ element, stencil, isSelected }) {
         strokeWidth={isSelected ? 2.5 : 1.5}
         filter={`url(#${shadowId})`}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={pickLabelColor(color)}
-        fontSize="16"
-        fontWeight="700"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
       {/* Collapsed badge indicator */}
       {isCollapsed && collapsedCount > 0 && (
         <CollapsedBadge
@@ -307,7 +298,7 @@ function MainTopicNode({ element, stencil, isSelected }) {
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
   const label = element.label || '';
-  const rx = height / 2;
+  const rx = pillRadius(height);
   const isCollapsed = element.collapsed;
   const collapsedCount = element.collapsedChildCount || 0;
 
@@ -332,18 +323,6 @@ function MainTopicNode({ element, stencil, isSelected }) {
         stroke={isSelected ? 'var(--accent, #0e74a3)' : darkenColor(color, 15)}
         strokeWidth={isSelected ? 2 : 1}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={pickLabelColor(color)}
-        fontSize="14"
-        fontWeight="600"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
       {/* Collapsed badge indicator */}
       {isCollapsed && collapsedCount > 0 && (
         <CollapsedBadge
@@ -365,7 +344,7 @@ function SubTopicNode({ element, stencil, isSelected }) {
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
   const label = element.label || '';
-  const rx = height / 2;
+  const rx = pillRadius(height);
   const isCollapsed = element.collapsed;
   const collapsedCount = element.collapsedChildCount || 0;
 
@@ -383,18 +362,6 @@ function SubTopicNode({ element, stencil, isSelected }) {
         strokeWidth={isSelected ? 2 : 1}
         opacity={0.9}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={pickLabelColor(color)}
-        fontSize="12"
-        fontWeight="500"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
       {/* Collapsed badge indicator */}
       {isCollapsed && collapsedCount > 0 && (
         <CollapsedBadge
@@ -416,7 +383,7 @@ function FloatingTopicNode({ element, stencil, isSelected }) {
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
   const label = element.label || '';
-  const rx = height / 2;
+  const rx = pillRadius(height);
 
   return (
     <g>
@@ -432,18 +399,6 @@ function FloatingTopicNode({ element, stencil, isSelected }) {
         strokeWidth={isSelected ? 2 : 1}
         strokeDasharray="4,2"
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={darkenColor(color, 30)}
-        fontSize="12"
-        fontWeight="500"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
     </g>
   );
 }
@@ -456,7 +411,7 @@ function ColoredTopicNode({ element, stencil, isSelected }) {
   const height = element.size?.height || stencil.defaultSize.height;
   const color = element.color || stencil.color;
   const label = element.label || '';
-  const rx = height / 2;
+  const rx = pillRadius(height);
   const isCollapsed = element.collapsed;
   const collapsedCount = element.collapsedChildCount || 0;
 
@@ -481,18 +436,6 @@ function ColoredTopicNode({ element, stencil, isSelected }) {
         stroke={isSelected ? 'var(--accent, #0e74a3)' : darkenColor(color, 15)}
         strokeWidth={isSelected ? 2 : 1}
       />
-      <text
-        x={width / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill={pickLabelColor(color)}
-        fontSize="12"
-        fontWeight="500"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
       {/* Collapsed badge indicator */}
       {isCollapsed && collapsedCount > 0 && (
         <CollapsedBadge
@@ -535,18 +478,6 @@ function CalloutNode({ element, stencil, isSelected }) {
         stroke={isSelected ? 'var(--accent, #0e74a3)' : '#d1d5db'}
         strokeWidth={isSelected ? 2 : 1}
       />
-      <text
-        x={(width + pointerSize) / 2}
-        y={height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="#374151"
-        fontSize="11"
-        fontWeight="400"
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
-      >
-        {label}
-      </text>
     </g>
   );
 }
@@ -575,19 +506,6 @@ function BoundaryNode({ element, stencil, isSelected }) {
         strokeWidth={isSelected ? 2 : 1.5}
         strokeDasharray="8,4"
       />
-      {label && (
-        <text
-          x={12}
-          y={20}
-          textAnchor="start"
-          fill="#6b7280"
-          fontSize="11"
-          fontWeight="500"
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
-        >
-          {label}
-        </text>
-      )}
     </g>
   );
 }
@@ -624,20 +542,6 @@ function SummaryNode({ element, stencil, isSelected }) {
         stroke={isSelected ? 'var(--accent, #0e74a3)' : '#9ca3af'}
         strokeWidth={isSelected ? 2 : 1.5}
       />
-      {label && (
-        <text
-          x={width + 15}
-          y={height / 2}
-          textAnchor="start"
-          dominantBaseline="central"
-          fill="#374151"
-          fontSize="11"
-          fontWeight="500"
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
-        >
-          {label}
-        </text>
-      )}
     </g>
   );
 }
@@ -676,10 +580,32 @@ function renderShape(element, stencil, isSelected) {
   }
 }
 
+// Label color per stencil (the shapes no longer draw text: the shared layout does, ADR-0008)
+function labelColorFor(element, stencil) {
+  const color = element.color || stencil?.color;
+  switch (stencil?.id) {
+    case 'floating-topic':
+      return darkenColor(color, 30);
+    case 'callout':
+    case 'summary':
+      return '#374151';
+    case 'boundary':
+      return '#6b7280';
+    default:
+      return pickLabelColor(color);
+  }
+}
+
 function renderNode(element, stencil, isSelected) {
   const shape = renderShape(element, stencil, isSelected);
   if (!shape) return shape;
-  return <SvgNodeFrame element={element} stencil={stencil}>{shape}</SvgNodeFrame>;
+  const kind = stencil?.id === 'boundary' ? 'title' : stencil?.id === 'summary' ? 'external' : 'inside';
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <SvgNodeFrame element={element} stencil={stencil}>{shape}</SvgNodeFrame>
+      <ElementText packId="mind-map" element={element} stencil={stencil} kind={kind} text={element.label || ''} color={element.textColor || labelColorFor(element, stencil)} pill />
+    </div>
+  );
 }
 
 // ============ PACK EXPORT ============

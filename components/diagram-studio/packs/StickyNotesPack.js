@@ -4,6 +4,7 @@
 import { cssUrl } from '../export/safeUrl';
 import { withBelowLabel } from './NodeLabels';
 import { stencils, connectionTypes } from './catalog/sticky-notes';
+import { ElementText } from '../text/useTextLayout';
 
 // ============ STENCILS ============
 
@@ -193,31 +194,8 @@ function StickyNoteNode({ element, stencil, isSelected }) {
         )}
       </svg>
 
-      {/* Content */}
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '12px',
-        boxSizing: 'border-box',
-      }}>
-        <div style={{
-          fontSize: Math.min(14, Math.max(11, width / 12)),
-          fontWeight: 500,
-          color: '#1f2937',
-          textAlign: 'center',
-          lineHeight: 1.3,
-          overflow: 'hidden',
-          wordBreak: 'break-word',
-          fontFamily: "'Patrick Hand', 'Comic Sans MS', cursive, sans-serif",
-        }}>
-          {label}
-        </div>
-      </div>
+      {/* Content: shared layout, the paper does not grow, so the text shrinks to 11 px and then clamps with a badge (ADR-0008) */}
+      <ElementText packId="sticky-notes" element={element} stencil={stencil} text={label} color={element.textColor || '#1f2937'} />
     </div>
   );
 }
@@ -276,19 +254,7 @@ function ContainerNode({ element, stencil, isSelected }) {
         />
       </svg>
 
-      {/* Label */}
-      <div style={{
-        position: 'absolute',
-        top: '6px',
-        left: '12px',
-        fontSize: 13,
-        fontWeight: 600,
-        color: '#374151',
-        textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-      }}>
-        {label}
-      </div>
+      <ElementText packId="sticky-notes" element={element} stencil={stencil} kind="title" text={label} color="#374151" />
     </div>
   );
 }
@@ -372,7 +338,7 @@ function ImagePlaceholderNode({ element, stencil }) {
         <circle cx="8.5" cy="8.5" r="1.5" fill="#9ca3af" />
         <path d="M21 15l-5-5L5 21" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      <span style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>{label}</span>
+      <ElementText packId="sticky-notes" element={element} stencil={stencil} text={label} color="#6b7280" />
     </div>
   );
 }
@@ -381,40 +347,38 @@ function ImagePlaceholderNode({ element, stencil }) {
 function LinkCardNode({ element, stencil }) {
   const label = element.label || element.data?.linkTitle || 'Link';
   const url = element.data?.url || '';
-  const { width, height } = element.size || stencil?.defaultSize || { width: 180, height: 80 };
 
   return (
     <div style={{
+      position: 'relative',
       width: '100%',
       height: '100%',
       background: '#dbeafe',
       border: '1px solid #93c5fd',
       borderRadius: 6,
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '10px',
       boxSizing: 'border-box',
+      overflow: 'hidden',
     }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        marginBottom: 4,
-      }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" strokeLinecap="round" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" strokeLinecap="round" />
-        </svg>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#1e40af' }}>{label}</span>
-      </div>
+      <svg style={{ position: 'absolute', left: 10, top: 10 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2">
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" strokeLinecap="round" />
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" strokeLinecap="round" />
+      </svg>
+      <ElementText packId="sticky-notes" element={element} stencil={stencil} text={label} color="#1e40af" offsetX={-1} offsetY={-1} />
       {url && (
-        <span style={{
-          fontSize: 10,
-          color: '#3b82f6',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
+        <span
+          title={url}
+          style={{
+            position: 'absolute',
+            left: 10,
+            right: 10,
+            bottom: 8,
+            fontSize: 11,
+            color: '#3b82f6',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {url}
         </span>
       )}
@@ -423,29 +387,8 @@ function LinkCardNode({ element, stencil }) {
 }
 
 // Text block (transparent)
-function TextBlockNode({ element }) {
-  const label = element.label || '';
-
-  return (
-    <div style={{
-      width: '100%',
-      height: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '8px',
-      boxSizing: 'border-box',
-    }}>
-      <div style={{
-        fontSize: 14,
-        color: '#1f2937',
-        textAlign: 'center',
-        lineHeight: 1.4,
-      }}>
-        {label}
-      </div>
-    </div>
-  );
+function TextBlockNode({ element, stencil }) {
+  return <ElementText packId="sticky-notes" element={element} stencil={stencil} color="#1f2937" />;
 }
 
 // Main render function
@@ -484,7 +427,7 @@ function renderNode(element, stencil, isSelected) {
 
   // Text block
   if (type === 'text-block') {
-    return <TextBlockNode element={element} />;
+    return <TextBlockNode element={element} stencil={stencil} />;
   }
 
   // Default - return null to use standard rendering

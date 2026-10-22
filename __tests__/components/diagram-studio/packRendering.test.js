@@ -8,6 +8,7 @@ import CLDPack from '../../../components/diagram-studio/packs/CLDPack';
 import MindMapPack from '../../../components/diagram-studio/packs/MindMapPack';
 import CorePack from '../../../components/diagram-studio/packs/CorePack';
 import { createDefaultRegistry } from '../../../components/diagram-studio/packs';
+import { sizeForText } from '../../../lib/text/fit';
 
 const SHAPE_SELECTOR = 'rect, circle, path, polygon, ellipse, line, polyline';
 
@@ -41,7 +42,9 @@ describe.each([
     expect(svg.getAttribute('overflow')).toBe('visible');
     expect(svg.getAttribute('width')).toBe(String(stencil.defaultSize.width));
     expect(svg.getAttribute('height')).toBe(String(stencil.defaultSize.height));
-    expect(container.firstChild.firstChild.tagName.toLowerCase()).toBe('svg');
+    // the svg is the node root, or the first child of the wrapper that also holds the shared text layout (ADR-0008)
+    const root = container.firstChild.firstChild;
+    expect(root.tagName.toLowerCase() === 'svg' || root.firstChild.tagName.toLowerCase() === 'svg').toBe(true);
     const msgs = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n');
     expect(msgs).not.toMatch(/unrecognized in this browser|incorrect casing/);
   });
@@ -90,7 +93,9 @@ describe('Core diamond', () => {
       expect(Math.abs(pts[i][0] - ex)).toBeLessThanOrEqual(2);
       expect(Math.abs(pts[i][1] - ey)).toBeLessThanOrEqual(2);
     });
-    expect(container.textContent).toContain('Label diamond');
+    // small diamonds clamp the text (ADR-0008) but never lose it: the badge's title holds the full label
+    const full = container.textContent + [...container.querySelectorAll('[title]')].map((n) => n.getAttribute('title')).join(' ');
+    expect(full.replace(/- /g, '')).toContain('Label diamond'); // an emergency break draws a hyphen at the line end
   });
 });
 
@@ -141,11 +146,13 @@ describe('Core diamond has no rotation wrapper', () => {
     expect(css).toMatch(/\.ds-node-diamond:not\(\.ds-node-custom-render\) \.ds-node-inner\s*\{[^}]*rotate\(-45deg\)/);
   });
 
-  test('label box is wide and breaks at word boundaries', () => {
-    const el = makeElement(stencil, 'd1', { label: 'Diamond' });
+  test('the label is drawn by the shared text layout, whole and unclipped at the size the text asks for', () => {
+    const fit = sizeForText('core', stencil, 'Diamond');
+    const el = makeElement(stencil, 'd1', { label: 'Diamond', packId: 'core', size: { width: fit.width, height: fit.height } });
     const { container } = render(<div>{CorePack.renderNode(el, stencil, false)}</div>);
-    const label = [...container.querySelectorAll('div')].find((d) => d.textContent === 'Diamond' && d.style.overflowWrap);
-    expect(label.style.overflowWrap).toBe('break-word');
-    expect(parseInt(label.style.width, 10)).toBeGreaterThanOrEqual(70);
+    const block = container.querySelector('[data-text-block]');
+    expect(block).not.toBeNull();
+    expect(block.getAttribute('data-overflow')).toBeNull();
+    expect(block.textContent).toBe('Diamond');
   });
 });

@@ -5,6 +5,8 @@ import React from 'react';
 import { stencils, connectionTypes } from './catalog/core';
 import TableNode from '../elements/table/TableNode';
 import DocCard from '../elements/doc/DocCard';
+import TextBlock from '../text/TextBlock';
+import { ElementText, useTextLayout } from '../text/useTextLayout';
 import TextPresetNode from '../elements/text/TextPresetNode';
 import { isPresetText } from '../../../lib/present/textPreset';
 
@@ -25,6 +27,7 @@ function FrameNode({ element, stencil, isSelected }) {
   const frameColor = element.color || '#64748b';
   // ADR-0007: a frame with a slide shape reads as a slide: square corners, a solid hairline instead of the dashed outline
   const isSlide = !!element.data?.aspect && element.data.aspect !== 'free';
+  const { layout: titleLayout, box: titleBox } = useTextLayout(element, stencil, 'title', label);
 
   return (
     <div style={{
@@ -33,29 +36,24 @@ function FrameNode({ element, stencil, isSelected }) {
       position: 'relative',
       pointerEvents: 'none',
     }}>
-      {/* External title above frame */}
-      {showTitle && (
-        <div style={{
-          position: 'absolute',
-          top: -28,
-          left: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          pointerEvents: 'auto',
-        }}>
-          <span style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: frameColor,
-            background: 'white',
-            padding: '4px 8px',
-            borderRadius: 4,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          }}>
-            {label}
-          </span>
-        </div>
+      {/* External title above frame: one line, ellipsis + badge when it does not fit (ADR-0008) */}
+      {showTitle && titleLayout.lines.length > 0 && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              top: titleBox.y - 2,
+              left: 0,
+              height: titleBox.height + 4,
+              width: Math.min(width, Math.ceil(titleLayout.width) + 16),
+              background: 'white',
+              borderRadius: 4,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+              pointerEvents: 'auto',
+            }}
+          />
+          <TextBlock layout={titleLayout} box={titleBox} color={frameColor} fontFamily={element.fontFamily} testId="title" />
+        </>
       )}
 
       <svg
@@ -112,6 +110,7 @@ function FrameNode({ element, stencil, isSelected }) {
 function SectionNode({ element, stencil }) {
   const label = element.label || element.name || '';
   const { width, height } = element.size || stencil?.defaultSize || { width: 400, height: 300 };
+  const { layout: titleLayout, box: titleBox } = useTextLayout(element, stencil, 'title', label);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -129,19 +128,11 @@ function SectionNode({ element, stencil }) {
         />
       </svg>
 
-      {label && (
-        <div style={{
-          position: 'absolute',
-          top: -10,
-          left: 12,
-          background: 'var(--panel)',
-          padding: '0 8px',
-          fontSize: 11,
-          fontWeight: 500,
-          color: 'var(--text-muted)',
-        }}>
-          {label}
-        </div>
+      {label && titleLayout.lines.length > 0 && (
+        <>
+          <div style={{ position: 'absolute', top: -9, left: 12, height: 18, width: Math.min(width - 24, Math.ceil(titleLayout.width) + 16), background: 'var(--panel)' }} />
+          <TextBlock layout={titleLayout} box={titleBox} color="var(--text-muted)" fontFamily={element.fontFamily} testId="title" />
+        </>
       )}
     </div>
   );
@@ -186,27 +177,12 @@ function DiamondNode({ element, stencil, isSelected, outlined = false }) {
           strokeLinejoin="round"
         />
       </svg>
-      <div style={{
-        position: 'absolute',
-        top: '20%',
-        left: '15%',
-        width: '70%',
-        height: '60%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        fontSize: element.fontSize || 13,
-        fontWeight: element.fontWeight || 500,
-        fontStyle: element.fontStyle || 'normal',
-        textDecoration: element.textDecoration || 'none',
-        color: element.textColor || (useOutline ? 'var(--text, #1f2937)' : pickTextColor(fill)),
-        overflowWrap: 'break-word',
-        pointerEvents: 'none',
-        userSelect: 'none',
-      }}>
-        {label}
-      </div>
+      <ElementText
+        element={element}
+        stencil={stencil}
+        text={label}
+        color={element.textColor || (useOutline ? 'var(--text, #1f2937)' : pickTextColor(fill))}
+      />
     </div>
   );
 }

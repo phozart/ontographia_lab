@@ -4,6 +4,8 @@
 // is drawn just below the shape instead of being dropped.
 
 import React from 'react';
+import { policyFor, externalPolicy } from '../../../lib/text/policy';
+import { ElementText } from '../text/useTextLayout';
 
 export function labelOf(element) {
   return element?.label || element?.name || '';
@@ -22,10 +24,25 @@ const BELOW_STYLE = {
   userSelect: 'none',
 };
 
-// HTML label centered under the node box.
-export function BelowLabel({ element }) {
+// HTML label centered under the node box. Stencils whose text policy is `external` (ADR-0008: events, gateway markers,
+// data objects, markers) draw it through the shared layout (wrapped to max(2w, 120), at most 3 lines, badge on clamp);
+// `forceExternal` does the same for a label that cannot fit inside. Other packs keep the legacy single line until T2.
+export function BelowLabel({ element, forceExternal = false }) {
   const label = labelOf(element);
   if (!label) return null;
+  const stencilLike = { id: element.type };
+  const policy = forceExternal ? externalPolicy(stencilLike) : policyFor(element.packId, stencilLike);
+  if (policy.slot === 'external') {
+    return (
+      <ElementText
+        element={element}
+        kind="external"
+        policy={policy}
+        className="ds-node-label-below"
+        color={element.textColor || 'var(--text, #1f2937)'}
+      />
+    );
+  }
   return (
     <div
       className="ds-node-label-below"
@@ -44,12 +61,12 @@ export function BelowLabel({ element }) {
 }
 
 // Wrap an already-rendered node so its label shows below it.
-export function withBelowLabel(node, element) {
+export function withBelowLabel(node, element, forceExternal = false) {
   if (!labelOf(element)) return node;
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       {node}
-      <BelowLabel element={element} />
+      <BelowLabel element={element} forceExternal={forceExternal} />
     </div>
   );
 }
