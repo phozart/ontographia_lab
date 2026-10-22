@@ -80,6 +80,7 @@ The typical run is: map the text, tabulate or cluster it, then write the finding
 3. `doc_create` with `title`, `markdown`, `baseRevision` and `anchor: {near: <frame or element id>}` so the card sits beside what it describes.
 4. Read `warnings`: an element link whose id is not on the board is reported (it renders struck through). Fix it with `doc_update`.
 5. Later edits: `doc_get` first, then `doc_update` with `append` or `replaceSection {heading, markdown}` (not a full rewrite). The owner may be typing in the doc; the editor merges, and their text wins on the same text.
+6. Tell the user what they can do with it: in the lab, the doc panel (and the card's right-click menu) has **Copy** (formatted, to paste into Outlook or Word; Cmd/Ctrl+Shift+C), **.docx**, **.pdf** and **.md**; a table has right-click **Copy table with formatting** (pastes as cells into Excel or Sheets) and **Export as Excel (.xlsx)** in its ⋯ menu; right-click any element, frame or the empty board for **Copy as image** (Cmd/Ctrl+Shift+C on the canvas) to paste a picture into a mail or chat. You cannot copy or export for them; just say where the buttons are.
    The server also offers the prompt `summarize_region` (link + optional focus).
 
 ### 6c. "Make a presentation from these frames"

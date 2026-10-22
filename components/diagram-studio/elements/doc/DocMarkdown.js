@@ -152,7 +152,7 @@ function Blocks({ blocks, ctx }) {
 /**
  * @param {{markdown: string, knownIds?: Set<string>, onElementLink?: (id: string) => void, maxBlocks?: number, maxChars?: number}} props
  */
-export default function DocMarkdown({ markdown, knownIds, onElementLink, maxBlocks, maxChars, truncationNotice }) {
+function DocMarkdown({ markdown, knownIds, onElementLink, maxBlocks, maxChars, truncationNotice }) {
   const { blocks, hidden } = useMemo(() => {
     const src = typeof markdown === 'string' ? (maxChars ? markdown.slice(0, maxChars) : markdown) : '';
     const all = parseMarkdown(src);
@@ -166,3 +166,6 @@ export default function DocMarkdown({ markdown, knownIds, onElementLink, maxBloc
     </div>
   );
 }
+
+// Memoized: a card re-renders on every board change, its body must not (props are stable: strings, a Set keyed on the id list).
+export default React.memo(DocMarkdown);

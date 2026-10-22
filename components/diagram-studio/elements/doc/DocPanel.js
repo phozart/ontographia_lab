@@ -16,6 +16,7 @@ import { useDiagram } from '../../DiagramContext';
 import { canWrite } from '../../sharing/accessMode';
 import DocMarkdown from './DocMarkdown';
 import { followElementLink } from './docStore';
+import { copyDocRich, exportDocFile } from './docActions';
 import { docOf, cleanTitle, MAX_DOC_TITLE } from '../../../../lib/doc/docElement';
 import { MAX_DOC_BYTES, utf8Length } from '../../../../lib/doc/markdown';
 import { docToMarkdownFile, docFileName } from '../../../../lib/doc/docText';
@@ -27,7 +28,7 @@ const utf8Bytes = utf8Length;
 const linkText = (label) => String(label || 'element').replace(/[[\]\\\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'element';
 
 const S = {
-  panel: { display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--panel, #fff)', color: 'var(--text, #0f172a)', fontSize: 13 },
+  panel: { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, flex: '1 1 auto', overflow: 'hidden', background: 'var(--panel, #fff)', color: 'var(--text, #0f172a)', fontSize: 13 },
   head: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderBottom: '1px solid var(--border, #e2e8f0)' },
   title: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: 650, border: '1px solid transparent', borderRadius: 6, padding: '4px 6px', background: 'transparent', color: 'inherit' },
   iconBtn: { border: 0, background: 'transparent', cursor: 'pointer', color: 'var(--text-muted, #475569)', borderRadius: 6, padding: '4px 8px', fontSize: 12 },
@@ -35,8 +36,8 @@ const S = {
   tab: (on) => ({ border: 0, background: on ? 'var(--accent-soft, rgba(79,179,206,.12))' : 'transparent', color: on ? 'var(--accent, #4FB3CE)' : 'var(--text-muted, #475569)', fontWeight: on ? 650 : 500, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }),
   tools: { display: 'flex', flexWrap: 'wrap', gap: 2, padding: '6px 12px', borderBottom: '1px solid var(--border-subtle, #f1f5f9)' },
   tool: { border: '1px solid var(--border, #e2e8f0)', background: 'var(--panel, #fff)', borderRadius: 5, padding: '2px 7px', cursor: 'pointer', fontSize: 12, color: 'var(--text, #0f172a)', minWidth: 26 },
-  area: { flex: 1, minHeight: 0, margin: 0, padding: '10px 12px', border: 0, outline: 'none', resize: 'none', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5, lineHeight: 1.55, background: 'transparent', color: 'inherit' },
-  preview: { flex: 1, minHeight: 0, overflow: 'auto', padding: '10px 14px' },
+  area: { flex: '1 1 0', minHeight: 0, overflowY: 'auto', margin: 0, padding: '10px 12px', border: 0, outline: 'none', resize: 'none', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5, lineHeight: 1.55, background: 'transparent', color: 'inherit' },
+  preview: { flex: '1 1 0', minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: '10px 14px' },
   foot: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', borderTop: '1px solid var(--border-subtle, #f1f5f9)', fontSize: 11.5, color: 'var(--text-muted, #475569)' },
   notice: { margin: '6px 12px 0', padding: '6px 8px', borderRadius: 6, background: '#fff7e6', color: '#5c3b00', border: '1px solid #f0c36d', fontSize: 12 },
   picker: { padding: '6px 12px', borderBottom: '1px solid var(--border-subtle, #f1f5f9)' },
@@ -217,6 +218,18 @@ export default function DocPanel({ elementId, onClose }) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  // Copy with formatting / .docx / .pdf use the draft in the panel (what the user sees), not the last saved value.
+  const copyRichNow = () => copyDocRich({ title: cleanTitle(title), markdown: text, diagram });
+  const exportAs = (kind) => exportDocFile(kind, { title: cleanTitle(title), markdown: text, diagram });
+  // Cmd/Ctrl+Shift+C copies the doc with formatting. Plain Cmd/Ctrl+C inside the textarea is left alone.
+  const onPanelKeyDown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'c') {
+      e.preventDefault();
+      e.stopPropagation();
+      copyRichNow();
+    }
+  };
+
   const close = () => {
     flush();
     onClose?.();
@@ -225,7 +238,7 @@ export default function DocPanel({ elementId, onClose }) {
   if (!element) return null;
 
   return (
-    <div style={S.panel} data-testid="doc-panel" role="region" aria-label="Doc editor">
+    <div style={S.panel} data-testid="doc-panel" role="region" aria-label="Doc editor" onKeyDown={onPanelKeyDown}>
       <div style={S.head}>
         <input
           style={S.title}
@@ -237,6 +250,9 @@ export default function DocPanel({ elementId, onClose }) {
           aria-label="Doc title"
           data-testid="doc-title"
         />
+        <button type="button" style={{ ...S.iconBtn, fontWeight: 650 }} onClick={copyRichNow} data-testid="doc-copy-rich" title="Copy with formatting, to paste into Outlook or Word (Cmd/Ctrl+Shift+C)">Copy</button>
+        <button type="button" style={S.iconBtn} onClick={() => exportAs('docx')} data-testid="doc-export-docx" title="Download as a Word document">.docx</button>
+        <button type="button" style={S.iconBtn} onClick={() => exportAs('pdf')} data-testid="doc-export-pdf" title="Download as a PDF">.pdf</button>
         <button type="button" style={S.iconBtn} onClick={exportMd} data-testid="doc-export-md" title="Download as a Markdown file">.md</button>
         <button type="button" style={S.iconBtn} onClick={close} aria-label="Close doc" data-testid="doc-close">&times;</button>
       </div>

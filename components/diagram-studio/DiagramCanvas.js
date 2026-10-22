@@ -50,6 +50,8 @@ import { newTableElement } from './elements/table/newTableElement';
 import { requestJsonImportFromDrop } from './export/useJsonImport';
 import { docDefaults } from '../../lib/doc/docElement';
 import { openDoc } from './elements/doc/docStore';
+import { copyAsImage } from './export/copyAsImage';
+import { copyDocElement, exportDocElement, copyTableElement } from './elements/doc/docActions';
 import { requestDocImportFromDrop } from './elements/doc/useDocImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
 import { frameAspectOf, resizeWithAspect } from '../../lib/present/presentationModel';
@@ -5036,6 +5038,21 @@ export default function DiagramCanvas({
       ];
     }
 
+    // Doc cards and tables: copy with formatting and export. Reading actions, so every role (including viewers) gets them.
+    if (nodeEl) {
+      const target = elements.find((el) => el.id === nodeEl.dataset?.nodeId);
+      const extra = [];
+      if (target?.type === 'doc') {
+        extra.push({ label: 'Copy with formatting', action: 'doc-copy', icon: '📋' }, { label: 'Export as Word (.docx)', action: 'doc-docx', icon: '⬇️' }, { label: 'Export as PDF', action: 'doc-pdf', icon: '⬇️' });
+      } else if (target?.type === 'table') {
+        extra.push({ label: 'Copy table with formatting', action: 'table-copy', icon: '📋' });
+      }
+      extra.push({ label: target?.type === 'frame' || target?.isFrame ? 'Copy frame as image' : 'Copy as image', action: 'copy-image', icon: '🖼️', shortcut: '⇧⌘C' });
+      menuItems = [...menuItems, ...(menuItems.length ? [{ type: 'divider' }] : []), ...extra];
+    } else if (!connectionEl) {
+      menuItems = [...menuItems, { type: 'divider' }, { label: 'Copy board as image', action: 'copy-image', icon: '🖼️', shortcut: '⇧⌘C' }];
+    }
+
     // AI-1: hand a selection / the visible region to Claude (works for every role, including read-only viewers)
     if (onCopyClaudeLink && !connectionEl) {
       if (menuItems.length) menuItems = [...menuItems, { type: 'divider' }];
@@ -5045,7 +5062,7 @@ export default function DiagramCanvas({
     if (menuItems.length > 0) {
       setContextMenu({ x, y, items: menuItems, nodeEl, connectionEl });
     }
-  }, [readOnly, connections, selectConnection, onCopyClaudeLink]);
+  }, [readOnly, connections, elements, selectConnection, onCopyClaudeLink]);
 
   const handleContextMenuAction = useCallback((action, nodeEl, connectionEl) => {
     setContextMenu(null);
@@ -5054,6 +5071,24 @@ export default function DiagramCanvas({
     const connectionId = connectionEl?.dataset?.connectionId;
 
     switch (action) {
+      case 'doc-copy':
+      case 'doc-docx':
+      case 'doc-pdf':
+      case 'table-copy': {
+        const target = elements.find((el) => el.id === nodeId);
+        if (!target) break;
+        if (action === 'doc-copy') copyDocElement(target, diagram);
+        else if (action === 'table-copy') copyTableElement(target, diagram);
+        else exportDocElement(action === 'doc-docx' ? 'docx' : 'pdf', target, diagram);
+        break;
+      }
+      case 'copy-image': {
+        // right-clicking inside the current selection copies the whole selection, otherwise just that element; none = board
+        const sel = selection?.nodeIds || [];
+        const ids = nodeId ? (sel.includes(nodeId) ? sel : [nodeId]) : [];
+        copyAsImage({ elements, connections, selection: { nodeIds: ids, connectionIds: [] }, name: diagram?.name });
+        break;
+      }
       case 'copy-claude-link':
         onCopyClaudeLink?.(nodeId || null, { view: !nodeId });
         break;
@@ -5206,7 +5241,7 @@ export default function DiagramCanvas({
       default:
         break;
     }
-  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry, zoomToFitAll, resetZoom, onCopyClaudeLink]);
+  }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry, zoomToFitAll, resetZoom, onCopyClaudeLink, diagram, selection]);
 
   // ============ RENDER ============
 
@@ -5944,6 +5979,7 @@ export default function DiagramCanvas({
                 <button
                   key={idx}
                   className={`ds-context-menu-item ${item.danger ? 'danger' : ''}`}
+                  data-testid={item.action ? `ctx-${item.action}` : undefined}
                   onClick={() => handleContextMenuAction(item.action, contextMenu.nodeEl, contextMenu.connectionEl)}
                   disabled={item.disabled}
                 >
