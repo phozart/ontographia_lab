@@ -9,6 +9,7 @@
  */
 const path = require('path');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
 jest.setTimeout(240000);
@@ -46,7 +47,7 @@ maybe('Sharing matrix (slice 5)', () => {
   afterAll(async () => { if (browser) await browser.close(); });
 
   it('enforces roles server-side and reflects them in the editor UI', async () => {
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox'] });
   try {
     const alice = await login(browser, 'alice@s5.test', PW);
     const bob = await login(browser, 'bob@s5.test', PW);

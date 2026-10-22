@@ -11,6 +11,7 @@
 const path = require('path');
 const fs = require('fs');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 const { layoutForElement } = require('../../lib/text/fit');
 const { policyFor } = require('../../lib/text/policy');
@@ -63,7 +64,7 @@ describe('Text layout and autosizing (ADR-0008 T1)', () => {
   }));
 
   beforeAll(async () => {
-    browser = await puppeteer.launch({ headless: process.env.E2E_HEADLESS_MODE || process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     context = await browser.createBrowserContext();
     const p = await context.newPage();
     await p.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle0', timeout: 90000 });

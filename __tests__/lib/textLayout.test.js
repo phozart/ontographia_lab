@@ -257,6 +257,24 @@ describe('fit modes', () => {
   });
 });
 
+describe('hostile sizes (M2)', () => {
+  test('an absurd stored font size lays out fast in every mode and never below 11 px', () => {
+    for (const mode of ['shrink', 'fixed', 'auto', 'auto-height']) {
+      const t0 = process.hrtime.bigint();
+      const l = layoutText({ text: CORPUS.c140, font: { size: 1e7, weight: 500, lineHeight: 1.3 }, box: { width: 120, height: 80 }, mode, limits: { minWidth: 120, maxWidth: 240 } });
+      expect(Number(process.hrtime.bigint() - t0) / 1e6).toBeLessThan(5);
+      expect(l.fontSize).toBeLessThanOrEqual(512);
+      expect(l.fontSize).toBeGreaterThanOrEqual(MIN_SIZE);
+    }
+  });
+  test('shrink bisects: the result is the largest integer size that fits', () => {
+    const fits = (size) => { const l = layoutText({ text: CORPUS.c60, font: { size, weight: 500, lineHeight: 1.3 }, box: { width: 150, height: 60 }, mode: 'fixed' }); return !l.overflow && l.breaks.emergency === 0; };
+    const l = layoutText({ text: CORPUS.c60, font: { size: 40, weight: 500, lineHeight: 1.3 }, box: { width: 150, height: 60 }, mode: 'shrink' });
+    expect(l.fontSize).toBeGreaterThanOrEqual(MIN_SIZE);
+    if (l.fontSize > MIN_SIZE) { expect(fits(l.fontSize)).toBe(true); expect(fits(l.fontSize + 1)).toBe(false); }
+  });
+});
+
 describe('performance', () => {
   test('a label lays out in well under a millisecond (median)', () => {
     const samples = [];

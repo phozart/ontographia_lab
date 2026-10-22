@@ -737,20 +737,28 @@
 }
 
 /* Node text drawn by the shared layout (ADR-0008, components/diagram-studio/text/TextBlock.js).
-   Lines are pinned: no wrapping is left for the browser to do. */
+   Lines are pre-broken (white-space: pre): no wrapping is left for the browser to do. Per-node values (position, width,
+   font size, line height, color) are inline; everything else is here. */
 .ds-text {
   position: absolute;
+  box-sizing: content-box;
   pointer-events: none;
-  user-select: none;
   overflow: visible;
+  text-align: center;
+  font-weight: 500;
 }
+.ds-node .ds-text { user-select: text; }
+.ds-text-w400 { font-weight: 400; }
+.ds-text-w500 { font-weight: 500; }
+.ds-text-w600 { font-weight: 600; }
+.ds-text-w700 { font-weight: 700; }
+.ds-text-start { text-align: start; }
+.ds-text-end { text-align: end; }
 
+/* Not user-select: none: the label can be selected and copied; dragging a node still moves it because the block ignores
+   pointer events (the node underneath handles them). */
 .ds-text-line {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  height: var(--ds-lh);
-  line-height: var(--ds-lh);
+  display: block;
   white-space: pre;
   unicode-bidi: plaintext;
 }
@@ -762,21 +770,45 @@
   pointer-events: auto;
   cursor: help;
   font-size: 11px;
-  line-height: 11px;
+  line-height: 13px;
   height: 13px;
   padding: 0 4px;
   border-radius: 7px;
-  background: var(--accent, #4FB3CE);
+  background: #1f6f89; /* darker accent: white glyph contrast 5.6:1 (non-text contrast needs 3:1) */
   color: #fff;
   font-weight: 700;
   letter-spacing: 1px;
   font-family: inherit;
   white-space: pre;
+  text-align: center;
 }
+.ds-text-badge:focus-visible { outline: 2px solid var(--accent, #4FB3CE); outline-offset: 1px; }
+.ds-text-badge-pill { right: 2px; }
 
-.ds-text-badge-pill {
-  right: 2px;
+/* the full text: on hover and on keyboard focus (the title attribute is the mouse fallback) */
+.ds-text-full {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 16px;
+  z-index: 60;
+  min-width: 120px;
+  max-width: 320px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #1f2933;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-align: start;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
+.ds-text-badge:focus .ds-text-full,
+.ds-text-badge:focus-visible .ds-text-full { display: block; }
 
 /* Node Label */
 .ds-node-label {

@@ -5,6 +5,7 @@
  */
 const path = require('path');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
@@ -26,7 +27,7 @@ describe('Version history (slice 2)', () => {
   beforeAll(async () => {
     const email = process.env.QA_ADMIN_EMAIL; const password = process.env.QA_ADMIN_PASSWORD;
     if (!email || !password) throw new Error('QA_ADMIN_EMAIL and QA_ADMIN_PASSWORD must be set (.env.qa.local)');
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     const login = await browser.newPage();
     await login.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle0' });
     await login.type('#email', email);

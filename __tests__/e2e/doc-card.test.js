@@ -9,6 +9,7 @@
 const path = require('path');
 const os = require('os');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
@@ -75,7 +76,7 @@ describe('Doc card (AI-5)', () => {
 
   beforeAll(async () => {
     downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai5-dl-'));
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     await login('a', process.env.QA_ADMIN_EMAIL, process.env.QA_ADMIN_PASSWORD);
     await login('b', process.env.QA_USER_EMAIL, process.env.QA_USER_PASSWORD);
     const p = await newPage('a');

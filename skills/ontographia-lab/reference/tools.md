@@ -54,7 +54,7 @@ Every write needs `id` and `baseRevision` (from your last read). Each call is on
 
 - `add_element {ref?: "@name", type: "pack/stencil", label?, x?, y?, w?, h?, textFit?, parent?, data?}` (leave x and y out: the server places it clear of content; leave w and h out: the box is sized from the label, never below the stencil default; only `w` keeps the width and lets the height follow the text; `textFit` is `auto`, `auto-height`, `shrink` or `fixed`)
 - `update_element {id, label?, x?, y?, w?, h?, textFit? (null resets), parent? (null removes), data? (merged, null deletes a key)}` (a new label re-fits a box that follows its text and only grows a hand-sized one, unless w or h is given)
-- `fit_to_text {ids: [id | @ref] | all: true}`: resize boxes to hug their labels (top-left stays, never below the stencil default size; `all` skips locked elements and stencils that keep their size, such as frames; the result lists `fitted` with before and after sizes)
+- `fit_to_text {ids: [id | @ref] | all: true}`: resize boxes to hug their labels (top-left stays, never below the stencil default size; locked elements (listed in `warnings`) and stencils that keep their size, such as frames, are skipped; the result lists `fitted` with before and after sizes)
 - `remove_element {id}` (also removes its connections)
 - `connect {ref?, from, to, label?, style?: straight|step|curved|arc|smart, connType?, fromPort?, toPort?}`
 - `update_connection {id, label?, style?, connType?}`, `remove_connection {id}`

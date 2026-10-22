@@ -9,6 +9,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
 jest.setTimeout(300000);
@@ -87,7 +88,7 @@ describe('Presets, themes and layouts (ADR-0007 P2)', () => {
 
   beforeAll(async () => {
     downloadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'p2-dl-'));
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     context = await browser.createBrowserContext();
     const p = await context.newPage();
     await p.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle0', timeout: 90000 });

@@ -72,14 +72,15 @@ dbDescribe('fit_to_text via agentWrite (throwaway database)', () => {
     expect((await rows('select 1 from audit_events where diagram_id=$1')).length - auditBefore).toBe(1);
   });
 
-  test('an explicit locked id is rejected and nothing is written', async () => {
+  test('an explicit locked id is skipped with a warning (the batch still succeeds)', async () => {
     const client = await editorClient();
     const got = await client.callTool({ name: 'diagram_get', arguments: { id: diagram.id } });
     const rev = got.structuredContent.diagram.revision;
     const r = await client.callTool({ name: 'diagram_apply_ops', arguments: { id: diagram.id, baseRevision: rev, ops: [{ op: 'fit_to_text', ids: ['c'] }] } });
-    expect(r.isError).toBe(true);
-    const head = (await rows('select revision::int rev from diagrams where id=$1'))[0];
-    expect(head.rev).toBe(rev);
+    expect(r.isError).toBeFalsy();
+    expect(r.structuredContent.warnings.join(' ')).toMatch(/locked/);
+    const head = (await rows('select content from diagrams where id=$1'))[0];
+    expect(head.content.elements.find((e) => e.id === 'c').size).toEqual({ width: 120, height: 80 });
   });
 
   test('a second fit_to_text all changes nothing and still saves cleanly (no fitted entries)', async () => {

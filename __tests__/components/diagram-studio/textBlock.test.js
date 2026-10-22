@@ -33,25 +33,26 @@ const sizes = (c) => [...c.container.querySelectorAll('[data-text-block]')].map(
 describe('TextBlock', () => {
   const layout = layoutText({ text: 'Customer Order Service', font: { size: 14, weight: 500, lineHeight: 1.3 }, box: { width: 80, height: 60 }, mode: 'fixed' });
 
-  test('draws every layout line as a pinned, non-wrapping span at its own top', () => {
+  test('draws every layout line as a block span in flow; only per-node values are inline', () => {
     const { container } = render(<TextBlock layout={layout} box={{ x: 5, y: 7, width: 80, height: 60 }} color="#123456" />);
     const spans = [...container.querySelectorAll('.ds-text-line')];
     expect(spans).toHaveLength(layout.lines.length);
     spans.forEach((s, i) => {
-      expect(s.classList.contains('ds-text-line')).toBe(true); // white-space: pre and absolute positioning come from the stylesheet
-      expect(parseFloat(s.style.top)).toBeCloseTo(layout.lines[i].top, 1);
+      expect(s.getAttribute('style')).toBeNull(); // no per-line style at all
       expect(s.textContent.trim()).toBe(layout.lines[i].text);
     });
-    const blockEl = container.querySelector('[data-text-block]');
-    expect(blockEl.style.color).toBe('rgb(18, 52, 86)');
-    expect(blockEl.style.fontSize).toBe('14px');
-    expect(blockEl.style.lineHeight).toBe(`${layout.lineHeight}px`);
-    expect(blockEl.getAttribute('data-font-size')).toBe('14');
     const block = container.querySelector('[data-text-block]');
     expect(block.style.left).toBe('5px');
     expect(block.style.top).toBe('7px');
+    expect(block.style.color).toBe('rgb(18, 52, 86)');
+    expect(block.style.fontSize).toBe('14px');
+    expect(block.style.lineHeight).toBe(`${layout.lineHeight}px`);
+    expect(parseFloat(block.style.paddingTop || '0')).toBeCloseTo(layout.lines[0].top, 1); // the vertical-align offset
+    expect(block.classList.contains('ds-text-w500')).toBe(true);
+    expect(block.getAttribute('data-font-size')).toBe('14');
     expect(block.getAttribute('data-overflow')).toBeNull();
     expect(container.querySelector('.ds-text-badge')).toBeNull();
+    expect(block.getAttribute('style').split(';').filter(Boolean).length).toBeLessThanOrEqual(8); // perf: few style writes per node
   });
 
   test('textContent keeps the words apart across lines (copy, search and tests read it)', () => {
@@ -65,6 +66,9 @@ describe('TextBlock', () => {
     const badge = container.querySelector('.ds-text-badge');
     expect(badge).not.toBeNull();
     expect(badge.getAttribute('title')).toBe(C140);
+    expect(badge.getAttribute('role')).toBe('button'); // keyboard reachable, with the full text on focus
+    expect(badge.getAttribute('tabindex')).toBe('0');
+    expect(badge.querySelector('.ds-text-full').textContent).toBe(C140);
     expect(badge.getAttribute('aria-label')).toContain(C140);
     expect(container.querySelector('[data-text-block]').getAttribute('data-overflow')).toBe('true');
     expect(css).toMatch(/\.ds-text-badge\s*\{[^}]*pointer-events:\s*auto/); // hover works; the rest of the block never blocks the node
@@ -77,6 +81,13 @@ describe('TextBlock', () => {
     const span = container.querySelector('.ds-text-line');
     expect(span.getAttribute('dir')).toBe('rtl');
     expect(css).toMatch(/\.ds-text-line\s*\{[^}]*unicode-bidi:\s*plaintext/);
+    expect(css).not.toMatch(/\.ds-text\s*\{[^}]*user-select:\s*none/); // the label can be selected and copied
+  });
+
+  test('the badge glyph has at least 3:1 contrast (white on the badge background)', () => {
+    const { parseColor, contrastRatio } = require('../../../components/diagram-studio/packs/colorUtils');
+    const bg = /\.ds-text-badge\s*\{[^}]*background:\s*(#[0-9a-f]{6})/i.exec(css)[1];
+    expect(contrastRatio(parseColor(bg), parseColor('#ffffff'))).toBeGreaterThanOrEqual(3);
   });
 
   test('renders nothing without a layout', () => {

@@ -5,6 +5,7 @@
  */
 const path = require('path');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 const fs = require('fs');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 
@@ -57,7 +58,7 @@ describe('Compare versions (slice 8)', () => {
   }, method, url, body, headers);
 
   beforeAll(async () => {
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     cookies.owner = await login('owner', process.env.QA_ADMIN_EMAIL, process.env.QA_ADMIN_PASSWORD);
     cookies.viewer = await login('viewer', process.env.QA_USER_EMAIL, process.env.QA_USER_PASSWORD);
     const p = await newPage('owner');

@@ -6,6 +6,7 @@
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
+const { headlessMode } = require('../helpers/headless');
 const { measureText, resolveFace } = require('../../lib/text/fonts');
 
 jest.setTimeout(120000);
@@ -27,7 +28,7 @@ const STRINGS = [
 describe('Inter advance tables vs Chrome measureText', () => {
   let browser;
   beforeAll(async () => {
-    browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--lang=en-US'] });
+    browser = await puppeteer.launch({ headless: headlessMode(), args: ['--no-sandbox', '--disable-dev-shm-usage', '--lang=en-US'] });
   });
   afterAll(async () => {
     if (browser) await browser.close();

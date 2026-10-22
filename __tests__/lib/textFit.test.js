@@ -228,3 +228,32 @@ describe('render-time layout of a stored element', () => {
     expect(layout.overflow).not.toBe(false);
   });
 });
+
+describe('circles keep short words whole (M1)', () => {
+  const circle = () => ({ packId: 'core', policy: policyFor('core', stencil('core/circle').stencil) });
+  test.each(['Approve', 'Inventory', 'Customer', 'Billing', 'Dashboard'])('"%s" in the default 80 px circle is one line, not hyphenated', (word) => {
+    const { policy } = circle();
+    const { layout } = layoutForElement({ label: word, size: { width: 80, height: 80 } }, policy);
+    expect(layout.lines).toHaveLength(1);
+    expect(layout.lines[0].text).toBe(word);
+    expect(layout.breaks.emergency).toBe(0);
+    expect(layout.fontSize).toBeGreaterThanOrEqual(11);
+    expect(layout.overflow).toBe(false);
+  });
+  test('a word that fits the circle only shrunk is shrunk, not broken', () => {
+    const { policy } = circle();
+    const { layout } = layoutForElement({ label: 'Verification', size: { width: 80, height: 80 } }, policy);
+    expect(layout.lines).toHaveLength(1);
+    expect(layout.fontSize).toBeLessThan(14);
+    expect(layout.breaks.emergency).toBe(0);
+  });
+  test('the default circle does not grow for a short word', () => {
+    expect(size('core/circle', 'Approve')).toMatchObject({ width: 80, height: 80, grew: false });
+  });
+  test('multi-line text still uses the inscribed rectangle', () => {
+    const { policy } = circle();
+    const { layout } = layoutForElement({ label: 'Order\nIntake', size: { width: 160, height: 160 } }, policy);
+    expect(layout.lines).toHaveLength(2);
+  });
+});
+

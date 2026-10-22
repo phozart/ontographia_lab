@@ -183,9 +183,9 @@ describe('fit_to_text op', () => {
     expect(apply(content, [{ op: 'fit_to_text', ids: ['nope'] }]).ok).toBe(false);
     expect(apply(content, [{ op: 'fit_to_text', all: false }]).ok).toBe(false);
     const locked = { ...content, elements: content.elements.map((e) => (e.id === ids['@b'] ? { ...e, locked: true } : e)) };
-    const one = apply(locked, [{ op: 'fit_to_text', ids: [ids['@b']] }]);
-    expect(one.ok).toBe(false);
-    expect(JSON.stringify(one.errors)).toMatch(/locked/);
+    const one = ok(apply(locked, [{ op: 'fit_to_text', ids: [ids['@b'], ids['@a']] }])); // a locked id is skipped with a warning
+    expect(one.warnings.join(' ')).toMatch(/locked/);
+    expect(one.content.elements.find((e) => e.id === ids['@b']).size).toEqual({ width: 140, height: 70 });
     const all = ok(apply(locked, [{ op: 'fit_to_text', all: true }]));
     expect(all.content.elements.find((e) => e.id === ids['@b']).size).toEqual({ width: 140, height: 70 });
   });
@@ -228,6 +228,15 @@ describe('map_structure sizes nodes from their text before layout', () => {
         }
       }
     }
+  });
+
+  test('size validation rejects NaN, negatives, huge values, unknown keys and existingId + size', () => {
+    const bad = (size, extra = {}) => run([{ key: 'a', label: 'x', stencil: 'core/rectangle', size, ...extra }]);
+    for (const size of [{ w: NaN }, { w: -5 }, { h: 1e9 }, { w: Infinity }, { w: '120' }, { w: 5000.5 }, 'big', [], { w: 1, depth: 2 }]) expect([JSON.stringify(size), bad(size).ok]).toEqual([JSON.stringify(size), false]);
+    const base = ok(apply(empty(), [{ op: 'add_element', type: 'core/rectangle', label: 'x', x: 100, y: 100 }])).content;
+    const r = compileMapStructure(base, { structure: { nodes: [{ key: 'a', existingId: base.elements[0].id, size: { w: 200 } }] }, layout: 'grid' }, { newId });
+    expect(r.ok).toBe(false);
+    expect(r.errors[0].message).toMatch(/size cannot be set together with existingId/);
   });
 
   test('size {w, h} on a node is honored and validated', () => {
