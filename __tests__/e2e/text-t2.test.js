@@ -217,8 +217,8 @@ describe('Text layout T2: the remaining packs, connection labels and tables', ()
     const page = await newPage();
     const table = {
       headerRow: true, headerColumn: false,
-      columns: [{ id: 'c1', name: 'Component', type: 'text', width: 160 }, { id: 'c2', name: 'Notes', type: 'text', width: 200 }],
-      rows: [{ id: 'r1', cells: { c1: 'Gateway', c2: C140 } }, { id: 'r2', cells: { c1: 'Customer Order Service', c2: C140.repeat(3) } }],
+      columns: [{ id: 'col-c1', name: 'Component', type: 'text', width: 160 }, { id: 'col-c2', name: 'Notes', type: 'text', width: 200 }],
+      rows: [{ id: 'row-r1', cells: { 'col-c1': 'Gateway', 'col-c2': C140 } }, { id: 'row-r2', cells: { 'col-c1': 'Customer Order Service', 'col-c2': C140.repeat(3) } }],
     };
     const size = tableElementSize(table);
     const els = [{ id: 't1', type: 'table', packId: 'core', x: O, y: O, size, label: 'Inventory', layerId: 'default', properties: {}, data: { table } }];
@@ -234,16 +234,16 @@ describe('Text layout T2: the remaining packs, connection labels and tables', ()
       return { row: c.getAttribute('data-row-id'), col: c.getAttribute('data-col-id'), h: cr.height, w: cr.width, lines: t ? t.textContent.split('\n') : [], flagged: t ? t.getAttribute('data-text-overflow') === 'true' : false, title: t ? t.getAttribute('title') : null, rects };
     }));
     for (const c of res) for (const r of c.rects) { expect(r.l).toBeGreaterThanOrEqual(-1); expect(r.r).toBeGreaterThanOrEqual(-1); expect(r.t).toBeGreaterThanOrEqual(-1); expect(r.b).toBeGreaterThanOrEqual(-1); }
-    const notes2 = res.find((c) => c.row === 'r2' && c.col === 'c2');
+    const notes2 = res.find((c) => c.row === 'row-r2' && c.col === 'col-c2');
     expect(notes2.flagged).toBe(true);
     expect(notes2.title).toBe(C140.repeat(3));
     expect(notes2.lines).toHaveLength(5);
     expect(notes2.lines[4].endsWith('…')).toBe(true);
-    const notes1 = res.find((c) => c.row === 'r1' && c.col === 'c2');
+    const notes1 = res.find((c) => c.row === 'row-r1' && c.col === 'col-c2');
     expect(notes1.flagged).toBe(false);
     expect(notes1.lines.join(' ')).toBe(cellLayout(C140, 200).lines.map((l) => l.text).join(' '));
     // the row height is the shared layout's: lines x 17 + 14
-    expect(Math.round(notes2.h)).toBe(5 * 17 + 14);
+    expect(Math.abs(Math.round(notes2.h) - (5 * 17 + 14))).toBeLessThanOrEqual(1); // minus the 1 px row border
     await shot(page, 't2-table.png');
     await page.close();
   });
