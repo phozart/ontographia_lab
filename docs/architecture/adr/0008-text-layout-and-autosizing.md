@@ -368,7 +368,9 @@ Branch `feat/t1-text-layout`. T1 is the pure `lib/text/` module, the shared text
 9. **`fit_to_text {ids | all: true}`** and `textFit` on `add_element` / `update_element`. `layout_apply fitToText` is not in T1 (`fit_to_text` then `layout_apply` does the same in two calls).
 10. **Editor.** Both default editors are `<textarea>`s (Enter commits, Shift+Enter is a newline; the frame title stays a single-line input). The resize rule (width handle: auto to auto-height; height or corner: fixed; sticky notes stay shrink) is applied while dragging. "Fit to text" is a button in the contextual toolbar and two command-palette entries (selection, all, one undo step, a toast with the count). The board-menu entry is T4. The toolbar's font-size stepper stops at 11.
 11. **Drawing.** `TextBlock` draws one block per label with one pinned `white-space: pre` span per line. Font, color and line height are set once on the block; the static rules live in the stylesheet. The text content keeps a space between lines. Decorative shapes with `showLabel: false` (the slide accent bar) still draw no label.
-12. `window.__dsTextStats()` exposes the layout cache counters for the performance checks.
+12. **Copy blocks on slides** (`lib/present/compose.js`): a copied shape's label font is the label role (14, not the old 13) times the copy scale, and never below 0.75 x the body preset (24 at 1080) so slide labels are comparable to body text; the shared layout shrinks or clamps inside a small box. This fixed the owner's complaint that copied boxes carried 11 px labels beside 32 px bullets.
+13. **Initial render of a 5,000-element board went from about 36 s to about 50 to 54 s** with T1 (about 60% more DOM per node). Both numbers are unacceptable and the regression is recorded as a separate performance item (virtualization or one pre-formatted block per label), not only T4.
+14. `window.__dsTextStats()` exposes the layout cache counters for the performance checks.
 
 ### 16.3 Verification
 
