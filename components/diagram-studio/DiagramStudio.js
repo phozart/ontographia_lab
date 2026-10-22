@@ -36,6 +36,7 @@ import { FEATURES } from '../../lib/features';
 import { accessMode as getAccessMode, canCommentWith } from './sharing/accessMode';
 import { ShareDialog, OPEN_SHARE_DIALOG_EVENT } from './ui/ShareDialog';
 import { VersionHistory, OPEN_VERSION_HISTORY_EVENT } from './ui/VersionHistoryPanel';
+import PresentationHost from './present/PresentationHost';
 import CompareOverlay from './ui/CompareOverlay';
 import { onReveal, setCompare, useCompare } from './versions/compareStore';
 import { computeFitForCanvas } from './viewportFit';
@@ -946,6 +947,9 @@ function DiagramStudioInner({
 
         {/* Version history panel (opened from the title-bar menu) */}
         <VersionHistory />
+
+        {/* Presentation panel, present mode and deck export (ADR-0007 P1) */}
+        <PresentationHost containerRef={canvasContainerRef} />
 
         {/* Share dialog (title-bar Share button; owner and editors) */}
         {canShare && <ShareDialog diagramId={diagram?.id} access={access} />}

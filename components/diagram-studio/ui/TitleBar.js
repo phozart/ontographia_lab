@@ -8,7 +8,9 @@ import { useJsonImport } from '../export/useJsonImport';
 import ImportJsonDialog from './ImportJsonDialog';
 import { OPEN_EXPORT_DIALOG_EVENT } from './ExportDialog';
 import { OPEN_VERSION_HISTORY_EVENT, OPEN_ACTIVITY_EVENT } from './VersionHistoryPanel';
+import { OPEN_PRESENTATIONS_EVENT } from '../present/presentStore';
 import HistoryIcon from '@mui/icons-material/History';
+import SlideshowIcon from '@mui/icons-material/Slideshow';
 import { FEATURES } from '../../../lib/features';
 import { formatShortcut } from '../../../lib/platform';
 
@@ -825,6 +827,11 @@ export default function TitleBar({
                 <FileDownloadIcon fontSize="small" />
                 <span>Export...</span>
                 <span className="ds-shortcut">PNG, SVG, PDF, JSON</span>
+              </button>
+              <button className="ds-dropdown-item" data-testid="menu-presentation" onClick={() => { if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(OPEN_PRESENTATIONS_EVENT)); setShowMenu(false); }}>
+                <SlideshowIcon fontSize="small" />
+                <span>Presentation...</span>
+                <span className="ds-shortcut">Present, PDF</span>
               </button>
               <button className="ds-dropdown-item" onClick={() => { openVersionHistory(); setShowMenu(false); }}>
                 <HistoryIcon fontSize="small" />
