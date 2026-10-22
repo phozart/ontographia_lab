@@ -27,7 +27,9 @@ const meta = (id, over = {}) => ({
   version_seq: 0, updated_at: new Date(), updated_by: null, domain_id: null, project_id: null, ...over,
 });
 const note = (id, x, y) => ({ id, type: 'sticky-small', packId: 'sticky-notes', label: id, x, y, size: { width: 100, height: 100 }, layerId: 'default', properties: {} });
-const STORED = () => ({ elements: [note('n1', 0, 0), note('n2', 30, 30), note('n3', 60, 0)], connections: [], layers: [], viewport: { x: 0, y: 0, zoom: 1 } });
+const FRAME = { id: 'f1', type: 'frame', packId: 'core', isFrame: true, membershipExplicit: true, label: 'Slide', x: 1000, y: 0, size: { width: 1920, height: 1080 }, layerId: 'default', properties: {} };
+const DECK = { id: 'pres-1', title: 'Deck', aspect: '16:9', slides: [{ id: 'sl-1', frameId: 'f1' }, { id: 'sl-2', frameId: 'f1' }] };
+const STORED = () => ({ elements: [note('n1', 0, 0), note('n2', 30, 30), note('n3', 60, 0), FRAME], connections: [], layers: [], presentations: [DECK], viewport: { x: 0, y: 0, zoom: 1 } });
 
 const MIND = { nodes: [{ key: 'hub', label: 'Topic' }, { key: 'c0', label: 'B0' }, { key: 'c1', label: 'B1' }], edges: [{ from: 'hub', to: 'c0' }, { from: 'hub', to: 'c1' }] };
 
@@ -46,6 +48,13 @@ const SINGLE_BOARD = {
   doc_update: { kind: 'write', setup: 'doc', args: (doc) => ({ id: A, baseRevision: 8, elementId: doc, append: '## More\n\ntext' }) },
   doc_get: { kind: 'read', setup: 'doc', args: (doc) => ({ id: A, elementId: doc }) },
   table_update: { kind: 'write', setup: 'table', args: (tbl) => ({ id: A, baseRevision: 8, elementId: tbl, key: 'Name', upsertRows: [{ cells: { Name: 'Mail', Count: 2 } }] }) },
+  // ADR-0007 P1 deck tools (the stored board has a frame f1 and a deck pres-1 with slides sl-1, sl-2)
+  presentation_create: { kind: 'write', args: { id: A, baseRevision: 7, title: 'New deck' } },
+  slide_add: { kind: 'write', args: { id: A, baseRevision: 7, presentationId: 'pres-1', frameId: 'f1' } },
+  slide_reorder: { kind: 'write', args: { id: A, baseRevision: 7, presentationId: 'pres-1', slideIds: ['sl-2', 'sl-1'] } },
+  slide_remove: { kind: 'write', args: { id: A, baseRevision: 7, presentationId: 'pres-1', slideId: 'sl-1' } },
+  slide_update: { kind: 'write', args: { id: A, baseRevision: 7, presentationId: 'pres-1', slideId: 'sl-1', notes: 'Say hello' } },
+  presentation_get: { kind: 'read', args: { id: A, presentationId: 'pres-1' } },
   table_get: { kind: 'read', setup: 'table', args: (tbl) => ({ id: A, elementId: tbl }) },
 };
 const SETUP = {

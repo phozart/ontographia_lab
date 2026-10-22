@@ -82,6 +82,15 @@ The typical run is: map the text, tabulate or cluster it, then write the finding
 5. Later edits: `doc_get` first, then `doc_update` with `append` or `replaceSection {heading, markdown}` (not a full rewrite). The owner may be typing in the doc; the editor merges, and their text wins on the same text.
    The server also offers the prompt `summarize_region` (link + optional focus).
 
+### 6c. "Make a presentation from these frames"
+
+A slide is a frame that already exists on the board; a deck (presentation) is an ordered list of them plus speaker notes. The owner presents it full screen and exports PDF/PNG from the editor (Menu, Presentation); you build and order it.
+
+1. Read: `board_read_region` / `diagram_get` for the frame ids (one frame per stop), `presentation_get` for decks that already exist. If the content is not in frames yet, group it first (`map_structure` with groups or `anchor {inFrame}`).
+2. `presentation_create {title, aspect?}` once, then `slide_add {presentationId, frameIds, fitAspect: true, notes?}` in storyline order. `fitAspect` grows a frame to 16:9 without moving its content; leave it out to keep the frame's own shape (it is letterboxed).
+3. Speaker notes with `slide_update {slideId, notes}`; `hidden: true` skips a slide. `slide_reorder` takes every `slideId` once; `slide_remove` only drops the slide (the frame stays) unless `deleteFrame`.
+4. Tell the user to open Menu, Presentation and press Present (arrow keys, Esc to leave) or Export PDF. You cannot start the show or download files. Ids and revisions come from the tool results; never invent them.
+
 ### 6. "Show me the board"
 
 `diagram_show` with `id`, or with `focus` for a region. It draws a read-only picture in hosts that support MCP Apps (claude.ai, Desktop, mobile). You only receive a short text summary with the link, not the picture. If the host cannot render it, give the user the "Open in lab" link from the summary; to see it yourself use `diagram_get` with `format: "outline"` or `diagram_thumbnail` (stored preview, may be missing or stale).

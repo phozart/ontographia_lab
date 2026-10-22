@@ -25,6 +25,12 @@ const TOOL_TEXT = {
   table_create: 'created a table',
   table_update: 'updated a table',
   table_get: 'read a table',
+  presentation_create: 'created a presentation',
+  slide_add: 'added slides',
+  slide_reorder: 'reordered slides',
+  slide_remove: 'removed a slide',
+  slide_update: 'updated a slide',
+  presentation_get: 'read the presentations',
 };
 
 /** Plain-language past tense for a tool name; unknown tools are named as is (the name is server-supplied text). */

@@ -3,7 +3,7 @@
 // `onReveal(change)` is only passed when comparing against the current diagram: items then become buttons that make
 // the canvas select / zoom to the element. Presentational and read-only.
 
-const KIND_HEADINGS = [['element', 'Elements'], ['connection', 'Connections'], ['layer', 'Layers'], ['group', 'Groups']];
+const KIND_HEADINGS = [['element', 'Elements'], ['connection', 'Connections'], ['layer', 'Layers'], ['group', 'Groups'], ['presentation', 'Presentations']];
 
 export default function CompareSummary({ diff, against, fromTitle, overlayOn, onToggleOverlay, onReveal }) {
   const { added = 0, removed = 0, changed = 0 } = diff.summary || {};
