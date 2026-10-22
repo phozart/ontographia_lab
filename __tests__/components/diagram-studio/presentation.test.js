@@ -25,7 +25,7 @@ import { resetPresentState, getPresentState } from '../../../components/diagram-
 import { renderNode } from '../../../components/diagram-studio/packs/CorePack';
 import { buildExportHost } from '../../../components/diagram-studio/export/captureCanvas';
 import CompareSummary from '../../../components/diagram-studio/ui/CompareSummary';
-import { pruneToFrame } from '../../../components/diagram-studio/present/slideClone';
+import { pruneToFrame, rotationOf } from '../../../components/diagram-studio/present/slideClone';
 
 const frame = (id, x = 0, label = id, extra = {}) => ({ id, type: 'frame', packId: 'core', x, y: 0, size: { width: 1920, height: 1080 }, label, ...extra });
 const slide = (n, title, notes = '') => ({ slideId: `s${n}`, frameId: `f${n}`, frame: frame(`f${n}`, n * 2000, title), title, notes });
@@ -212,6 +212,21 @@ describe('slide clone pruning', () => {
   });
 });
 
+describe('slide clone: rotation', () => {
+  const mk = (transform, left = '2100px') => { const n = document.createElement('div'); n.setAttribute('data-node-id', 'x'); Object.assign(n.style, { left, top: '0px', width: '100px', height: '100px', transform }); return n; };
+  test('rotate(0deg) is not a rotation: a neighbor 180 px away is removed; a really rotated one gets slack', () => {
+    const host = document.createElement('div');
+    host.append(mk('rotate(0deg)'));
+    expect(pruneToFrame(host, frame('f', 0))).toBe(1);
+    const host2 = document.createElement('div');
+    host2.append(mk('rotate(45deg)', '2000px'));
+    expect(pruneToFrame(host2, frame('f', 0))).toBe(0);
+    expect(rotationOf('rotate(0deg)')).toBe(0);
+    expect(rotationOf('translate(1px) rotate(-30deg)')).toBe(-30);
+    expect(rotationOf('')).toBe(0);
+  });
+});
+
 describe('slide frame rendering', () => {
   const dashed = (el) => !!render(renderNode(el, { id: 'frame' }, false)).container.querySelector('rect[stroke-dasharray]');
   test('an ordinary frame keeps the dashed outline; a slide frame is a solid, square-cornered slide', () => {
@@ -352,6 +367,16 @@ describe('Presentation panel', () => {
     expect(props.onCancelExport).toHaveBeenCalled();
     expect(screen.getByRole('alert')).toHaveTextContent('The export failed.');
     expect(screen.getByTestId('pp-export-pdf')).toBeDisabled();
+  });
+
+  test('a very large deck asks before the PDF export', () => {
+    const slides = Array.from({ length: 101 }, (_, i) => ({ id: `s${i}`, frameId: 'f1' }));
+    const { props } = panel({ content: content({ presentations: [{ id: 'p1', title: 'Big', aspect: '16:9', slides }] }) });
+    fireEvent.click(screen.getByTestId('pp-export-pdf'));
+    expect(props.onExportPdf).not.toHaveBeenCalled();
+    expect(screen.getByTestId('pp-big-export')).toHaveTextContent('101 slides');
+    fireEvent.click(screen.getByRole('button', { name: 'Export anyway' }));
+    expect(props.onExportPdf).toHaveBeenCalledWith('p1');
   });
 
   test('an export note says what the export left out', () => {

@@ -78,7 +78,8 @@ A slide is an existing frame; a presentation is an ordered list of slides plus n
 - `slide_reorder {…, presentationId, slideIds}`: every slide exactly once.
 - `slide_remove {…, presentationId, slideId, deleteFrame?}`: the frame stays unless `deleteFrame`.
 - `slide_update {…, presentationId, slideId, notes?, hidden?, title?}`: `title` renames the slide's frame; an empty `notes` clears them.
-- `presentation_get {id, presentationId?}`: without `presentationId` the decks; with it the slides (`n`, `slideId`, `frameId`, `title`, `notes`, `hidden`, `missing`, a short `outline` of labels on the frame).
+- `presentation_get {id, presentationId?, offset?, limit?, slideId?}`: without `presentationId` the decks; with it the slides (`n`, `slideId`, `frameId`, `title`, `notes`, `hidden`, `missing`, a short `outline` of labels on the frame). Pages of up to 50 slides and about 56 KB (`truncated`, `next` is the following `offset`); notes are cut to 500 characters (`notesTruncated`, `notesChars`); `slideId` gives one slide with its full notes.
+- A locked frame can be added with `slide_add` (a read-only reference); `fitAspect` and `slide_remove {deleteFrame}` are refused on it.
 
 ## Limits at a glance
 

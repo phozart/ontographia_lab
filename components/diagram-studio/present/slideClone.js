@@ -3,6 +3,14 @@
 
 const num = (v, d = 0) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 
+/** The rotation in degrees from a CSS transform; 0 when absent, unparsable or rotate(0deg). */
+export function rotationOf(transform) {
+  const m = /rotate\((-?[\d.]+)(deg|rad|turn)?\)/.exec(transform || '');
+  if (!m) return 0;
+  const v = parseFloat(m[1]);
+  return Number.isFinite(v) ? v : 0;
+}
+
 /**
  * Remove every cloned element node whose box does not touch the frame, and the frame's own dashed outline. What is
  * clipped by the host is invisible anyway; removing it keeps off-slide text out of the accessibility tree and makes the
@@ -29,7 +37,7 @@ export function pruneToFrame(host, frame) {
     const w = num(n.style.width, 0);
     const h = num(n.style.height, 0);
     // a rotated element can reach further than its box: keep it unless it is clearly away from the frame
-    const slack = n.style.transform && /rotate\(/.test(n.style.transform) ? Math.max(w, h) : 0;
+    const slack = rotationOf(n.style.transform) !== 0 ? Math.max(w, h) : 0;
     const outside = x + w + slack < fx || x - slack > fx + fw || y + h + slack < fy || y - slack > fy + fh;
     if (outside && n.parentNode) { n.parentNode.removeChild(n); removed += 1; }
   });

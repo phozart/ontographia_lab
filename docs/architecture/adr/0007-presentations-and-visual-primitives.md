@@ -496,6 +496,13 @@ Status of the ADR: **Accepted** (the owner approved it with all recommended defa
 6. The shape presets grow a frame to the ratio (they do not rescale it to 1920 x 1080). `fitAspect` in `slide_add` does the same.
 7. `diagram_get` does not summarize decks; `presentation_get` does. `diagram_show` per-slide focus, the `present_region` prompt and the export link stay in P6.
 
+**Review follow-ups (2026-10-22)**
+
+- `presentation_get` respects the 120 KB response budget: pages of at most 50 slides and about 56 KB (`truncated`, `next` is the next `offset`), notes cut to 500 characters (`notesTruncated`, `notesChars`), `slideId` reads one slide with its full notes. A 200-slide deck with 10 KB notes pages cleanly and every page stays under 120 KB (tested).
+- PDF export memory: the pixel ratio now follows the deck size (2x up to 20 slides, 1.5x up to 60, 1x above), each slide's clone and image are released before the next one is rendered with a full task break between slides, the panel shows progress with Cancel, and it asks for confirmation above 100 slides. Measured in headless Chrome against a dev server (3 to 6 rects per slide, 16:9, one run each, so treat as indicative): 20 slides at 2x 21 s, 50 slides at 1.5x 34 s (JS heap peak 96 MB), 100 slides at 1x 34 s (JS heap peak 160 MB, PDF 3.3 MB). The review measured 49 s and a 450 MB peak for 50 slides at 2x before the change.
+- `pruneToFrame` only gives rotated nodes slack when the angle is not zero (`rotate(0deg)` is not a rotation), so neighbouring slides no longer stay in the DOM. What remains in the clone touches the slide.
+- A locked frame can be added as a slide (a read-only reference); `fitAspect` and `slide_remove {deleteFrame}` are refused on it (guide, skill and tests say so).
+
 **Not verified**: a real claude.ai session building a deck (needs the deployed connector); the full-screen API in Safari and Firefox; touch swipe on a real device; boards with several hundred slides.
 
 **Tests**: `presentationSchema`, `presentationPatch`, `presentationDiffMerge`, `mcpDeckTools`, the updated `mcpServer` and `mcpAgentActivity` (every deck tool records the board), `diagramRepositoryAgentEdit` (db: one agent version and one audit row per call, restore brings back the deck order), `components/diagram-studio/{presentation,presentKeys,presentExport,presentationState}`, and the browser test `__tests__/e2e/slides.test.js` (build a deck from frames, reorder, notes, hide, present with the keyboard, deep link, a viewer, PDF with one 16:9 page per slide, PNG, and a real MCP agent building a 3-slide deck that the open editor picks up live).

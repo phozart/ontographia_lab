@@ -23,7 +23,7 @@ jest.mock('../../../components/diagram-studio/export/captureCanvas', () => ({
   }),
 }));
 
-import { exportDeckPdf, exportSlidePng, pdfPageSize } from '../../../components/diagram-studio/present/exportDeck';
+import { exportDeckPdf, exportSlidePng, pdfPageSize, scaleForSlides } from '../../../components/diagram-studio/present/exportDeck';
 import { parsePresentQuery } from '../../../components/diagram-studio/present/PresentationHost';
 
 const mk = (n, w = 1920, h = 1080) => ({ slideId: `s${n}`, frameId: `f${n}`, frame: { id: `f${n}`, x: n * 2000, y: 0, size: { width: w, height: h } } });
@@ -70,6 +70,32 @@ describe('exportDeckPdf', () => {
     const p = exportDeckPdf({ slides, elements: [], connections: [], title: 'x', signal: ctl.signal, onProgress: (d) => { if (d === 1) ctl.abort(); } });
     await expect(p).rejects.toMatchObject({ name: 'AbortError' });
     expect(document.body.children).toHaveLength(0);
+  });
+});
+
+describe('exportDeckPdf memory discipline', () => {
+  test('the pixel ratio shrinks with the deck: 2x up to 20 slides, 1.5x up to 60, 1x above', async () => {
+    expect([1, 20, 21, 60, 61, 200].map(scaleForSlides)).toEqual([2, 2, 1.5, 1.5, 1, 1]);
+    const { toPng } = require('html-to-image');
+    for (const [n, ratio] of [[3, 2], [30, 1.5], [70, 1]]) {
+      toPng.mockClear();
+      await exportDeckPdf({ slides: Array.from({ length: n }, (_, i) => mk(i + 1)), elements: [], connections: [], title: 'x' });
+      expect(toPng.mock.calls[0][1].pixelRatio).toBe(ratio);
+    }
+  });
+
+  test('each slide clone and image is released before the next slide is rendered', async () => {
+    const { buildExportHost } = require('../../../components/diagram-studio/export/captureCanvas');
+    const { toPng } = require('html-to-image');
+    const live = [];
+    toPng.mockImplementation(async () => { live.push(document.body.children.length); return 'data:image/png;base64,iVBORw0KGgo='; });
+    buildExportHost.mockClear();
+    await exportDeckPdf({ slides: Array.from({ length: 30 }, (_, i) => mk(i + 1)), elements: [], connections: [], title: 'x' });
+    expect(buildExportHost).toHaveBeenCalledTimes(30);
+    expect(Math.max(...live)).toBe(1); // never more than one slide clone in the document at a time
+    expect(document.body.children).toHaveLength(0);
+    // each page got its image and the pipeline yielded a task between slides (progress is reported after every one)
+    expect(mockImages).toHaveLength(30);
   });
 });
 

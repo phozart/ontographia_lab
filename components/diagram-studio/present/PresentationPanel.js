@@ -18,6 +18,7 @@ import { resolveDeck, frameSize } from '../../../lib/present/presentationModel';
 import { MAX_NOTES_BYTES } from '../../../lib/diagramLimits';
 import { ASPECTS } from '../../../lib/present/presentationSchema';
 import { addFramesToDeck, addNewSlide } from './deckActions';
+import { PDF_WARN_SLIDES } from './exportDeck';
 
 const NOTES_CHAR_CAP = Math.floor(MAX_NOTES_BYTES / 4); // characters; 4 is the worst case bytes per character
 
@@ -84,6 +85,7 @@ export default function PresentationPanel({
   const [dragId, setDragId] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState(null); // slide being removed (frame still exists)
   const [message, setMessage] = useState(null);
+  const [confirmBig, setConfirmBig] = useState(false);
   const elements = useDeferredValue(content.elements);
   const connections = useDeferredValue(content.connections);
   const presentations = content.presentations;
@@ -164,7 +166,14 @@ export default function PresentationPanel({
         {deck && (
           <div className="pp-actions">
             <button type="button" className="pp-btn primary" data-testid="pp-present" onClick={() => onPresent(deck.id, 0)} disabled={playable.length === 0}>Present</button>
-            <button type="button" className="pp-btn" data-testid="pp-export-pdf" onClick={() => onExportPdf(deck.id)} disabled={playable.length === 0 || !!exporting}>Export PDF</button>
+            <button type="button" className="pp-btn" data-testid="pp-export-pdf" onClick={() => (playable.length > PDF_WARN_SLIDES ? setConfirmBig(true) : onExportPdf(deck.id))} disabled={playable.length === 0 || !!exporting}>Export PDF</button>
+          </div>
+        )}
+        {confirmBig && deck && (
+          <div className="pp-confirm" role="group" aria-label="Large export" data-testid="pp-big-export">
+            <span>{playable.length} slides: the PDF can take several minutes and a lot of memory. Export anyway?</span>
+            <button type="button" className="pp-btn" onClick={() => { setConfirmBig(false); onExportPdf(deck.id); }}>Export anyway</button>
+            <button type="button" className="pp-btn" onClick={() => setConfirmBig(false)}>Cancel</button>
           </div>
         )}
         {exporting && (

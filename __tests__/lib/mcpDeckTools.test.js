@@ -173,6 +173,44 @@ describe('slide_reorder, slide_remove, slide_update', () => {
   });
 });
 
+describe('presentation_get stays inside the response budget', () => {
+  test('a maximum deck (200 slides, 10 KB notes, 12 labels each) is paged, notes are cut, every page is under 120 KB', async () => {
+    const frames = []; const notes = []; const slides = [];
+    for (let i = 0; i < 200; i += 1) {
+      frames.push(frame(`mf${i}`, i * 700));
+      for (let j = 0; j < 12; j += 1) notes.push({ ...note(`mn${i}-${j}`, i * 700 + 5, `mf${i}`), label: `Label ${i}-${j} ${'y'.repeat(150)}` });
+      slides.push({ id: `ms${i}`, frameId: `mf${i}`, notes: 'n'.repeat(10 * 1024) });
+    }
+    stored.elements = [...stored.elements, ...frames, ...notes];
+    stored.presentations = [{ id: 'big', title: 'Big', aspect: '16:9', slides }];
+    const client = await connect();
+    const seen = [];
+    let offset = 0;
+    for (let guard = 0; guard < 100; guard += 1) {
+      const r = await call(client, 'presentation_get', { id: A, presentationId: 'big', offset });
+      expect(r.isError).toBeFalsy();
+      expect(JSON.stringify(r).length).toBeLessThanOrEqual(120 * 1024);
+      const sc = r.structuredContent;
+      expect(sc.slideCount).toBe(200);
+      for (const s of sc.slides) { seen.push(s.n); expect(s.notes.length).toBeLessThanOrEqual(500); expect(s.notesTruncated).toBe(true); expect(s.notesChars).toBe(10 * 1024); }
+      if (!sc.truncated) break;
+      expect(sc.next).toBeGreaterThan(offset);
+      offset = sc.next;
+    }
+    expect(seen).toEqual(Array.from({ length: 200 }, (_, i) => i + 1));
+  });
+
+  test('slideId returns one slide with its full notes; limit pages', async () => {
+    stored.presentations = [{ id: 'p1', title: 'D', aspect: '16:9', slides: [{ id: 's1', frameId: 'fa', notes: 'z'.repeat(3000) }, { id: 's2', frameId: 'fb' }] }];
+    const client = await connect();
+    const one = await call(client, 'presentation_get', { id: A, presentationId: 'p1', slideId: 's1' });
+    expect(one.structuredContent.slides).toHaveLength(1);
+    expect(one.structuredContent.slides[0].notes).toHaveLength(3000);
+    const page = await call(client, 'presentation_get', { id: A, presentationId: 'p1', limit: 1 });
+    expect(page.structuredContent).toMatchObject({ truncated: true, next: 1, slideCount: 2 });
+  });
+});
+
 describe('guards', () => {
   test('rejects an unknown frame, a non-frame element and an unknown presentation (nothing written)', async () => {
     const client = await connect();
@@ -197,6 +235,19 @@ describe('guards', () => {
     const r = await call(client, 'slide_add', { id: A, baseRevision: 8, presentationId: p, frameId: 'fa', fitAspect: true });
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toMatch(/locked/);
+  });
+
+  test('a locked frame can be added as a slide (a read-only reference), but cannot be deleted through slide_remove deleteFrame', async () => {
+    stored.elements.find((e) => e.id === 'fa').locked = true;
+    const client = await connect();
+    const p = (await call(client, 'presentation_create', { id: A, baseRevision: 7, title: 'D' })).structuredContent.presentationId;
+    const add = await call(client, 'slide_add', { id: A, baseRevision: 8, presentationId: p, frameId: 'fa' });
+    expect(add.isError).toBeFalsy();
+    const rm = await call(client, 'slide_remove', { id: A, baseRevision: 9, presentationId: p, slideId: add.structuredContent.slideIds[0], deleteFrame: true });
+    expect(rm.isError).toBe(true);
+    expect(rm.content[0].text).toMatch(/locked/);
+    expect(stored.elements.some((e) => e.id === 'fa')).toBe(true);
+    expect(deck().slides).toHaveLength(1);
   });
 
   test('revision conflict writes nothing; viewer tokens cannot write but can read', async () => {

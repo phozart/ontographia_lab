@@ -11,6 +11,15 @@ import { sanitizeFilename } from '../export/diagramJson';
 import { nextFrames } from '../export/exportRenderer';
 import { pruneToFrame } from './slideClone';
 
+export const PDF_WARN_SLIDES = 100; // the panel asks before exporting more than this
+
+/** Pixel ratio by deck size: memory grows with slides x pixels (measured about 5.6 MB per slide at 2x), so big decks get less. */
+export function scaleForSlides(count) {
+  if (count <= 20) return 2;
+  if (count <= 60) return 1.5;
+  return 1;
+}
+
 export const PDF_PAGE_HEIGHT_PT = 540; // 16:9 -> 960 x 540 pt
 const MAX_PAGE_WIDTH_PT = 1200;
 
@@ -54,7 +63,7 @@ function dataUrlToBlob(dataUrl) {
  *          title: string, scale?: number, signal?: AbortSignal, onProgress?: (done: number, total: number) => void}} p
  * @returns {Promise<{format: 'pdf', content: Blob, mimeType: string, filename: string, pages: number}>}
  */
-export async function exportDeckPdf({ slides, elements, connections, title, scale = 2, signal, onProgress }) {
+export async function exportDeckPdf({ slides, elements, connections, title, scale = scaleForSlides(slides.length), signal, onProgress }) {
   if (!slides.length) throw new Error('There are no slides to export. Add slides, or show hidden ones.');
   const htmlToImage = await import('html-to-image');
   const { jsPDF } = await import('jspdf');
@@ -72,7 +81,9 @@ export async function exportDeckPdf({ slides, elements, connections, title, scal
       doc.addPage([page.width, page.height], page.width >= page.height ? 'landscape' : 'portrait');
     }
     doc.addImage(shot.dataUrl, 'PNG', 0, 0, page.width, page.height, undefined, 'FAST');
+    shot.dataUrl = null; // the page holds its own copy: drop ours before the next slide is rendered
     await nextFrames(1);
+    await new Promise((resolve) => setTimeout(resolve, 0)); // a full task break so the browser can collect the slide's canvas
   }
   onProgress?.(slides.length, slides.length);
   return { format: 'pdf', content: doc.output('blob'), mimeType: 'application/pdf', filename: `${sanitizeFilename(title, 'presentation')}.pdf`, pages: slides.length };
