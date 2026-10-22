@@ -58,6 +58,7 @@ export function normalizeDiagramContent(content) {
   const connections = firstArray(chain, 'connections', 'edges') || [];
   const layers = firstArray(chain, 'layers');
   const groups = firstArray(chain, 'groups') || [];
+  const presentations = firstArray(chain, 'presentations');
   const viewport = firstViewport(chain);
 
   // Duplicate ids (legacy rows) are renamed so merge and the server's unique-id rule hold; nothing is dropped.
@@ -66,6 +67,8 @@ export function normalizeDiagramContent(content) {
     connections: [...connections],
     layers: layers && layers.length > 0 ? [...layers] : [{ ...DEFAULT_LAYER }],
     groups: [...groups],
+    // ADR-0007: only present when the board has decks, so older content keeps its exact shape
+    ...(presentations ? { presentations: [...presentations] } : {}),
     viewport: viewport ? { ...viewport } : { ...DEFAULT_VIEWPORT },
   });
 }

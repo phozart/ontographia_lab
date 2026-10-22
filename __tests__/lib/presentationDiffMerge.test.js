@@ -128,7 +128,7 @@ describe('mergeContent: presentations (order and notes rules)', () => {
     expect(mergeContent(base, dup, base).ok).toBe(false);
     const r = mergeContent({ elements: [] }, { elements: [] }, { elements: [] });
     expect(r.ok).toBe(true);
-    expect(r.content.presentations).toEqual([]);
+    expect(r.content.presentations).toBeUndefined();
   });
 });
 

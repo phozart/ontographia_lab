@@ -22,6 +22,7 @@ export function contentFromDiagram(d) {
     connections: d.connections || content.connections,
     layers: d.layers || content.layers,
     groups: d.groups || content.groups,
+    presentations: d.presentations || content.presentations || [],
   };
 }
 
