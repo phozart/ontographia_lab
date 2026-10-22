@@ -736,6 +736,48 @@
   transform: rotate(-45deg);
 }
 
+/* Node text drawn by the shared layout (ADR-0008, components/diagram-studio/text/TextBlock.js).
+   Lines are pinned: no wrapping is left for the browser to do. */
+.ds-text {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  overflow: visible;
+}
+
+.ds-text-line {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: var(--ds-lh);
+  line-height: var(--ds-lh);
+  white-space: pre;
+  unicode-bidi: plaintext;
+}
+
+.ds-text-badge {
+  position: absolute;
+  right: 0;
+  bottom: -8px;
+  pointer-events: auto;
+  cursor: help;
+  font-size: 11px;
+  line-height: 11px;
+  height: 13px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--accent, #4FB3CE);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 1px;
+  font-family: inherit;
+  white-space: pre;
+}
+
+.ds-text-badge-pill {
+  right: 2px;
+}
+
 /* Node Label */
 .ds-node-label {
   font-size: 13px;

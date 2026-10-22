@@ -685,7 +685,7 @@ function Node({
         caretColor: 'var(--accent, #3b82f6)',
       }}
     />
-  ) : (
+  ) : element.showLabel === false ? null : ( // ADR-0007: decorative shapes (the slide accent bar) draw no label
     <ElementText
       element={element}
       stencil={stencil}

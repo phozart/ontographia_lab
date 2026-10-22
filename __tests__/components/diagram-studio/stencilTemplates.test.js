@@ -54,8 +54,8 @@ describe('Mind map label contrast', () => {
     const stencil = MindMapPack.stencils.find((s) => s.id === id);
     const el = makeElement(stencil, 'm1', color ? { color } : {});
     const { container } = render(<div>{MindMapPack.renderNode(el, stencil, false)}</div>);
-    // the label is drawn by the shared text layout (ADR-0008): its color is on the line spans, as rgb()
-    const rgb = /rgb\((\d+), (\d+), (\d+)\)/.exec(container.querySelector('.ds-text-line').style.color);
+    // the label is drawn by the shared text layout (ADR-0008): its color is on the text block, as rgb()
+    const rgb = /rgb\((\d+), (\d+), (\d+)\)/.exec(container.querySelector('[data-text-block]').style.color);
     const hex = `#${[1, 2, 3].map((i) => Number(rgb[i]).toString(16).padStart(2, '0')).join('')}`;
     return hex === '#ffffff' ? '#fff' : hex;
   };

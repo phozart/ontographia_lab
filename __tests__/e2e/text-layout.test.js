@@ -63,7 +63,7 @@ describe('Text layout and autosizing (ADR-0008 T1)', () => {
   }));
 
   beforeAll(async () => {
-    browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
+    browser = await puppeteer.launch({ headless: process.env.E2E_HEADLESS_MODE || process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
     context = await browser.createBrowserContext();
     const p = await context.newPage();
     await p.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle0', timeout: 90000 });
@@ -72,7 +72,7 @@ describe('Text layout and autosizing (ADR-0008 T1)', () => {
     await Promise.all([p.waitForFunction(() => !window.location.pathname.startsWith('/login'), { timeout: 30000 }), p.click('button[type="submit"]')]);
     await p.close();
     const page = await newPage();
-    board = (await call(page, 'POST', '/api/diagrams', { type: 'infinite-canvas', name: 'E2E text editor', content: content([rect('r1', 0, 0, 'Billing'), rect('r2', 400, 0, C140), rect('r3', 800, 0, 'Fit me')]) })).body;
+    board = (await call(page, 'POST', '/api/diagrams', { type: 'infinite-canvas', name: 'E2E text editor', content: content([rect('r1', 0, 0, 'Billing'), rect('r2', 400, 0, C140), rect('r3', 800, 0, 'Fit me'), rect('r4', 1200, 0, 'Accent', { showLabel: false })]) })).body;
     agentBoard = (await call(page, 'POST', '/api/diagrams', { type: 'infinite-canvas', name: 'E2E text agent', content: content([]) })).body;
     legacyBoard = (await call(page, 'POST', '/api/diagrams', { type: 'infinite-canvas', name: 'E2E text legacy', content: content([rect('l1', 0, 0, C140), rect('l2', 400, 0, 'Kundenzufriedenheitsanalyse', { size: { width: 100, height: 40 } })]) })).body;
     await page.close();
@@ -117,6 +117,8 @@ describe('Text layout and autosizing (ADR-0008 T1)', () => {
     const page = await newPage();
     await open(page, board);
     const sel = '[data-node-id="r1"]';
+    // a decorative shape with showLabel: false (the slide accent bar) draws no label at all
+    expect((await geometry(page)).find((n) => n.id === 'r4').lines).toHaveLength(0);
     const box0 = await page.$eval(sel, (n) => ({ w: n.offsetWidth, h: n.offsetHeight }));
     expect(box0).toEqual({ w: 120, h: 80 });
     await page.click(sel, { clickCount: 2 });

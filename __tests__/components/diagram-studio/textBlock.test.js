@@ -12,6 +12,10 @@ import ProcessFlowPack from '../../../components/diagram-studio/packs/ProcessFlo
 import StickyNotesPack from '../../../components/diagram-studio/packs/StickyNotesPack';
 import MindMapPack from '../../../components/diagram-studio/packs/MindMapPack';
 import { sizeForText } from '../../../lib/text/fit';
+import fs from 'fs';
+import path from 'path';
+
+const css = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'styles', 'diagram-studio.css'), 'utf8');
 
 const C140 = 'Aggregate all inbound partner shipment notifications, reconcile them against open purchase orders and flag any discrepancies for review';
 const pack = { core: CorePack, 'process-flow': ProcessFlowPack, 'sticky-notes': StickyNotesPack, 'mind-map': MindMapPack };
@@ -24,7 +28,7 @@ function draw(packId, stencilId, label, extra = {}) {
   return render(<div>{out}</div>);
 }
 const lineSpans = (c) => [...c.container.querySelectorAll('.ds-text-line')];
-const sizes = (c) => lineSpans(c).map((s) => parseFloat(s.style.fontSize));
+const sizes = (c) => [...c.container.querySelectorAll('[data-text-block]')].map((b) => parseFloat(b.getAttribute('data-font-size')));
 
 describe('TextBlock', () => {
   const layout = layoutText({ text: 'Customer Order Service', font: { size: 14, weight: 500, lineHeight: 1.3 }, box: { width: 80, height: 60 }, mode: 'fixed' });
@@ -34,11 +38,15 @@ describe('TextBlock', () => {
     const spans = [...container.querySelectorAll('.ds-text-line')];
     expect(spans).toHaveLength(layout.lines.length);
     spans.forEach((s, i) => {
-      expect(s.style.whiteSpace).toBe('pre');
-      expect(s.style.position).toBe('absolute');
+      expect(s.classList.contains('ds-text-line')).toBe(true); // white-space: pre and absolute positioning come from the stylesheet
       expect(parseFloat(s.style.top)).toBeCloseTo(layout.lines[i].top, 1);
       expect(s.textContent.trim()).toBe(layout.lines[i].text);
     });
+    const blockEl = container.querySelector('[data-text-block]');
+    expect(blockEl.style.color).toBe('rgb(18, 52, 86)');
+    expect(blockEl.style.fontSize).toBe('14px');
+    expect(blockEl.style.lineHeight).toBe(`${layout.lineHeight}px`);
+    expect(blockEl.getAttribute('data-font-size')).toBe('14');
     const block = container.querySelector('[data-text-block]');
     expect(block.style.left).toBe('5px');
     expect(block.style.top).toBe('7px');
@@ -59,8 +67,8 @@ describe('TextBlock', () => {
     expect(badge.getAttribute('title')).toBe(C140);
     expect(badge.getAttribute('aria-label')).toContain(C140);
     expect(container.querySelector('[data-text-block]').getAttribute('data-overflow')).toBe('true');
-    expect(badge.style.pointerEvents).toBe('auto'); // hover works; the rest of the block never blocks the node
-    expect(container.querySelector('[data-text-block]').style.pointerEvents).toBe('none');
+    expect(css).toMatch(/\.ds-text-badge\s*\{[^}]*pointer-events:\s*auto/); // hover works; the rest of the block never blocks the node
+    expect(css).toMatch(/\.ds-text\s*\{[^}]*pointer-events:\s*none/);
   });
 
   test('right-to-left lines carry their direction', () => {
@@ -68,8 +76,7 @@ describe('TextBlock', () => {
     const { container } = render(<TextBlock layout={ar} box={{ x: 0, y: 0, width: 200, height: 40 }} />);
     const span = container.querySelector('.ds-text-line');
     expect(span.getAttribute('dir')).toBe('rtl');
-    expect(span.style.direction).toBe('rtl');
-    expect(span.style.unicodeBidi).toBe('plaintext');
+    expect(css).toMatch(/\.ds-text-line\s*\{[^}]*unicode-bidi:\s*plaintext/);
   });
 
   test('renders nothing without a layout', () => {
@@ -109,7 +116,7 @@ describe('migrated renderNodes', () => {
     expect(spans.length).toBeLessThanOrEqual(3);
     expect(c.container.querySelector('.ds-node-label-below')).not.toBeNull();
     expect(c.container.querySelector('.ds-text-badge')).not.toBeNull(); // 140 chars cannot fit 3 lines of 120 px
-    for (const s of spans) expect(s.style.whiteSpace).toBe('pre');
+    for (const s of spans) expect(s.classList.contains('ds-text-line')).toBe(true);
   });
 
   test('ProcessFlow swimlane title is drawn rotated by the shared layout, one line', () => {
@@ -159,7 +166,7 @@ describe('migrated renderNodes', () => {
         const out = p.renderNode(el, st, false);
         if (out === undefined || out === null) continue;
         const { container, unmount } = render(<div>{out}</div>);
-        for (const s of container.querySelectorAll('.ds-text-line')) expect([packId, st.id, parseFloat(s.style.fontSize) >= 11]).toEqual([packId, st.id, true]);
+        for (const b of container.querySelectorAll('[data-text-block]')) expect([packId, st.id, parseFloat(b.getAttribute('data-font-size')) >= 11]).toEqual([packId, st.id, true]);
         unmount();
       }
     }
