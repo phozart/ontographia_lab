@@ -200,7 +200,7 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
       color: el.color || selectedStencil?.color || '#3b82f6',
       textColor: el.textColor || null, // null means auto (based on variant)
       styleVariant: el.styleVariant || 'floating',
-      fontSize: el.fontSize || 13,
+      fontSize: el.fontSize || 14,
       fontFamily: el.fontFamily || null,
       fontWeight: el.fontWeight || 'normal',
       fontStyle: el.fontStyle || 'normal',
@@ -260,12 +260,12 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
 
   // Font size increment/decrement
   const incrementFontSize = useCallback(() => {
-    const newSize = Math.min((currentStyles.fontSize || 13) + 1, 72);
+    const newSize = Math.min((currentStyles.fontSize || 14) + 1, 72);
     handleStyleChange('fontSize', newSize);
   }, [currentStyles.fontSize, handleStyleChange]);
 
   const decrementFontSize = useCallback(() => {
-    const newSize = Math.max((currentStyles.fontSize || 13) - 1, 8);
+    const newSize = Math.max((currentStyles.fontSize || 14) - 1, 11) /* ADR-0008: nothing below 11 px */;
     handleStyleChange('fontSize', newSize);
   }, [currentStyles.fontSize, handleStyleChange]);
 

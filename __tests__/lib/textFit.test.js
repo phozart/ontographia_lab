@@ -59,6 +59,18 @@ describe('sizeForText', () => {
     expect(s.height).toBeGreaterThanOrEqual(80);
   });
 
+  test('inscribed shapes grow proportionally: a diamond stays a diamond, a gateway keeps its 110:70 ratio, a circle stays round', () => {
+    for (const label of [C140, 'Customer Order Service', 'Kundenzufriedenheitsanalyse']) {
+      const d = size('core/diamond', label);
+      expect(Math.abs(d.width - d.height)).toBeLessThanOrEqual(10);
+      const g = size('process-flow/exclusive-gateway', label);
+      expect(Math.abs(g.width / g.height - 110 / 70)).toBeLessThan(0.15);
+      const c = size('core/circle', label);
+      expect(c.width).toBe(c.height);
+      expect(Math.max(d.width / d.height, d.height / d.width)).toBeLessThan(1.2);
+    }
+  });
+
   test('auto-height keeps the width and grows the height (text block)', () => {
     const s = size('core/text-block', C140);
     expect(s.width).toBe(200);

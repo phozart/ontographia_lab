@@ -605,8 +605,6 @@ function Node({
   // Default node rendering
   const shape = stencil?.shape || 'rect';
   const color = element.color || stencil?.color || '#3b82f6';
-  const fontSize = element.fontSize || 13;
-  const fontWeight = element.fontWeight || 'normal';
   const fontStyle = element.fontStyle || 'normal';
   const textDecoration = element.textDecoration || 'none';
   const textAlign = element.textAlign || 'center';
@@ -691,6 +689,7 @@ function Node({
     <ElementText
       element={element}
       stencil={stencil}
+      kind={textPolicy.slot === 'external' ? 'external' : 'inside'}
       text={element.label || element.name || 'Untitled'}
       color={textColor}
       offsetX={-borderInset}
@@ -806,7 +805,7 @@ function Node({
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 style={{
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: 600,
                   textAlign: 'left',
                   width: 'auto',

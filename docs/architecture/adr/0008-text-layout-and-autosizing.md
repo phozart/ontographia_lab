@@ -1,6 +1,6 @@
 # ADR-0008: Text layout and autosizing (one shared text-layout module for canvas, exports, diagram_show and agents)
 
-- Status: **Proposed** (2026-10-22). Awaiting owner approval of the defaults in section 13.
+- Status: **Accepted** (2026-10-22).
 - Evidence: [text rendering audit](../investigations/text-rendering-audit.md) (1,870 nodes per creation path, 187 stencils × 10 label variants).
   - 57% of the cells have a defect.
   - Editor and MCP produce identical sizes.

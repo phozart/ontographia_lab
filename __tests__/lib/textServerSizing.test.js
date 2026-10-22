@@ -261,6 +261,19 @@ describe('map_structure sizes nodes from their text before layout', () => {
     if (xs.length > 1) expect(xs[1] - xs[0]).toBeGreaterThanOrEqual(100);
   });
 
+  test('every stencil of the four T1 packs (dividers and tiny markers included) compiles with all ten label variants', () => {
+    const { PACK_CATALOG } = require('../../components/diagram-studio/packs/catalog');
+    for (const packId of ['core', 'process-flow', 'sticky-notes', 'mind-map']) {
+      const pack = PACK_CATALOG.find((p) => p.id === packId);
+      const nodes = [];
+      for (const st of pack.stencils.filter((x) => !['table', 'doc'].includes(x.id))) for (const [k, label] of Object.entries(VARIANTS)) nodes.push({ key: `${st.id}__${k}`, label, stencil: `${packId}/${st.id}` });
+      for (let i = 0; i < nodes.length; i += 100) {
+        const r = run(nodes.slice(i, i + 100), 'grid');
+        expect([packId, i, r.ok ? 'ok' : JSON.stringify(r.errors).slice(0, 300)]).toEqual([packId, i, 'ok']);
+      }
+    }
+  });
+
   test('is deterministic', () => {
     const a = JSON.stringify(run(longNodes).content.elements.map((e) => [e.x, e.y, e.size]));
     const b = JSON.stringify(run(longNodes).content.elements.map((e) => [e.x, e.y, e.size]));
