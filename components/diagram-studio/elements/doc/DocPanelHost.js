@@ -6,7 +6,7 @@
 import React, { Suspense, useEffect } from 'react';
 import { useDiagram } from '../../DiagramContext';
 import ResizablePanel from '../../ResizablePanel';
-import { useOpenDocId, openDoc, closeDoc } from './docStore';
+import { useOpenDocId, openDoc, closeDoc, useDocNotice } from './docStore';
 import { useDocImport } from './useDocImport';
 
 const DocPanel = React.lazy(() => import('./DocPanel'));
@@ -17,6 +17,7 @@ export default function DocPanelHost() {
   const openId = useOpenDocId();
   const { elements = [], selection } = useDiagram() || {};
   const { notice, dismiss } = useDocImport();
+  const toast = useDocNotice();
 
   // Enter opens the selected doc card
   useEffect(() => {
@@ -48,6 +49,11 @@ export default function DocPanelHost() {
               <DocPanel key={openId} elementId={openId} onClose={closeDoc} />
             </Suspense>
           </ResizablePanel>
+        </div>
+      )}
+      {toast && (
+        <div role="status" aria-live="polite" data-testid="doc-toast" data-kind={toast.kind} style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 2100, maxWidth: 520, padding: '9px 14px', borderRadius: 8, background: toast.kind === 'error' ? '#fdecea' : '#0f172a', color: toast.kind === 'error' ? '#7a1c12' : '#fff', border: toast.kind === 'error' ? '1px solid #f1a9a0' : '1px solid transparent', boxShadow: '0 4px 16px rgba(0,0,0,.2)', fontSize: 13 }}>
+          {toast.text}
         </div>
       )}
       {notice && (

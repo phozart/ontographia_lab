@@ -235,6 +235,16 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Deviations from the ADR:** the probe ETag stays `"<revision>"` when no agent is visible and becomes `"<revision>-a<time>"` otherwise (the ADR sketched `r<rev>-a<at>`); `forUser.id` is only present for the acting user; each item also carries `ageMs` (server-relative, so no client clock agreement is needed); the `tool` is passed to `applyContentChange` as its own option, not inside `actor`; `diagram_create` is classified non-board (a brand-new board nobody is watching). No migration, no new dependency.
 - **Tests:** register states, TTL, LRU, privacy matrix and labels; every registered tool is classified and, for single-board tools, records exactly one entry after the access check and nothing when access is refused; probe payload with a query-count check (a caught-up probe still runs no query); pill/popover/focus-box components; e2e with two browser contexts and a real MCP agent (the viewer sees no read, both see the write, the pill turns muted after 20 s).
 
+## Slice DX-1 — Doc copy (rich), .docx / .pdf export, table copy, doc scroll
+
+- **PR title:** `feat: doc copy with formatting, .docx and .pdf export, formatted table copy, and doc scrolling`
+- **REQ refs:** `docs/architecture/investigations/ai-canvas-via-mcp.md` section 11.7; owner request 2026-10-22.
+- **Branch:** `feat/doc-copy-export`
+- **Files changed:** `lib/doc/{docLinks,docHtml,docDocx,docPdf}.js`, `lib/clipboard/richCopy.js`, `lib/table/tableClipboard.js` (new); `components/diagram-studio/elements/doc/{docActions,docStore,DocPanel,DocPanelHost,DocCard}.js`, `elements/table/TableNode.js`, `DiagramCanvas.js` (context menu); `skills/ontographia-lab/SKILL.md`; `package.json` / lock (`docx` 9.13.0, MIT, 19 MB unpacked, dynamic import only).
+- **Tests:** unit (docHtml, docDocx, docPdf, tableClipboard, richCopy, components/docCopyExport) and e2e `doc-copy-export` (clipboard read-back, downloads, wheel scroll).
+
+---
+
 ## Slice LA-3 — Activity panel
 
 - **PR title:** `feat: slice LA-3 activity panel (edit sessions, GET /activity, Activity tab with Review and Compare)`

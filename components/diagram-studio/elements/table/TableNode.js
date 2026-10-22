@@ -18,6 +18,7 @@ import {
   columnWidths, COLUMN_TYPES, MIN_COLUMN_WIDTH,
 } from '../../../../lib/table/tableModel';
 import { tableToCsv, tableToJson, parseDelimited } from '../../../../lib/table/tableCsv';
+import { copyTableRich } from '../doc/docActions';
 import CellEditor from './CellEditor';
 import TableMenu from './TableMenu';
 
@@ -303,12 +304,9 @@ export default function TableNode({ element, stencil, isSelected }) {
     if (kind === 'csv') downloadExport({ content: `﻿${tableToCsv(t)}`, mimeType: 'text/csv;charset=utf-8', filename: exportFilename(name, 'csv') });
     else downloadExport({ content: tableToJson(t), mimeType: 'application/json', filename: exportFilename(name, 'json') });
   };
-  const copyTsv = async () => {
-    const t = tableRef.current;
-    const lines = [];
-    if (t.headerRow !== false) lines.push(t.columns.map((c) => c.name).join('\t'));
-    t.rows.forEach((r) => lines.push(t.columns.map((c) => cellText(r.cells?.[c.id]).replace(/[\t\r\n]+/g, ' ')).join('\t')));
-    try { await navigator.clipboard.writeText(lines.join('\n')); setNotice('Copied as tab separated text'); } catch { setNotice('Copy was blocked by the browser'); }
+  const copyTable = async () => {
+    const r = await copyTableRich(tableRef.current, diagram);
+    setNotice(r.ok ? (r.rich ? 'Table copied. Paste into Excel, Sheets, Word or Outlook.' : 'Table copied as tab separated text') : 'Copy was blocked by the browser');
   };
   const otherSelected = (selection?.nodeIds || []).filter((id) => id !== element.id);
   const linkTarget = otherSelected.length === 1 ? elements.find((e) => e.id === otherSelected[0]) : null;
@@ -365,7 +363,7 @@ export default function TableNode({ element, stencil, isSelected }) {
       { separator: true },
       { label: 'Export as CSV', onSelect: () => exportTable('csv') },
       { label: 'Export as JSON', onSelect: () => exportTable('json') },
-      { label: 'Copy as TSV', onSelect: copyTsv },
+      { label: 'Copy table (formatted)', onSelect: copyTable },
     ];
   };
 
