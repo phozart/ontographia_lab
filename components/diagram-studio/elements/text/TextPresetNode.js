@@ -3,8 +3,9 @@
 // resolve through the board theme at render time (a theme switch restyles it); the font size is materialized on the element.
 // Present mode and the exports clone this DOM, so they show exactly what the editor shows.
 //
-// Sizing: the box GROWS to fit its text for people who can edit (never shrinks, so a user's bigger box stays); for everyone
-// else, and for locked boxes, overflow is flagged with data-overflow and the text is never clipped (overflow: visible).
+// Sizing: the text is never clipped (overflow: visible), so an undersized box simply draws over its bottom edge. Opening a board
+// or swapping a font never writes anything (no dirty state, no autosave, no merge noise). The box GROWS to fit (persisted, never
+// shrinks) only right after the person edited the text here; otherwise the overflow is flagged with data-overflow.
 // All text measurement and wrapping decisions live behind lib/present/textLayout.js (server-side estimate); here the
 // browser lays the real text out.
 
@@ -29,6 +30,7 @@ export default function TextPresetNode({ element, edit }) {
   const width = element.size?.width;
   const height = element.size?.height;
   const editing = Boolean(edit?.editing) && editable;
+  const editedRef = useRef(false); // set when this session changed the text: only then may a grown size be saved
 
   useLayoutEffect(() => {
     const inner = innerRef.current;
@@ -38,7 +40,8 @@ export default function TextPresetNode({ element, edit }) {
       setOverflow(false);
       return;
     }
-    if (editable && updateElement && Number.isFinite(width)) {
+    if (editable && editedRef.current && updateElement && Number.isFinite(width)) {
+      editedRef.current = false;
       updateElement(element.id, { size: { width, height: Math.ceil(need) } }, { coalesceKey: `text-fit:${element.id}` });
       setOverflow(false);
     } else {
@@ -50,6 +53,7 @@ export default function TextPresetNode({ element, edit }) {
 
   const commit = () => {
     if (draft !== text.markdown) {
+      editedRef.current = true;
       updateElement?.(element.id, { label: plainLabelOf(draft), data: { ...(element.data || {}), text: { ...text, markdown: draft } } });
     }
     edit?.onDone?.(false);

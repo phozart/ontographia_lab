@@ -129,3 +129,23 @@ describe('provenance, layout and label flags', () => {
     expect(r.content.elements[0].data.layout).toBeUndefined();
   });
 });
+
+describe('font size and element size clamps', () => {
+  const run = (extra) => validateDiagramContent({ elements: [rect(extra)] });
+  test('out-of-range values are clamped with a warning, in-range ones untouched', () => {
+    const r = run({ fontSize: 99999, size: { width: 1e9, height: -5 } });
+    expect(r.ok).toBe(true);
+    expect(r.content.elements[0].fontSize).toBe(2000);
+    expect(r.content.elements[0].size).toEqual({ width: 100000, height: 0 });
+    expect(r.warnings.join(' ')).toMatch(/clamped/);
+    expect(run({ fontSize: 0 }).content.elements[0].fontSize).toBe(1);
+    const ok = run({ fontSize: 24, size: { width: 100, height: 60 } });
+    expect(ok.content.elements[0]).toMatchObject({ fontSize: 24, size: { width: 100, height: 60 } });
+    expect(ok.warnings.join(' ')).not.toMatch(/clamped/);
+  });
+  test('non-numbers are stripped', () => {
+    const r = run({ fontSize: 'big', size: { width: 'x', height: 10 } });
+    expect(r.content.elements[0].fontSize).toBeUndefined();
+    expect(r.content.elements[0].size).toEqual({ height: 10 });
+  });
+});

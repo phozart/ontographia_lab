@@ -65,7 +65,7 @@ const FONT_FAMILIES = [
   { id: 'system', name: 'System Default', value: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', category: 'System' },
   { id: 'inter', name: 'Inter', value: FONT_STACKS.inter, category: 'Business' },
   { id: 'ibm-plex-sans', name: 'IBM Plex Sans', value: FONT_STACKS['ibm-plex-sans'], category: 'Business' },
-  { id: 'lato', name: 'Lato', value: FONT_STACKS.lato, category: 'Business' },
+  { id: 'work-sans', name: 'Work Sans', value: FONT_STACKS['work-sans'], category: 'Business' },
   { id: 'montserrat', name: 'Montserrat', value: FONT_STACKS.montserrat, category: 'Business' },
   { id: 'source-serif-4', name: 'Source Serif 4', value: FONT_STACKS['source-serif-4'], category: 'Elegant' },
   { id: 'georgia', name: 'Georgia', value: 'Georgia, "Times New Roman", serif', category: 'Elegant' },

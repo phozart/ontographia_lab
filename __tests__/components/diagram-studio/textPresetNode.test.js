@@ -102,16 +102,27 @@ describe('auto-size', () => {
     const spy = jest.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(h);
     return () => spy.mockRestore();
   };
-  test('an editor grows the box to fit the text (never shrinks, never writes when it fits)', () => {
+  test('opening an undersized preset writes nothing (no dirty state, no autosave) and flags the overflow', () => {
     const restore = withScrollHeight(300);
     render(<TextPresetNode element={el({ preset: 'body', markdown: 'long' })} />);
-    expect(mockCtx.updateElement).toHaveBeenCalledWith('t1', { size: { width: 600, height: 300 } }, expect.any(Object));
-    restore();
-    mockCtx.updateElement.mockClear();
-    const restore2 = withScrollHeight(50);
-    render(<TextPresetNode element={el({ preset: 'body', markdown: 'short' })} />);
     expect(mockCtx.updateElement).not.toHaveBeenCalled();
-    restore2();
+    expect(box()).toHaveAttribute('data-overflow', 'true');
+    restore();
+  });
+  test('after the person edits the text the grown size is saved once; a font swap alone never writes', () => {
+    const restore = withScrollHeight(300);
+    const first = el({ preset: 'body', markdown: 'old' });
+    const { rerender } = render(<TextPresetNode element={first} edit={{ editing: true, onDone: jest.fn() }} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'new long text' } });
+    fireEvent.blur(screen.getByRole('textbox'));
+    mockCtx.updateElement.mockClear();
+    rerender(<TextPresetNode element={el({ preset: 'body', markdown: 'new long text' })} />);
+    expect(mockCtx.updateElement).toHaveBeenCalledWith('t1', { size: { width: 600, height: 300 } }, expect.any(Object));
+    mockCtx.updateElement.mockClear();
+    setCtx({ theme: themeFromPreset('paper') });
+    rerender(<TextPresetNode element={el({ preset: 'body', markdown: 'new long text' })} />);
+    expect(mockCtx.updateElement).not.toHaveBeenCalled();
+    restore();
   });
   test('a viewer or a locked box is never written to; the overflow is flagged instead of clipped', () => {
     const restore = withScrollHeight(300);

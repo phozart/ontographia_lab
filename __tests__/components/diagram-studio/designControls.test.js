@@ -28,13 +28,13 @@ describe('ThemePicker', () => {
     expect(onApply).toHaveBeenLastCalledWith({ preset: 'slate-dark' });
     fireEvent.change(screen.getByLabelText('Heading font'), { target: { value: 'montserrat' } });
     expect(onApply).toHaveBeenLastCalledWith({ fonts: { heading: 'montserrat' } });
-    fireEvent.change(screen.getByLabelText('Body font'), { target: { value: 'lato' } });
-    expect(onApply).toHaveBeenLastCalledWith({ fonts: { body: 'lato' } });
+    fireEvent.change(screen.getByLabelText('Body font'), { target: { value: 'work-sans' } });
+    expect(onApply).toHaveBeenLastCalledWith({ fonts: { body: 'work-sans' } });
   });
   test('offers only the closed list of self-hosted fonts', () => {
     render(<ThemePicker theme={undefined} onApply={jest.fn()} />);
     const names = within(screen.getByLabelText('Body font')).getAllByRole('option').map((o) => o.textContent);
-    expect(names).toEqual(['Inter', 'Source Serif 4', 'IBM Plex Sans', 'IBM Plex Mono', 'Lato', 'Montserrat']);
+    expect(names).toEqual(['Inter', 'Source Serif 4', 'IBM Plex Sans', 'IBM Plex Mono', 'Work Sans', 'Montserrat']);
   });
   test('disabled for read-only roles', () => {
     render(<ThemePicker theme={undefined} onApply={jest.fn()} disabled />);

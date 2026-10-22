@@ -182,6 +182,21 @@ describe('Presets, themes and layouts (ADR-0007 P2)', () => {
     await page.close();
   });
 
+  test('opening a board with an undersized text preset writes nothing: no new revision after 10 s', async () => {
+    const page = await newPage();
+    const content = boardContent();
+    content.elements = content.elements.filter((e) => e.type !== 'table'); // a table has its own (older) fit-on-open rule
+    content.elements.push({ id: 'tiny', type: 'text-block', packId: 'core', x: O + 80, y: O + 560, size: { width: 300, height: 10 }, fontSize: 28, label: 'x', layerId: 'default', properties: {}, parentFrameId: 'fa', data: { text: { preset: 'body', markdown: 'A long line of text that needs several lines in a three hundred unit wide box so it overflows.' } } });
+    const d = (await call(page, 'POST', '/api/diagrams', { type: 'infinite-canvas', name: 'E2E undersized', content })).body;
+    const before = (await head(page, d)).revision;
+    await open(page, d);
+    await sleep(10000);
+    expect((await head(page, d)).revision).toBe(before);
+    expect(await page.$eval('[data-testid="text-preset"][data-preset="body"]', (e) => e.getAttribute('data-overflow'))).toBe('true');
+    await call(page, 'DELETE', `/api/diagrams/${d.id}`);
+    await page.close();
+  });
+
   test('a real MCP agent builds a 5-slide themed deck from board content; each slide is presented at 1379x985', async () => {
     const A = await newPage();
     await open(A, agentDiagram);

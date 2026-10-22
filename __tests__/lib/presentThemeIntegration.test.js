@@ -36,7 +36,7 @@ describe('diff', () => {
   test('a theme change is reported as one "theme" change with field names', () => {
     const d = diffContent({ elements: [] }, { elements: [], theme: paper });
     expect(d.changes).toEqual([expect.objectContaining({ id: 'theme', kind: 'theme', change: 'added' })]);
-    const d2 = diffContent({ elements: [], theme: paper }, { elements: [], theme: { ...paper, palette: { ...paper.palette, accent: '#102030' }, fonts: { heading: 'lato', body: paper.fonts.body } } });
+    const d2 = diffContent({ elements: [], theme: paper }, { elements: [], theme: { ...paper, palette: { ...paper.palette, accent: '#102030' }, fonts: { heading: 'work-sans', body: paper.fonts.body } } });
     expect(d2.changes).toHaveLength(1);
     expect(d2.changes[0]).toMatchObject({ kind: 'theme', change: 'changed' });
     expect(d2.changes[0].fields).toEqual(['fonts', 'palette']);
@@ -68,6 +68,17 @@ describe('merge', () => {
     expect(r.content.theme.palette.accent).toBe('#111111');
     expect(r.content.theme.palette.accent2).toBe('#333333');
   });
+  test('different tokens and fonts edited on both sides both survive; the same token reports a local-wins conflict', () => {
+    const ours = { elements: [], theme: { ...paper, palette: { ...paper.palette, accent: '#111111' }, fonts: { ...paper.fonts, heading: 'montserrat' } } };
+    const theirs = { elements: [], theme: { ...paper, palette: { ...paper.palette, accent: '#222222', muted: '#444444' } } };
+    const r = mergeContent(base, ours, theirs);
+    expect(r.content.theme.palette).toMatchObject({ accent: '#111111', muted: '#444444' });
+    expect(r.content.theme.fonts.heading).toBe('montserrat');
+    expect(r.conflicts).toEqual([expect.objectContaining({ kind: 'theme', resolution: 'local-wins', fields: ['palette.accent'] })]);
+    const clean = mergeContent(base, { elements: [], theme: { ...paper, palette: { ...paper.palette, bg: '#fafafa' } } }, { elements: [], theme: { ...paper, palette: { ...paper.palette, muted: '#444444' } } });
+    expect(clean.conflicts).toEqual([]);
+    expect(clean.content.theme.palette).toMatchObject({ bg: '#fafafa', muted: '#444444' });
+  });
   test('content that never had a theme gets none', () => {
     const r = mergeContent({ elements: [] }, { elements: [] }, { elements: [] });
     expect('theme' in r.content).toBe(false);
@@ -80,5 +91,13 @@ describe('merge', () => {
     expect(r.ok).toBe(true);
     expect(r.content.elements[0].data.text.markdown).toBe('b');
     expect(r.content.elements[0].x).toBe(50);
+  });
+});
+
+describe('legacy font ids', () => {
+  const { validateTheme, resolveTheme } = require('../../lib/present/themes');
+  test('a stored lato is migrated to work-sans (Lato has an OFL Reserved Font Name)', () => {
+    expect(validateTheme({ preset: 'paper', fonts: { heading: 'lato', body: 'inter' } }).theme.fonts).toEqual({ heading: 'work-sans', body: 'inter' });
+    expect(resolveTheme({ preset: 'paper', fonts: { heading: 'lato' } }).fonts.heading).toBe('work-sans');
   });
 });

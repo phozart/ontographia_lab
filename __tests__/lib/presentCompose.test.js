@@ -93,6 +93,13 @@ describe('copyIntoSlot', () => {
     expect(big.ok).toBe(false);
     expect(big.error).toMatch(/300/);
   });
+  test('a copied table scale stays within 0.2 to 3 even when the source is already scaled', () => {
+    const big = { elements: [{ ...table('ts', 0, 0), data: { table: { ...table('x', 0, 0).data.table, scale: 2 } } }], connections: [] };
+    const r = copyIntoSlot(big, { elementIds: ['ts'] }, { ...slot, w: 4000, h: 4000 }, { newId: ids, revision: 1, parentId: 'p' });
+    expect(r.ok).toBe(true);
+    expect(r.elements[0].data.table.scale).toBeLessThanOrEqual(3);
+    expect(r.elements[0].data.table.scale).toBeGreaterThanOrEqual(0.2);
+  });
   test('deterministic and result passes content validation', () => {
     const a = run({ elementIds: ['a', 'b', 't'] });
     const b = run({ elementIds: ['a', 'b', 't'] });
