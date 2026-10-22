@@ -4,6 +4,7 @@
 // rasterized to a small PNG. Board-load performance: docs/architecture/investigations/board-load-performance.md.
 
 import { THUMBNAIL_WIDTH } from '../../../lib/thumbnail';
+import { renderDiagramSvg } from '../../../lib/render/diagramSvg'; // (static: one chunk to preload, not two to wait for)
 
 function loadImage(src) {
   return new Promise((resolve, reject) => {
@@ -19,7 +20,6 @@ function loadImage(src) {
  * @returns {Promise<string|null>} a PNG data URL whose longer side is at most `maxSide` px, or null when there is nothing to draw
  */
 export async function renderThumbnailPng(content, maxSide = THUMBNAIL_WIDTH) {
-  const { renderDiagramSvg } = await import('../../../lib/render/diagramSvg');
   const { svg, viewBox } = renderDiagramSvg(content, { maxElements: 5000, maxConnections: 10000, maxBytes: Infinity });
   if (!svg || !(viewBox.width > 0) || !(viewBox.height > 0)) return null;
   const img = await loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);

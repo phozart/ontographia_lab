@@ -33,7 +33,7 @@ test('captures once, debounced, after an edit-save and PUTs the PNG as the thumb
   const { rerender } = renderHook((p) => useThumbnailCapture(p), { initialProps: { ...base, lastSaved: 's0' } });
   rerender({ ...base, lastSaved: 's1' });
   await settle(THUMBNAIL_DEBOUNCE_MS - 1);
-  expect(mockRender).not.toHaveBeenCalled();
+  expect(puts()).toHaveLength(0); // (pre-rendered by now, but not sent)
   await settle(20000);
   expect(puts()).toHaveLength(1);
   expect(puts()[0][0]).toBe('/api/diagrams/d1');
@@ -53,14 +53,14 @@ test('does nothing without a save, for read-only, or for an empty canvas', async
 });
 
 test('skips oversized captures and swallows capture errors', async () => {
-  mockRender.mockResolvedValueOnce('data:image/png;base64,' + 'A'.repeat(300 * 1024));
+  mockRender.mockResolvedValue('data:image/png;base64,' + 'A'.repeat(300 * 1024));
   const a = renderHook((p) => useThumbnailCapture(p), { initialProps: { ...base, lastSaved: 's0' } });
   a.rerender({ ...base, lastSaved: 's1' });
   await settle(60000);
   expect(mockRender).toHaveBeenCalled();
   expect(puts()).toHaveLength(0);
 
-  mockRender.mockRejectedValueOnce(new Error('boom'));
+  mockRender.mockRejectedValue(new Error('boom'));
   const b = renderHook((p) => useThumbnailCapture(p), { initialProps: { ...base, diagramId: 'd2', lastSaved: 's0' } });
   b.rerender({ ...base, diagramId: 'd2', lastSaved: 's1' });
   await settle(60000);
@@ -87,5 +87,19 @@ test('hiding the tab flushes a pending capture; with nothing pending nothing hap
   await act(async () => { document.dispatchEvent(new Event('visibilitychange')); });
   await settle(100);
   expect(puts()).toHaveLength(1);
+  Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+});
+
+test('a pre-rendered image is sent synchronously when the page is hidden (a closing page cannot wait for a render)', async () => {
+  const { rerender } = renderHook((p) => useThumbnailCapture(p), { initialProps: { ...base, lastSaved: 's0' } });
+  rerender({ ...base, lastSaved: 's1' });
+  await settle(2000); // prepared after 800 ms + idle, not yet sent (debounce 3 s)
+  expect(mockRender).toHaveBeenCalledTimes(1);
+  expect(puts()).toHaveLength(0);
+  Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+  act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+  expect(puts()).toHaveLength(1); // no await in between
+  expect(puts()[0][1].keepalive).toBe(true);
+  expect(mockRender).toHaveBeenCalledTimes(1); // the prepared image was reused
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
 });

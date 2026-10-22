@@ -45,8 +45,10 @@ const deckBoard = () => content([
   frame('fc', 12000, 0, SLIDE_W, SLIDE_H, 'Next steps'), note('c1', 12120, 300, 'Fix the payment form', 'fc', '#4FB3CE'),
 ], { presentations: [{ id: 'deck1', title: 'Deck', aspect: '16:9', slides: [{ id: 's1', frameId: 'fa' }, { id: 's2', frameId: 'fb' }, { id: 's3', frameId: 'fc' }] }] });
 
+const smallBoard = () => content(Array.from({ length: 6 }, (_, i) => shape(`s${i}`, i * 200, 0)));
+
 describe('Board load performance: viewport culling', () => {
-  let browser; let context; let big; let wide; let deck; let downloadDir;
+  let browser; let context; let big; let wide; let deck; let small; let downloadDir;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const call = (page, method, url, body) => page.evaluate(async (m, u, b) => {
     const r = await fetch(u, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
@@ -116,13 +118,14 @@ describe('Board load performance: viewport culling', () => {
     big = await mk('E2E perf 2000', seedContent(2000));
     wide = await mk('E2E perf export', exportBoard());
     deck = await mk('E2E perf deck', deckBoard());
+    small = await mk('E2E perf thumb', smallBoard());
     await page.close();
   });
 
   afterAll(async () => {
     try {
       const page = await newPage();
-      for (const d of [big, wide, deck]) if (d) await call(page, 'DELETE', `/api/diagrams/${d.id}`);
+      for (const d of [big, wide, deck, small]) if (d) await call(page, 'DELETE', `/api/diagrams/${d.id}`);
     } catch (e) { /* best effort */ }
     await browser.close();
   });
@@ -266,6 +269,48 @@ describe('Board load performance: viewport culling', () => {
     await page.keyboard.press('Escape');
     await waitFor(async () => (await page.$('[data-testid="present-mode"]')) === null, 10000);
     await waitFor(async () => (await nodeCount(page)) < 167, 15000); // culling is back after presenting (the board may have followed to the last slide)
+    await page.close();
+  });
+
+  test('leaving soon after an edit still stores the thumbnail (flushed on pagehide with a pre-rendered image)', async () => {
+    const page = await newPage();
+    const saves = [];
+    page.on('request', (r) => { if (r.method() === 'PUT' && /\/api\/diagrams\//.test(r.url()) && !/thumbnail/.test(r.postData() || '')) saves.push(Date.now()); });
+    await open(page, small);
+    await sleep(800);
+    const box = await (await page.$('[data-node-id="s2"]')).boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 40, { steps: 6 });
+    await page.mouse.up();
+    await waitFor(() => saves.length > 0, 20000, 100);
+    await sleep(1300); // leave about 1 s after the save: before the 3 s debounce
+    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: 'domcontentloaded' });
+    await waitFor(async () => !!(await call(page, 'GET', `/api/diagrams/${small.id}`)).body.thumbnail, 15000, 500);
+    await page.close();
+  });
+
+  test('zoomed far out the board is one overview image; clicking selects by geometry; zooming in hands back to nodes', async () => {
+    const page = await newPage();
+    await open(page, big);
+    await sleep(800);
+    const v = await view(page);
+    await page.mouse.move(v.left + 300, v.top + 300);
+    await page.keyboard.down('Control');
+    for (let i = 0; i < 40; i += 1) await page.mouse.wheel({ deltaY: 100 });
+    await page.keyboard.up('Control');
+    await waitFor(async () => (await page.$('[data-testid="board-overview"]')) !== null, 15000, 200);
+    expect(await nodeCount(page)).toBeLessThan(5);
+    expect((await view(page)).scale).toBeLessThan(0.15);
+    // click on the image where the first element is (world -> screen)
+    const v2 = await view(page);
+    await page.mouse.click(v2.left + (O + 70 + v2.tx) * v2.scale, v2.top + (O + 40 + v2.ty) * v2.scale);
+    await waitFor(async () => (await page.$$('[data-node-id].selected')).length === 1, 5000, 100);
+    await page.keyboard.down('Control');
+    for (let i = 0; i < 40; i += 1) await page.mouse.wheel({ deltaY: -100 });
+    await page.keyboard.up('Control');
+    await waitFor(async () => (await page.$('[data-testid="board-overview"]')) === null, 15000, 200);
+    expect(await nodeCount(page)).toBeGreaterThan(5);
     await page.close();
   });
 });

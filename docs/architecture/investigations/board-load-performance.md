@@ -32,7 +32,7 @@ The Mac was heavily loaded by other work while this was measured (load average 1
 
 ### 3.1 Thumbnails (no html-to-image, never on open)
 
-- `lib/thumbnail.js`: `createThumbnailScheduler`. The first `lastSaved` seen for a board is a baseline (open writes nothing). After an edit-save the capture is debounced (8 s quiet period, restarted by each further save), then scheduled with `requestIdleCallback` (timeout 10 s), then throttled to one per 5 minutes (a throttled capture re-arms for the remaining time, so the final state is still captured). Switching boards or unmounting drops anything pending.
+- `lib/thumbnail.js`: `createThumbnailScheduler`. The first `lastSaved` seen for a board is a baseline (open writes nothing). After an edit-save the capture is debounced (3 s quiet period, restarted by each further save), then scheduled with `requestIdleCallback` (timeout 10 s), then throttled to one per 5 minutes (a throttled capture re-arms for the remaining time, so the final state is still captured). Switching boards or unmounting drops anything pending.
 - `components/diagram-studio/export/thumbnailRenderer.js`: renders `lib/render/diagramSvg.renderDiagramSvg` (content in, SVG string out; up to 5,000 elements, no byte cap) and rasterizes it to a 320 px PNG on a canvas. Cost grows with the number of elements, not with DOM nodes and computed styles. The result goes through the same PUT as before (`isValidThumbnail`, 200 KB cap), so the dashboard cards still update.
 - Fidelity: the SVG path draws shapes, labels, connections, tables, docs and text presets like `diagram_show`; pack-specific decorations (UML compartments, ERD fields, icons) are not drawn. At 320 px that is not visible. `diagramSvg` now measures bytes without `Buffer` so it also runs in the browser.
 - Side effect to know: a board that is only ever opened (never edited in the UI) gets no thumbnail until its first edit. Boards created through the API or MCP show the logo until then, as before for boards that were never opened.
@@ -93,3 +93,19 @@ Progression at 5,000 elements, load 24 to 40 (so only the ordering is meaningful
 - The minimap still draws one SVG node per element (about 7,000 DOM nodes at 5,000 elements). A canvas-drawn minimap would remove most of the remaining DOM.
 - Dropping `html-to-image` from export is not attempted: exports need pack-faithful rendering (UML compartments, fonts), which only the DOM clone has. Culling is held off for the duration of an export instead.
 - The 5,000-element export of the whole board clones 5,000 DOM nodes; that cost is inherent in the clone approach.
+
+## 7. Review follow-ups (M1, L2, level of detail)
+
+- **M1, thumbnail lost when leaving soon after an edit.** The scheduler now pre-renders the PNG 0.8 s after an edit-save (idle, once per burst; the renderer chunk is preloaded when the editor is idle) and sends it at the 3 s debounce. `flush()` runs on unmount, `pagehide` and `visibilitychange` to hidden: with a pre-rendered image the PUT is sent synchronously with `keepalive` (bodies under 60 KB; larger ones use a normal fetch, which survives a client-side route change). Still throttled to one per 5 minutes. A full page unload within about 1 s of an edit-save, before the pre-render finishes, can still lose the thumbnail (the render cannot be awaited while the page closes).
+- **L2, contextual toolbar frame export.** "Export frame as SVG/PNG" now holds the frame's rectangle mounted (`suspendCulling(rectOfFrame(frame))`) while it clones. Finding, not fixed here: these two handlers clone `document.querySelector('.ds-canvas-area svg')`, which is the grid SVG, so the exported file contains only the grid, with or without culling; the Export dialog and Copy as image are the working paths. No e2e is possible for that handler until it is fixed.
+- **Level of detail.** `OverviewLayer`: when the zoom is below 0.15, or more than 800 nodes would be mounted (and the board has 120 or more elements), no nodes or connections are mounted (except the selection, dragged, edited and connect-source ones). The board is drawn as one `<img>` of `renderDiagramSvg` output (blob URL, cached until elements, connections or theme change). A click is hit-tested by geometry (`hitTestElements`: topmost element, a frame only if nothing else is under the point) and selects the element, which mounts; selections over 100 elements are drawn as outline overlays; live highlight rings and agent focus are separate state-driven layers. Zooming in past the threshold hands back to node mounting. Captures (export, copy as image, present) disable the overview. Text in the overview is simplified by the SVG renderer, which is below 5 screen px at these zooms anyway.
+- **Minimap at 1,000+ elements** is one `<path>` for all elements (no per-element double-click zoom, no connection lines), which removed the last 7,000 DOM nodes at 5,000 elements.
+
+Fit-all style zoom-out (ctrl+wheel to the minimum zoom), then 60 frames of pan; best of 3, production build:
+
+| Elements | Before (review) | Mounted after zoom-out | DOM nodes | Zoom-out to next frame | Pan p50 / p95 after zoom-out | Load: nodes exist | Load: pan p95 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2,000 | all nodes mounted | 0 | 450 | 39 ms | 17 / 18 ms | 0.40 s (load 7) | 32 ms |
+| 5,000 | 60k DOM nodes, pan p95 1.8 s, one tab crash | 0 | 750 | 79 ms | 17 / 61 ms | 0.65 s (load 6) | 40 ms |
+
+The one slow frame in the 5,000 zoomed-out pan is the first image raster after the zoom; the median stays at one 60 Hz frame. Benchmark: `board-load-bench.js` now also reports `zoomOut`.

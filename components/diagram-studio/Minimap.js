@@ -4,6 +4,7 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useDiagram, useDiagramViewport } from './DiagramContext';
 
+const LARGE_BOARD_ELEMENTS = 1000;
 const MINIMAP_WIDTH = 180;
 const MINIMAP_HEIGHT = 120;
 const MINIMAP_PADDING = 10;
@@ -186,7 +187,20 @@ export default function Minimap({ packRegistry, containerSize = { width: 1200, h
   }, [isDragging, toDiagramCoords, containerSize, viewport.scale, setViewport]);
 
   // The 1 element = 1 rect drawing: rebuilt only when elements, connections or the minimap scale change, not on every pan frame
-  const minimapShapes = useMemo(() => (
+  // Very large boards: one <path> for every element instead of an <rect> and a <line> each (about 7,000 SVG nodes at
+  // 5,000 elements); per-element double-click zoom and connection lines are only drawn up to LARGE_BOARD_ELEMENTS.
+  const bigShapes = useMemo(() => {
+    if (elements.length <= LARGE_BOARD_ELEMENTS) return null;
+    let d = '';
+    for (const el of elements) {
+      const stencil = packRegistry?.get?.(el.packId)?.stencils?.find(st => st.id === el.type);
+      const size = el.size || stencil?.defaultSize || { width: 120, height: 60 };
+      const pos = toMinimapCoords(el.x, el.y);
+      d += `M${pos.x.toFixed(1)} ${pos.y.toFixed(1)}h${Math.max(size.width * scale, 3).toFixed(1)}v${Math.max(size.height * scale, 3).toFixed(1)}h-${Math.max(size.width * scale, 3).toFixed(1)}z`;
+    }
+    return <path d={d} fill="#0e74a3" opacity="0.8" stroke="none" />;
+  }, [elements, packRegistry, toMinimapCoords, scale]);
+  const smallShapes = useMemo(() => (elements.length > LARGE_BOARD_ELEMENTS ? null : (
     <>
     {/* Connections */}
     {connections.map(conn => {
@@ -258,7 +272,8 @@ export default function Minimap({ packRegistry, containerSize = { width: 1200, h
       );
     })}
     </>
-  ), [connections, elements, elementsById, packRegistry, toMinimapCoords, scale, handleElementDoubleClick]);
+  )), [connections, elements, elementsById, packRegistry, toMinimapCoords, scale, handleElementDoubleClick]);
+  const minimapShapes = bigShapes || smallShapes;
 
   if (isCollapsed) {
     return (

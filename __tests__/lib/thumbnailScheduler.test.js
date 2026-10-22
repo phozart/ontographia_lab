@@ -75,3 +75,24 @@ test('flush is still throttled', () => {
   expect(h.s.flush()).toBe(false);
   expect(h.capture).toHaveBeenCalledTimes(1);
 });
+
+test('with prepare: the image is pre-rendered after a short quiet period (idle), once per edit burst', () => {
+  let t = 0; const timers = new Map(); let id = 0; const idles = [];
+  const prepare = jest.fn(() => Promise.resolve());
+  const s = createThumbnailScheduler({
+    capture: jest.fn(), prepare, now: () => t,
+    setTimer: (fn, ms) => { id += 1; timers.set(id, { fn, at: t + ms }); return id; },
+    clearTimer: (h) => timers.delete(h),
+    requestIdle: (fn) => { idles.push(fn); return idles.length; },
+    cancelIdle: () => { idles.length = 0; },
+  });
+  const advance = (ms) => { t += ms; for (const [h, x] of [...timers]) if (x.at <= t) { timers.delete(h); x.fn(); } };
+  s.observe('d1', 'T0');
+  advance(5000); while (idles.length) idles.shift()();
+  expect(prepare).not.toHaveBeenCalled(); // opening prepares nothing
+  s.observe('d1', 'T1'); advance(500); s.observe('d1', 'T2'); advance(799);
+  expect(prepare).not.toHaveBeenCalled();
+  advance(1); while (idles.length) idles.shift()();
+  expect(prepare).toHaveBeenCalledTimes(1);
+  expect(prepare).toHaveBeenCalledWith('d1');
+});

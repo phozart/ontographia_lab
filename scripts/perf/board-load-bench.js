@@ -78,6 +78,29 @@ async function measure(context, board) {
     };
     requestAnimationFrame(step);
   }));
+  // fit-all style zoom-out (ctrl+wheel to the minimum zoom): time to the next painted frame, DOM size, then pan again
+  r.zoomOut = await page.evaluate(() => new Promise((resolve) => {
+    const area = document.querySelector('.ds-canvas-area');
+    const box = area.getBoundingClientRect();
+    const t0 = performance.now();
+    for (let i = 0; i < 40; i += 1) area.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, ctrlKey: true, bubbles: true, cancelable: true, clientX: box.left + 300, clientY: box.top + 300 }));
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const mountMs = Math.round(performance.now() - t0);
+      const frames = [];
+      let last = performance.now();
+      let n = 0;
+      const step = () => {
+        const now = performance.now();
+        frames.push(now - last);
+        last = now;
+        area.dispatchEvent(new WheelEvent('wheel', { deltaX: 40, deltaY: 20, bubbles: true, cancelable: true, clientX: box.left + 100, clientY: box.top + 100 }));
+        n += 1;
+        if (n < 60) requestAnimationFrame(step);
+        else { frames.shift(); frames.sort((x, y) => x - y); resolve({ mountMs, nodes: document.querySelectorAll('[data-node-id]').length, domNodes: document.getElementsByTagName('*').length, overview: !!document.querySelector('[data-testid="board-overview"]'), p50: Math.round(frames[frames.length >> 1]), p95: Math.round(frames[Math.floor(frames.length * 0.95)]) }); }
+      };
+      requestAnimationFrame(step);
+    }));
+  }));
   r.puts = puts.length; r.putAt = puts.length ? puts[0] - t0 : 0;
   await page.close();
   return r;
