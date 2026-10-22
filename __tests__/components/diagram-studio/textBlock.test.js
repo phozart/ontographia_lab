@@ -4,7 +4,7 @@
  * with the full text instead of silent clipping.
  */
 import React from 'react';
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import TextBlock from '../../../components/diagram-studio/text/TextBlock';
 import { layoutText } from '../../../lib/text/layout';
 import CorePack from '../../../components/diagram-studio/packs/CorePack';
@@ -27,37 +27,42 @@ function draw(packId, stencilId, label, extra = {}) {
   const out = p.renderNode(el, stencil, false);
   return render(<div>{out}</div>);
 }
-const lineSpans = (c) => [...c.container.querySelectorAll('.ds-text-line')];
+// the drawn lines of every text block: the block's own text node split on newlines (or its line spans for RTL)
+const blockLines = (block) => {
+  const spans = [...block.querySelectorAll(':scope > .ds-text-line')];
+  if (spans.length) return spans.map((x) => x.textContent.replace(/\n$/, ''));
+  return [...block.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join('').split('\n');
+};
+const lineSpans = (c) => [...c.container.querySelectorAll('[data-text-block]')].flatMap((b) => (b.textContent === '' ? [] : blockLines(b)));
 const sizes = (c) => [...c.container.querySelectorAll('[data-text-block]')].map((b) => parseFloat(b.getAttribute('data-font-size')));
 
 describe('TextBlock', () => {
   const layout = layoutText({ text: 'Customer Order Service', font: { size: 14, weight: 500, lineHeight: 1.3 }, box: { width: 80, height: 60 }, mode: 'fixed' });
 
-  test('draws every layout line as a block span in flow; only per-node values are inline', () => {
+  test('LTR text is one text node of newline-joined lines; only per-node values are inline', () => {
     const { container } = render(<TextBlock layout={layout} box={{ x: 5, y: 7, width: 80, height: 60 }} color="#123456" />);
-    const spans = [...container.querySelectorAll('.ds-text-line')];
-    expect(spans).toHaveLength(layout.lines.length);
-    spans.forEach((s, i) => {
-      expect(s.getAttribute('style')).toBeNull(); // no per-line style at all
-      expect(s.textContent.trim()).toBe(layout.lines[i].text);
-    });
     const block = container.querySelector('[data-text-block]');
+    expect(container.querySelectorAll('.ds-text-line')).toHaveLength(0);
+    expect(blockLines(block)).toEqual(layout.lines.map((l) => l.text));
+    expect(block.childNodes).toHaveLength(1); // a div and one text node per label
     expect(block.style.left).toBe('5px');
     expect(block.style.top).toBe('7px');
     expect(block.style.color).toBe('rgb(18, 52, 86)');
     expect(block.style.fontSize).toBe('14px');
-    expect(block.style.lineHeight).toBe(`${layout.lineHeight}px`);
+    expect(block.classList.contains('ds-text-lh130')).toBe(true); // the role line height is a class (1.3 x 14 = 18.2 px)
+    expect(css).toMatch(/\.ds-text-lh130\s*\{\s*line-height:\s*1\.3/);
     expect(parseFloat(block.style.paddingTop || '0')).toBeCloseTo(layout.lines[0].top, 1); // the vertical-align offset
     expect(block.classList.contains('ds-text-w500')).toBe(true);
     expect(block.getAttribute('data-font-size')).toBe('14');
     expect(block.getAttribute('data-overflow')).toBeNull();
     expect(container.querySelector('.ds-text-badge')).toBeNull();
     expect(block.getAttribute('style').split(';').filter(Boolean).length).toBeLessThanOrEqual(8); // perf: few style writes per node
+    expect(css).toMatch(/\.ds-text\s*\{[^}]*white-space:\s*pre/);
   });
 
   test('textContent keeps the words apart across lines (copy, search and tests read it)', () => {
     const { container } = render(<TextBlock layout={layout} box={{ x: 0, y: 0, width: 80, height: 60 }} />);
-    expect(container.textContent.replace(/\s+/g, ' ').trim()).toBe('Customer Order Service');
+    expect(container.textContent.replace(/\s+/g, ' ').trim()).toBe('Customer Order Service'); // lines are separated by a newline, so words never fuse
   });
 
   test('a clamped layout shows an accent badge whose title is the full text, never silent', () => {
@@ -68,7 +73,11 @@ describe('TextBlock', () => {
     expect(badge.getAttribute('title')).toBe(C140);
     expect(badge.getAttribute('role')).toBe('button'); // keyboard reachable, with the full text on focus
     expect(badge.getAttribute('tabindex')).toBe('0');
+    expect(badge.querySelector('.ds-text-full')).toBeNull(); // the popover exists only while focused
+    act(() => badge.focus());
     expect(badge.querySelector('.ds-text-full').textContent).toBe(C140);
+    act(() => badge.blur());
+    expect(badge.querySelector('.ds-text-full')).toBeNull();
     expect(badge.getAttribute('aria-label')).toContain(C140);
     expect(container.querySelector('[data-text-block]').getAttribute('data-overflow')).toBe('true');
     expect(css).toMatch(/\.ds-text-badge\s*\{[^}]*pointer-events:\s*auto/); // hover works; the rest of the block never blocks the node
@@ -106,11 +115,10 @@ describe('migrated renderNodes', () => {
 
   test('Core frame and section: one-line title with an ellipsis and badge when it does not fit', () => {
     const f = draw('core', 'frame', C140, { size: { width: 200, height: 120 } });
-    const line = lineSpans(f)[0];
-    expect(line.textContent.trim().endsWith('\u{2026}')).toBe(true);
+    expect(lineSpans(f)[0].trim().endsWith('\u{2026}')).toBe(true);
     expect(f.container.querySelector('.ds-text-badge').getAttribute('title')).toBe(C140);
     const s = draw('core', 'section', C140, { size: { width: 200, height: 120 } });
-    expect(lineSpans(s)[0].textContent.trim().endsWith('\u{2026}')).toBe(true);
+    expect(lineSpans(s)[0].trim().endsWith('\u{2026}')).toBe(true);
   });
 
   test('ProcessFlow task keeps a column free for the type icon and wraps instead of clamping at 2 lines', () => {
@@ -127,7 +135,6 @@ describe('migrated renderNodes', () => {
     expect(spans.length).toBeLessThanOrEqual(3);
     expect(c.container.querySelector('.ds-node-label-below')).not.toBeNull();
     expect(c.container.querySelector('.ds-text-badge')).not.toBeNull(); // 140 chars cannot fit 3 lines of 120 px
-    for (const s of spans) expect(s.classList.contains('ds-text-line')).toBe(true);
   });
 
   test('ProcessFlow swimlane title is drawn rotated by the shared layout, one line', () => {

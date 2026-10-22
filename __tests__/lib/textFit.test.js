@@ -132,9 +132,11 @@ describe('text area geometry', () => {
     expect(back.height).toBeCloseTo(91, 6);
   });
 
-  test('inscribed boxes: ellipse 0.707, diamond 0.5', () => {
+  test('text rectangles: ellipse 0.78 x 0.58 (inside the outline), diamond 0.5', () => {
     const e = textBoxOf({ ...policyFor('core', stencil('core/circle').stencil), inset: { t: 0, r: 0, b: 0, l: 0 } }, { width: 100, height: 100 });
-    expect(e.width).toBeCloseTo(70.71, 1);
+    expect(e.width).toBeCloseTo(78, 1);
+    expect(e.height).toBeCloseTo(58, 1);
+    expect((e.width / 200) ** 2 + (e.height / 200) ** 2).toBeLessThanOrEqual(0.25 + 1e-9); // the corner is inside the circle
     const d = textBoxOf({ ...policyFor('core', stencil('core/diamond').stencil), inset: { t: 0, r: 0, b: 0, l: 0 } }, { width: 100, height: 60 });
     expect(d.width).toBeCloseTo(50, 5);
     expect(d.height).toBeCloseTo(30, 5);
@@ -231,6 +233,13 @@ describe('render-time layout of a stored element', () => {
 
 describe('circles keep short words whole (M1)', () => {
   const circle = () => ({ packId: 'core', policy: policyFor('core', stencil('core/circle').stencil) });
+  test('a two-word label keeps each word whole in the default circle at 11 px or more', () => {
+    const { policy } = circle();
+    const { layout } = layoutForElement({ label: 'Customer Order', size: { width: 80, height: 80 } }, policy);
+    expect(layout.breaks.emergency).toBe(0);
+    expect(layout.lines.map((l) => l.text).join(' ')).toBe('Customer Order');
+  });
+
   test.each(['Approve', 'Inventory', 'Customer', 'Billing', 'Dashboard'])('"%s" in the default 80 px circle is one line, not hyphenated', (word) => {
     const { policy } = circle();
     const { layout } = layoutForElement({ label: word, size: { width: 80, height: 80 } }, policy);

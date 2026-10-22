@@ -95,7 +95,7 @@ describe('Core diamond', () => {
     });
     // small diamonds clamp the text (ADR-0008) but never lose it: the badge's title holds the full label
     const full = container.textContent + [...container.querySelectorAll('[title]')].map((n) => n.getAttribute('title')).join(' ');
-    expect(full.replace(/- /g, '')).toContain('Label diamond'); // an emergency break draws a hyphen at the line end
+    expect(full.replace(/-\n/g, '').replace(/\s+/g, ' ')).toContain('Label diamond'); // an emergency break draws a hyphen at the line end
   });
 });
 

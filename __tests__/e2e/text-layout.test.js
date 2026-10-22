@@ -53,14 +53,21 @@ describe('Text layout and autosizing (ADR-0008 T1)', () => {
   /** One record per node: its box, every text line's rect, font sizes and whether a badge accompanies a clamp. */
   const geometry = (page) => page.evaluate(() => [...document.querySelectorAll('[data-node-id]')].map((n) => {
     const nr = n.getBoundingClientRect();
-    const lines = [...n.querySelectorAll('.ds-text-line')].map((l) => {
-      const r = l.getBoundingClientRect();
-      const range = document.createRange();
-      range.selectNodeContents(l);
-      const t = range.getBoundingClientRect();
-      return { text: l.textContent.trim(), left: t.left - nr.left, right: nr.right - t.right, top: t.top - nr.top, bottom: nr.bottom - t.bottom, w: t.width, font: parseFloat(getComputedStyle(l).fontSize), spanLeft: r.left };
-    });
-    return { id: n.getAttribute('data-node-id'), type: n.getAttribute('data-type'), label: (n.querySelector('.ds-text-line') || {}).textContent, w: nr.width, h: nr.height, lines, overflow: !!n.querySelector('[data-overflow="true"]'), badge: !!n.querySelector('.ds-text-badge'), below: !!n.querySelector('.ds-node-label-below') };
+    // each text block is one text node of newline-joined lines (or line spans for RTL): measure every line box with a Range
+    const lines = [];
+    for (const block of n.querySelectorAll('[data-text-block]')) {
+      const font = parseFloat(getComputedStyle(block).fontSize);
+      const spans = [...block.querySelectorAll(':scope > .ds-text-line')];
+      const texts = spans.length ? spans.map((x) => x.textContent.replace(/\n$/, '')) : [...block.childNodes].filter((c) => c.nodeType === 3).map((c) => c.nodeValue).join('').split('\n');
+      const rects = [];
+      if (spans.length) spans.forEach((x) => { const r = document.createRange(); r.selectNodeContents(x); const b2 = r.getBoundingClientRect(); rects.push(b2); });
+      else {
+        const tn = [...block.childNodes].find((c) => c.nodeType === 3);
+        if (tn) { const r = document.createRange(); r.selectNodeContents(tn); for (const b2 of r.getClientRects()) if (b2.width > 0) rects.push(b2); }
+      }
+      texts.forEach((t, i) => { const t2 = rects[i] || rects[rects.length - 1] || nr; lines.push({ text: t.trim(), left: t2.left - nr.left, right: nr.right - t2.right, top: t2.top - nr.top, bottom: nr.bottom - t2.bottom, w: t2.width, font }); });
+    }
+    return { id: n.getAttribute('data-node-id'), type: n.getAttribute('data-type'), label: (lines[0] || {}).text, w: nr.width, h: nr.height, lines, overflow: !!n.querySelector('[data-overflow="true"]'), badge: !!n.querySelector('.ds-text-badge'), below: !!n.querySelector('.ds-node-label-below') };
   }));
 
   beforeAll(async () => {
@@ -172,7 +179,8 @@ describe('Text layout and autosizing (ADR-0008 T1)', () => {
     await page.click(r2);
     await page.waitForSelector('[data-testid="fit-to-text"]', { timeout: 10000 });
     await page.click('[data-testid="fit-to-text"]');
-    await sleep(600);
+    await page.waitForFunction((sel) => document.querySelector(sel).offsetWidth > 120, { timeout: 10000 }, r2).catch(() => {});
+    await sleep(300);
     const after = await page.$eval(r2, (n) => ({ w: n.offsetWidth, h: n.offsetHeight }));
     expect(after.w).toBeGreaterThan(120);
     expect(after.h).toBeGreaterThan(80);

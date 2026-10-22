@@ -601,10 +601,10 @@ function renderNode(element, stencil, isSelected) {
   if (!shape) return shape;
   const kind = stencil?.id === 'boundary' ? 'title' : stencil?.id === 'summary' ? 'external' : 'inside';
   return (
-    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <>
       <SvgNodeFrame element={element} stencil={stencil}>{shape}</SvgNodeFrame>
       <ElementText packId="mind-map" element={element} stencil={stencil} kind={kind} text={element.label || ''} color={element.textColor || labelColorFor(element, stencil)} pill />
-    </div>
+    </>
   );
 }
 
