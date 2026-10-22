@@ -4,7 +4,8 @@
 
 import { useMemo } from 'react';
 import { policyFor } from '../../../lib/text/policy';
-import { layoutForElement, layoutForExternal, layoutForTitle, labelOf } from '../../../lib/text/fit';
+import { layoutForElement, layoutForExternal, layoutForSlot, layoutForTitle, labelOf } from '../../../lib/text/fit';
+import { MONO_FAMILY } from '../../../lib/text/tokens';
 import TextBlock from './TextBlock';
 
 /** The element's stencil policy (packs pass the stencil their registry resolved). */
@@ -48,6 +49,37 @@ export function ElementText({ element, stencil, kind = 'inside', text, color, of
       pill={pill}
       className={className}
       testId={kind}
+    />
+  );
+}
+
+/**
+ * A named text slot of a node (compartment, header strip, stereotype, badge text) at an explicit rectangle in node
+ * coordinates. Memoized on its parts, so re-rendering with the same element recomputes nothing. See layoutForSlot
+ * (lib/text/fit.js) for the fields; `color` is the text color the renderer knows from its fill.
+ */
+export function SlotText({ element, text, box, role, mode, maxLines, align, valign, own, mono, rotate, size, weight, color, pill, className, testId = 'slot' }) {
+  const bx = box.x;
+  const by = box.y;
+  const bw = box.width;
+  const bh = box.height;
+  const { layout, box: b } = useMemo(
+    () => layoutForSlot(element, { text, box: { x: bx, y: by, width: bw, height: bh }, role, mode, maxLines, align, valign, own, mono, rotate, size, weight }),
+    [element, text, bx, by, bw, bh, role, mode, maxLines, align, valign, own, mono, rotate, size, weight],
+  );
+  if (!layout.lines.length) return null;
+  return (
+    <TextBlock
+      layout={layout}
+      box={b}
+      rotate={b.rotate}
+      color={color}
+      fontFamily={mono ? MONO_FAMILY : own ? element.fontFamily : undefined}
+      fontStyle={own ? element.fontStyle : undefined}
+      textDecoration={own ? element.textDecoration : undefined}
+      pill={pill}
+      className={className}
+      testId={testId}
     />
   );
 }
