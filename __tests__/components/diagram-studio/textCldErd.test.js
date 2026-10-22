@@ -125,20 +125,25 @@ describe('ERD entity compartments', () => {
   const entity = ERDPack.stencils.find((s) => s.id === 'entity');
   const fields = (n) => Array.from({ length: n }, (_, i) => ({ name: `field_${i}`, dataType: 'VARCHAR(255)', isPrimaryKey: i === 0 }));
 
-  test('L3: a row gives its type its measured width first (shown whole) and clamps the name, the badge sits in its own column', () => {
-    const f = [{ name: 'order_total_including_vat_and_shipping', dataType: 'decimal(12,2)' }];
+  test('L3: the name keeps at least half of a clamped row, the type is ellipsized first, ONE badge per row sits in the badge column', () => {
+    const f = [{ name: 'order_total_including_vat_and_shipping', dataType: 'decimal(12,2)' }, { name: 'id', dataType: 'uuid' }];
     const c = draw('erd', entity, 'Orders', { data: { fields: f } });
-    const type = c.container.querySelector('[data-text-block="field-type"]');
-    const name = c.container.querySelector('[data-text-block="field"]');
-    expect(type.textContent).toBe('decimal(12,2)');
-    expect(type.getAttribute('data-overflow')).toBeNull();
+    const rows = [...c.container.querySelectorAll('.erd-field')];
+    const long = rows[0];
+    const name = long.querySelector('[data-text-block="field"]');
+    const type = long.querySelector('[data-text-block="field-type"]');
+    expect(long.querySelectorAll('.ds-text-badge')).toHaveLength(1);
+    expect(long.querySelector('.erd-row-badge .ds-text-badge')).not.toBeNull();
+    expect(name.querySelector('.ds-text-badge')).toBeNull();
+    expect(type.querySelector('.ds-text-badge')).toBeNull();
     expect(name.getAttribute('data-overflow')).toBe('true');
-    expect(name.textContent.replace(/\u22EF$/, '').endsWith('\u2026')).toBe(true);
-    // the badge column: the clamped block is 18 px narrower than the room and the badge hangs right after it
-    expect(name.className).toMatch(/erd-cell/);
-    const left = parseFloat(name.style.left);
-    const w = parseFloat(name.style.width);
-    expect(left + w + 18).toBeLessThanOrEqual(parseFloat(type.style.left) + 1); // never over the type column
+    expect(parseFloat(name.style.width)).toBeGreaterThanOrEqual((parseFloat(name.style.width) + parseFloat(type.style.width)) / 2 - 1);
+    expect(parseFloat(name.style.left) + parseFloat(name.style.width)).toBeLessThanOrEqual(parseFloat(type.style.left) + 1);
+    // a row that fits has no badge and shows both whole
+    const ok = rows[1];
+    expect(ok.querySelectorAll('.ds-text-badge')).toHaveLength(0);
+    expect(ok.querySelector('[data-text-block="field"]').textContent).toBe('id');
+    expect(ok.querySelector('[data-text-block="field-type"]').textContent).toBe('uuid');
   });
 
   test('the name is the first slot; attribute rows are mono role-meta (11 px) blocks', () => {
@@ -165,7 +170,11 @@ describe('ERD entity compartments', () => {
     expect(c.container.textContent).toMatch(/\+\d+ more/);
     const clamped = blocks(c).filter((b) => b.getAttribute('data-overflow') === 'true');
     expect(clamped.length).toBeGreaterThan(0);
-    clamped.forEach((b) => expect(b.querySelector('.ds-text-badge').getAttribute('title')).toMatch(/\w/));
+    // one badge per clamped row, in the row's badge column, carrying the full name and type
+    const badges = [...c.container.querySelectorAll('.erd-field .erd-row-badge .ds-text-badge')];
+    expect(badges.length).toBeGreaterThan(0);
+    badges.forEach((b) => expect(b.getAttribute('title')).toMatch(/\w/));
+    expect(c.container.querySelector('.erd-field [data-text-block] .ds-text-badge')).toBeNull();
   });
 
   test('a small legacy card never lets the name header swallow the card: it clamps with the badge', () => {

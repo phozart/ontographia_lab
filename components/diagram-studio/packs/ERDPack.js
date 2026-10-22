@@ -5,7 +5,7 @@ import React, { useMemo } from 'react';
 import { DiamondNode } from './CorePack';
 import { normalizeFields, visibleRows, ERD_HEADER_H, ERD_ROW_H, ERD_INDEX_H } from './erdFields';
 import { ElementText, SlotText } from '../text/useTextLayout';
-import TextBlock from '../text/TextBlock';
+import TextBlock, { OverflowBadge } from '../text/TextBlock';
 import { layoutForSlot } from '../../../lib/text/fit';
 import { stencils, connectionTypes } from './catalog/erd';
 
@@ -345,23 +345,23 @@ function useEntityHeader(element, label, innerW, badgeW, maxH) {
 }
 
 // A field row: a pk/fk tinted strip with the key icons, then the name and the type as slots in the row
-const BADGE_W = 18; // the overflow badge of a clamped cell sits in its own 18 px column, never over the text
+const BADGE_W = 18; // ONE overflow badge per row, in its own column at the right end of the row, never inside a text column
 const probe = (element, text, width, align) => layoutForSlot(element, { text, box: { x: 0, y: 0, width, height: ERD_ROW_H }, role: 'meta', mono: true, align, maxLines: 1 }).layout;
 
-// Column widths of a row (L3): the type column gets its measured width first (up to what leaves the name 40 px), the name
-// takes the rest; a clamped cell keeps a badge column right after its text.
+// Column widths of a row: the name is the key information. Whole when both fit; otherwise the name takes what the type does
+// not need but at least half of the row (or its measured width when smaller), and the TYPE is ellipsized first. The row is
+// already at the 11 px minimum (role meta). A clamped row reserves the badge column.
 function rowColumns(element, name, type, innerW) {
   const nameX = 10 + 20 + 6;
-  const avail = innerW - nameX - 10 - 8;
+  const avail0 = innerW - nameX - 10 - 8;
   const nat = (t) => Math.ceil(probe(element, t, 2000, 'start').width) + 2;
   const nw = nat(name);
   const tw = type ? nat(type) : 0;
-  const typeW = Math.max(0, Math.min(tw, avail - 40));
-  const nameW = Math.max(40, avail - typeW);
-  const cell = (text, w, align) => (probe(element, text, w, align).overflow ? { w: Math.max(20, w - BADGE_W), clamped: true } : { w, clamped: false });
-  const n = cell(name, nameW, 'start');
-  const t = type ? cell(type, typeW, 'end') : { w: 0, clamped: false };
-  return { nameX, nameW: n.w, typeW: t.w, typeFull: typeW, nw };
+  if (nw + tw <= avail0) return { nameX, nameW: nw, typeW: tw, typeFull: tw, clamped: false, badgeX: 0 };
+  const avail = avail0 - BADGE_W;
+  const nameW = Math.max(40, Math.min(nw, Math.max(avail / 2, avail - tw)));
+  const typeW = type ? Math.max(0, avail - nameW) : 0;
+  return { nameX, nameW, typeW, typeFull: typeW, clamped: true, badgeX: innerW - 10 - BADGE_W };
 }
 
 // A field row: a pk/fk tinted strip with the key icons, then the name and the type as slots in the row
@@ -370,6 +370,7 @@ function FieldRow({ element, field, y, innerW }) {
   const type = `${keys}${field.dataType || ''}${field.isNullable === false ? ' *' : ''}`.trim();
   const cols = rowColumns(element, field.name || '', type, innerW);
   const { nameX, nameW, typeW, typeFull } = cols;
+  const typeX = cols.clamped ? innerW - 10 - BADGE_W - typeFull : innerW - 10 - typeFull;
   return (
     <div className={`erd-field ${field.isPrimaryKey ? 'pk' : ''} ${field.isForeignKey ? 'fk' : ''}`} style={{ top: y }}>
       <span className="erd-field-icons">
@@ -377,8 +378,13 @@ function FieldRow({ element, field, y, innerW }) {
         {field.isForeignKey && <span className="erd-fk-icon" title="Foreign Key">🔗</span>}
         {!field.isPrimaryKey && !field.isForeignKey && <span className="erd-field-spacer">•</span>}
       </span>
-      <SlotText element={element} text={field.name || ''} box={{ x: nameX, y: 0, width: nameW, height: ERD_ROW_H }} role="meta" mono align="start" maxLines={1} color="var(--text, #1f2937)" className="erd-cell" testId="field" />
-      <SlotText element={element} text={type} box={{ x: innerW - 10 - typeFull, y: 0, width: typeW, height: ERD_ROW_H }} role="meta" mono align="end" maxLines={1} color="var(--text-muted, #6b7280)" className="erd-cell" testId="field-type" />
+      <SlotText element={element} text={field.name || ''} box={{ x: nameX, y: 0, width: nameW, height: ERD_ROW_H }} role="meta" mono align="start" maxLines={1} color="var(--text, #1f2937)" className="erd-cell" hideBadge testId="field" />
+      <SlotText element={element} text={type} box={{ x: typeX, y: 0, width: typeW, height: ERD_ROW_H }} role="meta" mono align="end" maxLines={1} color="var(--text-muted, #6b7280)" className="erd-cell" hideBadge testId="field-type" />
+      {cols.clamped && (
+        <span className="erd-row-badge" style={{ left: cols.badgeX }}>
+          <OverflowBadge text={`${field.name || ''}  ${type}`.trim()} />
+        </span>
+      )}
     </div>
   );
 }

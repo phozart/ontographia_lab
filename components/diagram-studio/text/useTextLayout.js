@@ -58,7 +58,7 @@ export function ElementText({ element, stencil, kind = 'inside', text, color, of
  * coordinates. Memoized on its parts, so re-rendering with the same element recomputes nothing. See layoutForSlot
  * (lib/text/fit.js) for the fields; `color` is the text color the renderer knows from its fill.
  */
-export function SlotText({ element, text, box, role, mode, maxLines, align, valign, own, mono, rotate, size, weight, color, pill, className, testId = 'slot' }) {
+export function SlotText({ element, text, box, role, mode, maxLines, align, valign, own, mono, rotate, size, weight, color, pill, className, hideBadge, testId = 'slot' }) {
   const bx = box.x;
   const by = box.y;
   const bw = box.width;
@@ -79,6 +79,7 @@ export function SlotText({ element, text, box, role, mode, maxLines, align, vali
       textDecoration={own ? element.textDecoration : undefined}
       pill={pill}
       className={className}
+      hideBadge={hideBadge}
       testId={testId}
     />
   );

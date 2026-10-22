@@ -46,3 +46,21 @@ describe('ring text box', () => {
     expect(sizeForNewElement('cld', stencil, 'R', {})).toEqual({ width: 50, height: 50 });
   });
 });
+
+describe('ring labels shrink before hyphenating (review round 3)', () => {
+  test('a word that fits a line of the ring is never hyphenated: is cut with an ellipsis and the badge instead (wide two-line chord, 11 px)', () => {
+    const { layout } = layoutForElement({ label: LONG, size: { width: 120, height: 80 } }, policy);
+    expect(layout.fontSize).toBe(MIN_SIZE);
+    expect(layout.lines.some((l) => l.hyphen)).toBe(false);
+    expect(layout.lines.map((l) => l.text).join(' ')).toMatch(/^R1 Escal/); // the 2nd line ends in the ellipsis, never in a hyphen
+    expect(layout.lines).toHaveLength(2);
+    expect(layout.overflow).toBeTruthy();
+  });
+
+  test('a word wider than any line of the ring is still hyphenated (nothing else is possible)', () => {
+    const { layout } = layoutForElement({ label: 'Supercalifragilisticexpialidocious', size: { width: 50, height: 50 } }, policy);
+    expect(layout.fontSize).toBe(MIN_SIZE);
+    expect(layout.lines.some((l) => l.hyphen) || !!layout.overflow).toBe(true);
+  });
+});
+

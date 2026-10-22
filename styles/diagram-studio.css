@@ -788,7 +788,9 @@
 .ds-text-badge:focus-visible { outline: 2px solid var(--accent, #4FB3CE); outline-offset: 1px; }
 .ds-text-badge-pill { right: 2px; }
 /* a clamped table-like cell (ERD rows): the badge sits in its own column right after the text, centered on the row */
-.erd-cell .ds-text-badge { right: -18px; bottom: auto; top: 50%; transform: translateY(-50%); }
+/* one badge per row, in the row's badge column; the cells themselves draw none */
+.erd-row-badge { position: absolute; top: 0; width: 18px; height: 100%; }
+.erd-row-badge .ds-text-badge { right: 2px; bottom: auto; top: 50%; transform: translateY(-50%); }
 /* SVG text drawn from the shared layout (connection and endpoint labels): pinned tspans, never re-wrapped */
 .ds-svg-text {
   pointer-events: none;

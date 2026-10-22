@@ -75,7 +75,7 @@ describe('ERD row capacity', () => {
     const { container } = render(<div>{ERDPack.renderNode({ ...el(160), data: { fields: f } }, stencil, false)}</div>);
     const type = container.querySelector('[data-text-block="field-type"]');
     expect(type.getAttribute('data-overflow')).toBe('true');
-    expect(type.querySelector('.ds-text-badge').getAttribute('title')).toBe('x'.repeat(80));
+    expect(container.querySelector('.erd-row-badge .ds-text-badge').getAttribute('title')).toBe('id  x'.concat('x'.repeat(79)));
     expect(container.querySelector('[data-text-block="field"]').textContent).toBe('id');
   });
 });
