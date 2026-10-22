@@ -354,6 +354,11 @@ describe('Presentation panel', () => {
     expect(screen.getByTestId('pp-export-pdf')).toBeDisabled();
   });
 
+  test('an export note says what the export left out', () => {
+    panel({ exportNote: '1 slide exported; 2 skipped (hidden or missing).' });
+    expect(screen.getByTestId('pp-export-note')).toHaveTextContent('2 skipped');
+  });
+
   test('Escape closes; closed renders nothing', () => {
     const { props, rerender } = panel();
     fireEvent.keyDown(window, { key: 'Escape' });

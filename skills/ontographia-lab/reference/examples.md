@@ -36,3 +36,7 @@ User pastes meeting notes. Pick `mindmap` for themes or `flow` for steps, root f
 
 "Draw the architecture in this text, put it in a table, then summarize it." `map_structure` (`cluster` by domain) for the graph; `diagram_get` (`format: "outline"` is cheap, `compact` has the ids) for the element ids; one `table_create` with a row per component (`Component`, `Tier` as select, `Instances` as number, `Critical` as boolean), each row's `elementId` set to the component's element id and `anchor: {near: <a component id>}`; `diagram_show`; then write the summary in your reply. After the board changes, `table_update` with `key: "Component"` refreshes the rows instead of duplicating them.
 
+
+## Deck from existing frames (architecture review, research readout)
+
+"Make a presentation from the three frames on this board." `board_read_region` (or `diagram_get`) for the frame ids and their content, then plan the storyline: one frame per stop, in order. `presentation_create` (`title`), `slide_add` (`frameIds` in order, `fitAspect: true`), then `slide_update` with speaker `notes` per slide that cite what each frame shows. Tell the user to open Menu, Presentation and press Present (or Export PDF). If a stop has no frame yet, build it first (`map_structure` with `anchor: {inFrame}` or a `doc_create` / `table_create` inside a frame) and add that frame.

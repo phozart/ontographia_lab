@@ -58,6 +58,7 @@ export default function PresentationHost({ containerRef }) {
   elementsRef.current = elements;
   const [exporting, setExporting] = useState(null);
   const [exportError, setExportError] = useState(null);
+  const [exportNote, setExportNote] = useState(null);
   const abortRef = useRef(null);
   const linkTried = useRef(null);
   const [notice, setNotice] = useState(null);
@@ -123,6 +124,7 @@ export default function PresentationHost({ containerRef }) {
 
   const runExport = useCallback(async (presentationId, only) => {
     setExportError(null);
+    setExportNote(null);
     const resolved = resolveDeck(content, presentationId);
     if (!resolved) return;
     const title = resolved.presentation.title;
@@ -140,6 +142,9 @@ export default function PresentationHost({ containerRef }) {
           onProgress: (done, total) => setExporting({ done, total }),
         });
         downloadExport(result);
+        // the export reports what it left out (ADR-0007 5.1): hidden slides and slides whose frame was deleted
+        const skipped = resolved.slides.length - resolved.playable.length;
+        if (skipped > 0) setExportNote(`${result.pages} slide${result.pages === 1 ? '' : 's'} exported; ${skipped} skipped (hidden or missing).`);
       }
     } catch (e) {
       if (e?.name !== 'AbortError') setExportError(e?.message || 'The export failed.');
@@ -171,6 +176,7 @@ export default function PresentationHost({ containerRef }) {
         exporting={exporting}
         onCancelExport={() => abortRef.current?.abort()}
         exportError={exportError}
+        exportNote={exportNote}
       />
       {presenting && deck && (
         <PresentMode

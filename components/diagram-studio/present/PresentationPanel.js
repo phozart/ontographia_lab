@@ -73,11 +73,11 @@ function NotesField({ value, disabled, onCommit, label }) {
  *          patchPresentation: Function, addElement: Function, removeElement: Function, getLiveElements: () => object[], onPresent: (presentationId: string, index: number) => void,
  *          onExportPdf: (presentationId: string) => void, onExportPng: (presentationId: string, slideId: string) => void,
  *          onRevealFrame: (frame: object) => void, exporting: null | {done: number, total: number}, onCancelExport: () => void,
- *          exportError: string|null}} props
+ *          exportError: string|null, exportNote?: string|null}} props
  */
 export default function PresentationPanel({
   open, onClose, content, activeId, onActiveChange, canEdit, selectedFrameIds, patchPresentation, addElement, removeElement, getLiveElements,
-  onPresent, onExportPdf, onExportPng, onRevealFrame, exporting, onCancelExport, exportError,
+  onPresent, onExportPdf, onExportPng, onRevealFrame, exporting, onCancelExport, exportError, exportNote,
 }) {
   const panelRef = useRef(null);
   const [expanded, setExpanded] = useState(null); // slide id whose notes are open
@@ -174,6 +174,7 @@ export default function PresentationPanel({
           </div>
         )}
         {exportError && <p className="pp-error" role="alert">{exportError}</p>}
+        {exportNote && <p className="pp-muted" role="status" data-testid="pp-export-note">{exportNote}</p>}
         {message && <p className="pp-error" role="alert">{message}</p>}
 
         {canEdit && (

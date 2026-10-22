@@ -123,7 +123,7 @@ A slide is a frame that already exists on the board; a deck (presentation) is an
 
 ## Not available (do not promise)
 
-Long-form text goes in a doc and matrices in a table. Tables have no formulas, no `date` column type and no connectors to single rows (a connector attaches to the whole table). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
+Long-form text goes in a doc and matrices in a table. Tables have no formulas, no `date` column type and no connectors to single rows (a connector attaches to the whole table). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Decks (`presentation_create` and friends) only reference frames that already exist: there are no slide layouts, text boxes, themes, images, charts or PPTX export yet, `diagram_show` has no per-slide view, and presenting and exporting happen in the editor, not through you. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
 
 ## Reading large boards
 

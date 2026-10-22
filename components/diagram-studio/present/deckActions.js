@@ -2,7 +2,7 @@
 // Editor-side deck operations built on the same pure presentation_patch the MCP tools use (lib/present). They take
 // the context callbacks as arguments so they are testable without React.
 
-import { SLIDE_SIZES, nextSlidePosition, frameAspectOf, frameSize, coverSize, findPresentation } from '../../../lib/present/presentationModel';
+import { SLIDE_SIZES, nextSlidePosition, frameSize, coverSize } from '../../../lib/present/presentationModel';
 import { DEFAULT_ASPECT } from '../../../lib/present/presentationSchema';
 
 /** The deck "Add to presentation" targets: the active one if it still exists, else the first, else none. */
@@ -65,10 +65,9 @@ export function setFrameShape(frame, aspect, updateElement) {
   updateElement(frame.id, { size, data: { ...(frame.data || {}), aspect } });
 }
 
-/** Where to go after the deck changed under the presenter: the same slide id if it is still playable, else the nearest. */
+/** Keep a 0-based slide index inside the playable range (the deck can shrink under the presenter). */
 export function clampIndex(index, count) {
   if (count <= 0) return 0;
   return Math.min(Math.max(0, index), count - 1);
 }
 
-export { frameAspectOf, findPresentation };
