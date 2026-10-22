@@ -123,3 +123,21 @@ describe('connections', () => {
     expect(cullConnections(list, boxes, rect, { total: 10 })).toBe(list);
   });
 });
+
+describe('overview (level of detail)', () => {
+  const { shouldUseOverview, hitTestElements } = require('../../lib/render/viewportCulling');
+  test('overview below the zoom threshold or above the node budget', () => {
+    expect(shouldUseOverview(1, 100)).toBe(false);
+    expect(shouldUseOverview(0.1, 10)).toBe(true);
+    expect(shouldUseOverview(0.5, 801)).toBe(true);
+  });
+  test('hit test: topmost element wins, a frame only when nothing else is under the point', () => {
+    const f = { id: 'f', type: 'frame', x: 0, y: 0, size: { width: 500, height: 500 } };
+    const a = { id: 'a', x: 10, y: 10, size: { width: 100, height: 50 } };
+    const b = { id: 'b', x: 50, y: 20, size: { width: 100, height: 50 } };
+    expect(hitTestElements([f, a, b], 60, 30)?.id).toBe('b');
+    expect(hitTestElements([f, a, b], 20, 20)?.id).toBe('a');
+    expect(hitTestElements([f, a, b], 400, 400)?.id).toBe('f');
+    expect(hitTestElements([a, b], 400, 400)).toBeNull();
+  });
+});

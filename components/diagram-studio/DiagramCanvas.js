@@ -3,8 +3,9 @@
 // Handles rendering, pan/zoom, selection, drag, and connections
 
 import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
-import { cullWorldRect, visibleWorldRect, cullElements, cullConnections, boxIndex } from '../../lib/render/viewportCulling';
+import { cullWorldRect, visibleWorldRect, cullElements, cullConnections, boxIndex, shouldUseOverview, CULL_MIN_ELEMENTS } from '../../lib/render/viewportCulling';
 import { useCullingHold, notifyCullingCommitted } from './canvasCulling';
+import OverviewLayer from './OverviewLayer';
 import { generateId } from './utils/ids';
 import { createPortal } from 'react-dom';
 import {
@@ -5262,15 +5263,23 @@ export default function DiagramCanvas({
     if (connectSource?.elementId) keep.add(connectSource.elementId);
     return keep;
   }, [selection.nodeIds, selection.connectionIds, dragIds, editingLabelId, editingConnectionId, connectSource]);
-  const mountedElements = useMemo(
+  const nearElements = useMemo(
     () => cullElements(zOrdered, cullRect, { sizeOf: sizeOfEl, keepIds: cullKeepIds }),
     [zOrdered, cullRect, sizeOfEl, cullKeepIds]
   );
-  const boxById = useMemo(() => (cullRect ? boxIndex(elements, sizeOfEl) : null), [cullRect, elements, sizeOfEl]);
-  const mountedConnections = useMemo(
-    () => (cullRect ? cullConnections(visibleConnections, boxById, cullRect, { keepIds: cullKeepIds, total: elements.length }) : visibleConnections),
-    [cullRect, visibleConnections, boxById, cullKeepIds, elements.length]
+  // Level of detail: zoomed far out, or more nodes near the viewport than are sensible to mount, draws one static
+  // overview image instead (see OverviewLayer). Never while a capture holds the board mounted.
+  const overview = !!cullRect && elements.length >= CULL_MIN_ELEMENTS && !cullHold.full && !cullHold.rect && shouldUseOverview(viewport.scale, nearElements.length);
+  const mountedElements = useMemo(
+    () => (overview ? zOrdered.filter((el) => cullKeepIds.has(el.id)) : nearElements),
+    [overview, zOrdered, nearElements, cullKeepIds]
   );
+  const boxById = useMemo(() => (cullRect ? boxIndex(elements, sizeOfEl) : null), [cullRect, elements, sizeOfEl]);
+  const mountedConnections = useMemo(() => {
+    if (!cullRect) return visibleConnections;
+    if (overview) return visibleConnections.filter((c) => cullKeepIds.has(c.id) || cullKeepIds.has(c.sourceId) || cullKeepIds.has(c.targetId));
+    return cullConnections(visibleConnections, boxById, cullRect, { keepIds: cullKeepIds, total: elements.length });
+  }, [cullRect, overview, visibleConnections, boxById, cullKeepIds, elements.length]);
   // shared by every mounted connection (each used to scan all elements and look up stencils to find its obstacles)
   const elementsById = useMemo(() => new Map(visibleElements.map((el) => [el.id, el])), [visibleElements]);
   const obstacleRects = useMemo(() => {
@@ -5664,6 +5673,18 @@ export default function DiagramCanvas({
           </svg>
 
           {/* Nodes Layer - sorted by zIndex for proper layering, filtered for collapsed */}
+          {overview && (
+            <OverviewLayer
+              elements={zOrdered}
+              connections={visibleConnections}
+              theme={boardTheme}
+              viewport={viewport}
+              canvasRef={canvasRef}
+              selectedIds={selection.nodeIds}
+              sizeOf={sizeOfEl}
+              onSelect={(id, shift) => (shift ? toggleElementSelection(id) : selectElement(id))}
+            />
+          )}
           {mountedElements.map(element => (
             <MemoNode
               key={element.id}

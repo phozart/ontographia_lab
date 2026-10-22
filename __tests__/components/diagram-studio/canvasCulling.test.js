@@ -1,7 +1,7 @@
 // Viewport culling in the real canvas: off-screen nodes are not mounted, a held capture mounts them, selection keeps
 // a node mounted, small boards are never culled.
 import React from 'react';
-import { render, act } from '@testing-library/react';
+import { render, act, fireEvent } from '@testing-library/react';
 import { DiagramProvider, useDiagram, useDiagramSelection } from '../../../components/diagram-studio/DiagramContext';
 import DiagramCanvas from '../../../components/diagram-studio/DiagramCanvas';
 import { suspendCulling } from '../../../components/diagram-studio/canvasCulling';
@@ -103,5 +103,20 @@ describe('viewport culling in the canvas', () => {
     const ids = [...container.querySelectorAll('[data-connection-id]')].map((n) => n.getAttribute('data-connection-id'));
     expect(ids).toContain('span');
     expect(ids).not.toContain('away');
+  });
+
+  test('zoomed far out it draws one overview image instead of mounting nodes; a click selects by geometry; zooming in hands back', () => {
+    global.URL.createObjectURL = jest.fn(() => 'blob:overview');
+    global.URL.revokeObjectURL = jest.fn();
+    const { container } = mount(400);
+    act(() => { api.setViewport({ x: 0, y: 0, scale: 0.1 }); });
+    expect(container.querySelector('[data-testid="board-overview"]')).not.toBeNull();
+    expect(mounted(container).length).toBe(0);
+    fireEvent.click(container.querySelector('[data-testid="board-overview"]'), { clientX: 5, clientY: 2 });
+    expect(sel.selection.nodeIds).toEqual(['n0']);
+    expect(mounted(container)).toEqual(['n0']); // the selected node is mounted, nothing else
+    act(() => { api.setViewport({ x: 0, y: 0, scale: 1 }); });
+    expect(container.querySelector('[data-testid="board-overview"]')).toBeNull();
+    expect(mounted(container).length).toBeGreaterThan(5);
   });
 });
