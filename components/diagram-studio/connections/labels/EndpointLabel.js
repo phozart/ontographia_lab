@@ -1,8 +1,11 @@
 // components/diagram-studio/connections/labels/EndpointLabel.js
 // Endpoint label component for connections (source/target labels - toolbar only per CLAUDE.md spec)
+// ADR-0008 T2: the lines come from the shared layout (11 px meta role); the background is the measured text plus padding.
 
-import React from 'react';
-import { calculateEndpointLabelPosition } from '../geometry/labelPositioning';
+import React, { useMemo } from 'react';
+import { calculateEndpointLabelPosition, placeEndpointLabel } from '../geometry/labelPositioning';
+import SvgTextBlock from '../../text/SvgTextBlock';
+import { endpointLabelLayout } from '../../../../lib/text/connectionLabel';
 
 /**
  * Endpoint label for connections (source or target)
@@ -19,22 +22,37 @@ export default function EndpointLabel({
   isSelected = false,
   showOnHover = true,
   isHovered = false,
+  otherPos,
+  nodes,
+  placed,
 }) {
+  // the room along the line between the two ends caps the width (it wraps instead of reaching a node)
+  const room = position && otherPos ? Math.hypot(otherPos.x - position.x, otherPos.y - position.y) : null;
+  const maxW = room === null ? undefined : Math.max(40, room - 8);
+  const own = useMemo(() => (placed ? null : endpointLabelLayout(value, maxW)), [placed, value, maxW]);
+  const box = placed ? placed.box : own;
+
   // Don't render if no value
   if (!value) return null;
 
   if (!position) return null;
 
   // Calculate offset position based on port direction
-  const offset = calculateEndpointLabelPosition(position, port, 12);
+  // Measured label dimensions
+  const { layout, width: labelWidth, height: labelHeight, textBox } = box;
 
-  // Calculate label dimensions
-  const labelWidth = Math.max(24, value.length * 7);
-  const labelHeight = 16;
+  // beside the line, never over a node (M1); without the other end, the legacy offset from the port
+  const offset = placed
+    ? placed.center
+    : otherPos && nodes
+    ? placeEndpointLabel(position, otherPos, { width: labelWidth, height: labelHeight }, nodes)
+    : calculateEndpointLabelPosition(position, port, 12);
 
   // Opacity based on selection/hover state
   // Per spec: 70-80% opacity when not selected
   const opacity = isSelected ? 0.95 : (isHovered && showOnHover) ? 0.85 : 0.7;
+  const x0 = offset.x - labelWidth / 2;
+  const y0 = offset.y - labelHeight / 2;
 
   return (
     <g
@@ -43,8 +61,8 @@ export default function EndpointLabel({
     >
       {/* Background rectangle */}
       <rect
-        x={offset.x - labelWidth / 2}
-        y={offset.y - labelHeight / 2}
+        x={x0}
+        y={y0}
         width={labelWidth}
         height={labelHeight}
         rx={3}
@@ -54,16 +72,13 @@ export default function EndpointLabel({
       />
 
       {/* Label text - smaller font than mid-label */}
-      <text
-        x={offset.x}
-        y={offset.y + 4}
-        textAnchor="middle"
-        fontSize={11}
+      <SvgTextBlock
+        layout={layout}
+        x={x0 + textBox.x}
+        y={y0 + textBox.y}
         fill={isSelected ? 'var(--accent)' : 'var(--text-muted)'}
-        style={{ pointerEvents: 'none' }}
-      >
-        {value}
-      </text>
+        testId="endpoint-label"
+      />
     </g>
   );
 }

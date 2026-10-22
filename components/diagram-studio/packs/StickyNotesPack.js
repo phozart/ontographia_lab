@@ -4,7 +4,7 @@
 import { cssUrl } from '../export/safeUrl';
 import { withBelowLabel } from './NodeLabels';
 import { stencils, connectionTypes } from './catalog/sticky-notes';
-import { ElementText } from '../text/useTextLayout';
+import { ElementText, SlotText } from '../text/useTextLayout';
 
 // ============ STENCILS ============
 
@@ -364,24 +364,7 @@ function LinkCardNode({ element, stencil }) {
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" strokeLinecap="round" />
       </svg>
       <ElementText packId="sticky-notes" element={element} stencil={stencil} text={label} color="#1e40af" offsetX={-1} offsetY={-1} />
-      {url && (
-        <span
-          title={url}
-          style={{
-            position: 'absolute',
-            left: 10,
-            right: 10,
-            bottom: 8,
-            fontSize: 11,
-            color: '#3b82f6',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {url}
-        </span>
-      )}
+      {url && <SlotText element={element} text={url} box={{ x: 10, y: Math.max(0, (element.size?.height || stencil?.defaultSize?.height || 80) - 22), width: Math.max(20, (element.size?.width || stencil?.defaultSize?.width || 200) - 20), height: 14 }} role="meta" maxLines={1} align="start" color="#3b82f6" testId="url" />}
     </div>
   );
 }

@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import { stencils, connectionTypes, COLORS, CAP_MATURITY_LEVELS, CAP_STRATEGIC_IMPORTANCE, CAP_INVESTMENT_LEVEL } from './catalog/capability-map';
+import { ElementText, SlotText } from '../text/useTextLayout';
+import { policyFor } from '../../../lib/text/policy';
 // components/diagram-studio/packs/CapabilityMapPack.js
 // Capability Map Pack - Stencils for capability modeling and operating model design
 
@@ -219,26 +222,8 @@ function CapabilityNode({ element, stencil, isSelected }) {
             strokeWidth="2"
           />
         </svg>
-        <div style={{
-          position: 'relative',
-          zIndex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          paddingLeft: point + 8,
-          paddingRight: point + 8,
-        }}>
-          <span style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#1f2937',
-            textAlign: 'center',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>{label}</span>
-        </div>
+        {/* the label sits between the two points (policy inset 23 px) */}
+        <ElementText packId="capability-map" element={element} stencil={stencil} text={label} color={element.textColor || '#1f2937'} />
       </div>
     );
   }
@@ -268,21 +253,9 @@ function CapabilityNode({ element, stencil, isSelected }) {
             fill={`${baseColor}15`}
           />
         </svg>
-        <div style={{
-          position: 'relative',
-          zIndex: 1,
-          padding: '6px 10px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-        }}>
-          <span style={{ fontSize: 14 }}>{stencil?.icon || '📁'}</span>
-          <span style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#1f2937',
-          }}>{label}</span>
-        </div>
+        <span style={{ position: 'absolute', left: 10, top: 6, fontSize: 14 /* ds-allow-text-style: icon glyph, not text */ }}>{stencil?.icon || '📁'}</span>
+        {/* one fixed line after the icon: ellipsis + badge with the full text when it does not fit */}
+        <ElementText packId="capability-map" element={element} stencil={stencil} kind="title" text={label} color={element.textColor || '#1f2937'} />
       </div>
     );
   }
@@ -293,21 +266,23 @@ function CapabilityNode({ element, stencil, isSelected }) {
       <div style={{
         width: '100%',
         height: '100%',
+        position: 'relative',
         background: '#fef3c7',
         borderRadius: 4,
-        padding: 8,
         boxShadow: '2px 2px 4px rgba(0,0,0,0.1)',
       }}>
-        <span style={{
-          fontSize: 11,
-          color: '#78716c',
-          whiteSpace: 'pre-wrap',
-        }}>{label || data.content || ''}</span>
+        <ElementText packId="capability-map" element={element} stencil={stencil} text={label || data.content || ''} color={element.textColor || '#78716c'} />
       </div>
     );
   }
 
   // Default card rendering for capabilities and other elements
+  const badge = type === 'cap-capability' && data.maturity
+    ? (CAP_MATURITY_LEVELS.find((l) => l.id === data.maturity)?.label || data.maturity)
+    : type === 'cap-gap' && data.severity
+      ? data.severity.charAt(0).toUpperCase() + data.severity.slice(1)
+      : '';
+  const badgeColor = type === 'cap-gap' ? getSeverityColor() : getMaturityColor();
   return (
     <div style={{
       width: '100%',
@@ -339,64 +314,39 @@ function CapabilityNode({ element, stencil, isSelected }) {
           rx="2"
         />
       </svg>
-      <div style={{
-        position: 'relative',
-        zIndex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        paddingLeft: 10,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 14 }}>{stencil?.icon || '🎯'}</span>
-          <span style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: '#1f2937',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-          }}>{label}</span>
-        </div>
-        {/* Show maturity badge for capabilities */}
-        {type === 'cap-capability' && data.maturity && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-          }}>
-            <span style={{
-              fontSize: 9,
-              padding: '2px 6px',
-              borderRadius: 10,
-              backgroundColor: `${getMaturityColor()}20`,
-              color: getMaturityColor(),
-              fontWeight: 600,
-            }}>
-              {CAP_MATURITY_LEVELS.find(l => l.id === data.maturity)?.label || data.maturity}
-            </span>
-          </div>
-        )}
-        {/* Show severity badge for gaps */}
-        {type === 'cap-gap' && data.severity && (
-          <span style={{
-            fontSize: 9,
-            padding: '2px 6px',
-            borderRadius: 10,
-            backgroundColor: `${getSeverityColor()}20`,
-            color: getSeverityColor(),
-            fontWeight: 600,
-            alignSelf: 'flex-start',
-          }}>
-            {data.severity.charAt(0).toUpperCase() + data.severity.slice(1)}
-          </span>
-        )}
-      </div>
+      <span style={{ position: 'absolute', left: 14, top: 0, bottom: 0, display: 'flex', alignItems: 'center', fontSize: 14 /* ds-allow-text-style: icon glyph, not text */ }}>{stencil?.icon || '🎯'}</span>
+      <CardText element={element} stencil={stencil} badge={badge} badgeColor={badgeColor} />
     </div>
   );
 }
+
+// Card label through the shared layout; a maturity or severity badge reserves its own line at the bottom
+function CardText({ element, stencil, badge, badgeColor }) {
+  const base = policyFor('capability-map', stencil);
+  const policy = useMemo(() => (badge ? { ...base, inset: { ...base.inset, b: BADGE_H + 12 } } : base), [base, badge]);
+  const { width, height } = element.size || stencil?.defaultSize || { width: 120, height: 60 };
+  return (
+    <>
+      <ElementText packId="capability-map" element={element} stencil={stencil} policy={policy} text={element.label || element.name || ''} color={element.textColor || '#1f2937'} />
+      {badge ? (
+        <SlotText
+          element={element}
+          text={badge}
+          box={{ x: base.inset.l, y: height - BADGE_H - 8, width: Math.max(20, width - base.inset.l - 10), height: BADGE_H }}
+          role="meta"
+          maxLines={1}
+          align="start"
+          valign="middle"
+          weight={600}
+          color={badgeColor}
+          testId="badge"
+        />
+      ) : null}
+    </>
+  );
+}
+
+const BADGE_H = 16;
 
 function renderNode(element, stencil, isSelected) {
   return <CapabilityNode element={element} stencil={stencil} isSelected={isSelected} />;

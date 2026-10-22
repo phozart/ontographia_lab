@@ -411,4 +411,55 @@ The 5,000-element initial render is slower in this environment because each labe
 
 - Windows and Safari font fallbacks (the CJK, emoji and Arabic class widths). Arabic and emoji boxes are roomy by design.
 - A real claude.ai session driving `fit_to_text`.
-- T2 packs keep their own text drawing; they only get the sizing rules (`policyFor` gives a generic policy of their shape).
+- T2 packs keep their own text drawing; they only get the sizing rules (`policyFor` gives a generic policy of their shape). *(Done in T2, section 17.)*
+
+## 17. As-built: slice T2 (2026-10-22)
+
+Branch `feat/t2-text-layout`. T2 moves the remaining packs (TOGAF, ITIL, CapabilityMap, ProductDesign, ERD, UML, CLD), the shared label helpers, connection labels and table cells onto the shared module. T3 (export and `diagram_show` parity, regression suite) and T4 (controls, level of detail) are untouched. Frames, sections, pools and lanes were already on `layoutForTitle` since T1; T2 adds title-slot tests for every container-like stencil.
+
+### 17.1 What shipped
+
+| Area | Files |
+| ---- | ----- |
+| Policies | one file per pack, `lib/text/policies/{togaf,itil,capability-map,product-design,erd,uml-class,cld}.js`, merged by `lib/text/policy.js`; building blocks in `lib/text/policyKit.js`. Every one of the 138 stencils has an explicit entry (a test asserts it) |
+| Slots | `layoutForSlot` and `layoutForList` (`lib/text/fit.js`), `SlotText` and `ListText` (`components/diagram-studio/text/useTextLayout.js`), `SvgTextBlock` (SVG twin of `TextBlock`), `titleBoxOf` honors `title.indent`, `externalBoxOf` honors `external.maxWidth` |
+| Renderers | the seven pack files, `NodeLabels.js` (the `nowrap` single-line path and `SvgBelowLabel` are gone), the link card of StickyNotes |
+| Connection labels | `lib/text/connectionLabel.js` (`connectionLabelLayout`, `endpointLabelLayout`), `connections/labels/{ConnectionLabel,EndpointLabel}.js`, `connections/Connection.js` (placement), `geometry/labelPositioning.js` |
+| Tables | `lib/table/tableModel.js` (`cellLayout`, `headerLayout`; `LAYOUT.charWidth` is gone), `elements/table/TableNode.js`, `lib/table/tableSvg.js` |
+| Lint | `__tests__/lib/packsTypeScale.test.js`: no numeric `fontSize`, CSS line clamp, `text-overflow`, `nowrap` or SVG `<text>` in `packs/` unless the line carries `ds-allow-text-style: why` (icon and emoji glyphs, a number in a badge) |
+
+### 17.2 Deviations from the design
+
+1. **Policies are per-pack files**, not one table, so each pack is edited in one place; `policyFor` is unchanged.
+2. **Compartments.** A UML class or ERD entity policy describes the NAME compartment (members never size the node). Member lists are one mono 11 px line per member, cut with an ellipsis, rows beyond the box behind the badge (`layoutForList`); a member never wraps, so two members cannot be confused. ERD names use `auto` (a long word grows the width), not `auto-height`.
+3. **Icons.** TOGAF, ITIL and capability cards reserve an icon column at the left (`inset.l`) and the label sits beside the icon, not under it. The oval motivation shapes use a rect with insets. Container headers use `title.indent`.
+4. **Role sizes.** Labels are now 14 px (600 for TOGAF and ITIL), so editor and `map_structure` boxes grow about 8% compared with the 11 and 12 px they had. Legacy boxes keep their stored size and shrink to 11 px or clamp with the badge.
+5. **CLD loop markers** are `shrink` with the badge (the in-code truncation `fitLoopLabel` is deleted); the loop arrow runs along the ring so the label has the whole inside. Flow, cloud and constant use an external label.
+6. **Connection labels** are SVG (`SvgTextBlock`): at most 200 px and 3 lines, background = measured lines + padding (8 and 4 px). A clamped label ends in an ellipsis and carries the full text as `<title>` (SVG has no badge). Placement: the midpoint, moved by `findNonOverlappingLabelPosition` when it would overlap a node; it now tries rings scaled to the label size (up to 4) and treats every node (the two endpoints with a 14 px margin, others 6 px) as an obstacle.
+7. **Tables.** Cell text is the shared layout at 12 px on the 17 px row line, at most 5 lines; row heights, the canvas and the SVG drawing (`diagram_show`) use the same lines. A word wider than a column is broken with a hyphen. A clamped cell shows an ellipsis and the full text as `title` (`data-text-overflow`). A select chip is one line (it used to count wrapped lines in the row height). The DOM text of a cell is now the pinned lines (a newline at each wrap), not the raw string.
+8. **P2** already delegated in T1.
+9. The full 187 stencils x 10 variants x 3 paths gallery test is T3. T2's acceptance is the audit harness (below) plus `__tests__/e2e/text-t2.test.js` (one MCP board per pack with long labels, a legacy board of every T2 stencil, connection labels, table cells) and the unit suites `textSlot`, `textT2Sizing`, `textT2Structure`, `textTitleSlots`, `connectionLabelText`, `tableCellText` and one component suite per pack group.
+
+### 17.3 Verification
+
+**Defect matrix** (audit harness on the seven T2 packs: 138 stencils x 10 variants = 1,380 nodes per path, 1379 x 985 headless Chrome; cells with at least one defect).
+
+| Path | Before | After |
+| ---- | ------ | ----- |
+| Editor, label typed (box sized by the editor rule) | 355 | **0** |
+| MCP `map_structure`, no sizes | 421 | **0** |
+| Legacy boards (stencil default sizes) | 660 | **0** |
+
+Before, editor path by code: CL 113, EL 113, OV 43, BL 19, NW 71, ML 116, SM 50, VA 3, PD 72. After there are zero of every code (spill, silent clipping, mid-word breaks, multi-line loss, padding under 3 px). No font is under 11 px (before: 9 and 10 px on 50 nodes). A clamp with its badge and tooltip is "indicated", not a defect: 127 cells on the editor and `map_structure` paths and 511 on legacy default sizes. External labels are bounded (at most `max(2w, 120)` wide, or 240 for one long word, at most 3 lines) and reserve their footprint in `map_structure`; the structure tests assert that boxes and footprints never overlap.
+
+**TOGAF and ITIL labels no longer hug the bottom border.** Labels within 6 px of the bottom edge, before to after: TOGAF editor 70 to 0, legacy 236 to 0; ITIL editor 30 to 0, legacy 82 to 0. The smallest gap is now 7 px.
+
+**Screenshots** (session scratchpad `t2/`): `before/<path>/<pack>/` and `after/<path>/<pack>/`, `z100-NN.png` and `z50-NN.png`; e2e screenshots in `t2/e2e-shots/`.
+
+**Performance** (production build, 500 elements from every pack, 120 connections of which 60 are labelled, a busy laptop, best of the valid runs of three): time to all nodes 6.04 s on main and 6.13 s on this branch (+1.6%, within the run-to-run spread of about 8%); main-thread task time 5.4 s and 5.25 s. No extra layout calls while panning (labels are cached by the layout LRU).
+
+### 17.4 Not verified or not done
+
+- Windows and Safari font fallbacks; a real claude.ai session driving T2 stencils.
+- Connection labels and table cells in PNG/PDF export were not compared pixel for pixel (T3).
+- A table cell's copied DOM text contains the wrap newlines (the table copy and export actions copy the data, not the DOM).
