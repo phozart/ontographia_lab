@@ -6,6 +6,7 @@ import { tableProblem } from '../../../lib/table/tableSchema';
 
 import { isUnsafeUrlValue } from '../../../lib/safeUrl';
 import { validateDocElements } from '../../../lib/doc/docElement';
+import { validatePresentations } from '../../../lib/present/presentationSchema';
 import {
   MAX_CONTENT_BYTES, MAX_ELEMENTS, MAX_CONNECTIONS, MAX_COLLECTION, MAX_DEPTH, FORBIDDEN_KEYS, CONTENT_KEYS,
 } from '../../../lib/diagramLimits';
@@ -39,6 +40,8 @@ export function buildExportEnvelope(diagram = {}, now = new Date()) {
     layers: diagram.layers || [],
     groups: diagram.groups || [],
   };
+  // ADR-0007: decks travel with the board (a slide references its frame by id, so the ids are kept)
+  if (Array.isArray(diagram.presentations) && diagram.presentations.length) content.presentations = diagram.presentations;
   if (diagram.viewport) content.viewport = diagram.viewport;
   return {
     format: FORMAT_ID,
@@ -191,6 +194,12 @@ export function sanitizeContent(rawContent) {
     layers: asList(rawContent.layers),
     groups: asList(rawContent.groups),
   };
+  // Presentations (ADR-0007): kept when they pass the server schema, dropped with a warning when they do not
+  if (rawContent.presentations !== undefined) {
+    const pres = validatePresentations(rawContent.presentations);
+    if (pres.ok && pres.presentations && pres.presentations.length) content.presentations = pres.presentations;
+    else if (!pres.ok) warnings.push('The presentations in this file were not valid and were skipped.');
+  }
   const viewport = sanitizeViewport(rawContent.viewport);
   if (viewport) content.viewport = viewport;
   // Everything else at the top level is intentionally dropped.

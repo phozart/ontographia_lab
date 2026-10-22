@@ -208,6 +208,49 @@ dbDescribe('diagramRepository.applyContentChange (throwaway database)', () => {
     expect((await head(id)).content.elements.map((e) => e.id)).toEqual(['a']);
   });
 
+  test('deck tools (ADR-0007 P1) through the same path: one agent version and one audit row per call, restore brings back the deck order', async () => {
+    const { compilePresentationCreate, compileSlideAdd, compileSlideReorder, compileSlideUpdate } = require('../../lib/mcp/deckTools');
+    const frame = (fid, x) => ({ id: fid, type: 'frame', packId: 'core', isFrame: true, label: fid, x, y: 0, size: { width: 1920, height: 1080 }, layerId: 'default', properties: {} });
+    const id = await newDiagram({ ...content(['a']), elements: [frame('fa', 0), frame('fb', 2000), frame('fc', 4000)] });
+    const tokenId = crypto.randomUUID();
+    const via = { ...actor(), tokenId };
+    const run = (expectedRevision, tool, compute) => repo.applyContentChange(id, { expectedRevision, userId: user.id, actor: via, tool, compute });
+
+    const made = await run(0, 'presentation_create', (c) => compilePresentationCreate(c, { title: 'Review' }));
+    expect(made.status).toBe('ok');
+    const presentationId = made.result.presentationId;
+    const added = await run(1, 'slide_add', (c) => compileSlideAdd(c, { presentationId, frameIds: ['fa', 'fb', 'fc'], notes: 'Intro' }));
+    expect(added.status).toBe('ok');
+    const [s1, s2, s3] = added.result.slideIds;
+    const order = async () => (await head(id)).content.presentations[0].slides.map((s) => s.id);
+    expect(await order()).toEqual([s1, s2, s3]);
+
+    const re = await run(2, 'slide_reorder', (c) => compileSlideReorder(c, { presentationId, slideIds: [s3, s1, s2] }));
+    expect(re.status).toBe('ok');
+    const note = await run(3, 'slide_update', (c) => compileSlideUpdate(c, { presentationId, slideId: s2, notes: 'Funnel' }));
+    expect(note.status).toBe('ok');
+    expect(await order()).toEqual([s3, s1, s2]);
+
+    // a wrong ordering writes nothing: no version, no audit row, revision unchanged
+    const bad = await run(4, 'slide_reorder', (c) => compileSlideReorder(c, { presentationId, slideIds: [s3] }));
+    expect(bad.status).toBe('rejected');
+    expect((await head(id)).rev).toBe(4);
+
+    const v = await vers(id);
+    expect(v.map((x) => x.via)).toEqual(['system', 'agent', 'agent', 'agent', 'agent']);
+    const audit = (await pg.query("select target from audit_events where diagram_id=$1 and action='diagram.agent_edit' order by occurred_at, id", [id])).rows;
+    expect(audit.map((r) => r.target.tool)).toEqual(['presentation_create', 'slide_add', 'slide_reorder', 'slide_update']);
+    expect(JSON.stringify(audit)).not.toContain('Funnel'); // notes are content, never in the audit row
+
+    // restoring the version made after slide_add brings back the original deck order (and drops the note)
+    await versions.restore(id, v[2].n, { userId: user.id, email: user.email, via: 'web' });
+    expect(await order()).toEqual([s1, s2, s3]);
+    expect((await head(id)).content.presentations[0].slides[0].notes).toBe('Intro');
+    // restoring the pre-agent version (before the deck existed) removes the deck again
+    await versions.restore(id, v[0].n, { userId: user.id, email: user.email, via: 'web' });
+    expect((await head(id)).content.presentations || []).toEqual([]);
+  });
+
   test('an open editor saving with the old revision after an agent write gets the normal CAS miss (409 flow)', async () => {
     const id = await newDiagram();
     await repo.applyContentChange(id, { expectedRevision: 0, userId: user.id, actor: actor(), compute: (c) => add({ content: c }) });

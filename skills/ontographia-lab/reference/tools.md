@@ -69,6 +69,18 @@ A doc is a Markdown text card on the board (title and first lines on the card, f
 - `doc_get {id, elementId, offset?, limit?}`: the stored text, paged on heading boundaries (`next` is the following offset; limit up to 12000 characters), plus `headings` and `elementLinks`.
 - Markdown: headings, bold, italic, strike, code, bullet, numbered and task lists, quotes, fenced code, tables, `---`, links. Allowed link targets: `https`, `mailto`, `#el=<elementId>` (selects and zooms to the element), `/diagram/LAB-12`. Raw HTML and images are not supported and are neutralized (the result `warnings` say so).
 
+### Decks: `presentation_create`, `slide_add`, `slide_reorder`, `slide_remove`, `slide_update` (write) and `presentation_get` (read)
+
+A slide is an existing frame; a presentation is an ordered list of slides plus notes (up to 20 decks per board, 200 slides per deck, notes 10 KB).
+
+- `presentation_create {id, baseRevision, title, aspect?}`: aspect `16:9` (default), `4:3` or `1:1`. Returns `presentationId`.
+- `slide_add {id, baseRevision, presentationId, frameId | frameIds (max 40), position?, fitAspect?, notes?}`: returns `slideIds`. `fitAspect` grows each frame to the deck ratio without moving content (locked frames are refused); otherwise `warnings` say a frame will be letterboxed.
+- `slide_reorder {…, presentationId, slideIds}`: every slide exactly once.
+- `slide_remove {…, presentationId, slideId, deleteFrame?}`: the frame stays unless `deleteFrame`.
+- `slide_update {…, presentationId, slideId, notes?, hidden?, title?}`: `title` renames the slide's frame; an empty `notes` clears them.
+- `presentation_get {id, presentationId?, offset?, limit?, slideId?}`: without `presentationId` the decks; with it the slides (`n`, `slideId`, `frameId`, `title`, `notes`, `hidden`, `missing`, a short `outline` of labels on the frame). Pages of up to 50 slides and about 56 KB (`truncated`, `next` is the following `offset`); notes are cut to 500 characters (`notesTruncated`, `notesChars`); `slideId` gives one slide with its full notes.
+- A locked frame can be added with `slide_add` (a read-only reference); `fitAspect` and `slide_remove {deleteFrame}` are refused on it.
+
 ## Limits at a glance
 
 - Output about 120 KB per result (narrow or page).

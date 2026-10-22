@@ -6,6 +6,7 @@ import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } fr
 import { useFloatingPlacement, placePopoverElement } from './positioning';
 import { generateId } from '../utils/ids';
 import { useDiagram, useDiagramSelection } from '../DiagramContext';
+import SlideFrameActions from '../present/SlideFrameActions';
 import {
   COLOR_PALETTE,
   COLOR_PRESETS,
@@ -1763,6 +1764,7 @@ export default function ContextualToolbar({ viewport, packRegistry, containerRef
             >
               <ContentCopyIcon fontSize="small" style={{ color: 'var(--accent)' }} />
             </button>
+            <SlideFrameActions frame={selectedElements[0]} />
           </div>
         </>
       )}

@@ -83,6 +83,16 @@ The typical run is: map the text, tabulate or cluster it, then write the finding
 6. Tell the user what they can do with it: in the lab, the doc panel (and the card's right-click menu) has **Copy** (formatted, to paste into Outlook or Word; Cmd/Ctrl+Shift+C), **.docx**, **.pdf** and **.md**; a table has right-click **Copy table with formatting** (pastes as cells into Excel or Sheets) and **Export as Excel (.xlsx)** in its ⋯ menu; right-click any element, frame or the empty board for **Copy as image** (Cmd/Ctrl+Shift+C on the canvas) to paste a picture into a mail or chat. You cannot copy or export for them; just say where the buttons are.
    The server also offers the prompt `summarize_region` (link + optional focus).
 
+### 6c. "Make a presentation from these frames"
+
+A slide is a frame that already exists on the board; a deck (presentation) is an ordered list of them plus speaker notes. The owner presents it full screen and exports PDF/PNG from the editor (Menu, Presentation); you build and order it.
+
+1. Read: `board_read_region` / `diagram_get` for the frame ids (one frame per stop), `presentation_get` for decks that already exist. If the content is not in frames yet, group it first (`map_structure` with groups or `anchor {inFrame}`).
+2. `presentation_create {title, aspect?}` once, then `slide_add {presentationId, frameIds, fitAspect: true, notes?}` in storyline order. `fitAspect` grows a frame to 16:9 without moving its content; leave it out to keep the frame's own shape (it is letterboxed).
+3. Speaker notes with `slide_update {slideId, notes}`; `hidden: true` skips a slide. `slide_reorder` takes every `slideId` once; `slide_remove` only drops the slide (the frame stays) unless `deleteFrame`.
+4. A locked frame can be added as a slide (read-only reference); `fitAspect` and `deleteFrame` are refused on it. `presentation_get` pages long decks (`next` is the next `offset`), cuts notes to 500 characters, and `slideId` returns one slide with its full notes.
+5. Tell the user to open Menu, Presentation and press Present (arrow keys, Esc to leave) or Export PDF. You cannot start the show or download files. Ids and revisions come from the tool results; never invent them.
+
 ### 6. "Show me the board"
 
 `diagram_show` with `id`, or with `focus` for a region. It draws a read-only picture in hosts that support MCP Apps (claude.ai, Desktop, mobile). You only receive a short text summary with the link, not the picture. If the host cannot render it, give the user the "Open in lab" link from the summary; to see it yourself use `diagram_get` with `format: "outline"` or `diagram_thumbnail` (stored preview, may be missing or stale).
@@ -114,7 +124,7 @@ The typical run is: map the text, tabulate or cluster it, then write the finding
 
 ## Not available (do not promise)
 
-Long-form text goes in a doc and matrices in a table. Tables have no formulas, no `date` column type and no connectors to single rows (a connector attaches to the whole table). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
+Long-form text goes in a doc and matrices in a table. Tables have no formulas, no `date` column type and no connectors to single rows (a connector attaches to the whole table). There is no tool to delete diagrams, share them (new boards stay private until the user shares them), comment, or restore versions. Decks (`presentation_create` and friends) only reference frames that already exist: there are no slide layouts, text boxes, themes, images, charts or PPTX export yet, `diagram_show` has no per-slide view, and presenting and exporting happen in the editor, not through you. Open editor tabs pick agent changes up within a few seconds ("Updated by an agent").
 
 ## Reading large boards
 

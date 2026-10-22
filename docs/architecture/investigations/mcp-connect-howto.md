@@ -210,6 +210,14 @@ To refresh the table after the board or the analysis changed, Claude calls `tabl
 
 Same rules as the other write tools: editor token, the diagram on its allowlist, `baseRevision`, one version per call, locks respected, rate limited. An open editor shows the new table within a few seconds (slice AI-2).
 
+## 6c. Slide decks from frames (presentation_create, slide_add, slide_reorder, slide_update, slide_remove, presentation_get)
+
+A presentation is an ordered list of slide frames that already exist on the board, plus speaker notes. A slide is the frame itself (nothing is copied), so edits to the frame show in the deck. Ask Claude, for example: "Make a presentation from the three frames on this board, in the order Problem, Funnel, Next steps, with speaker notes."
+
+- Claude reads the frame ids, creates the presentation, adds the frames as slides (it can grow a frame to 16:9 without moving its content) and writes the notes. Every call is one saved version you can restore from History.
+- You present and export in the lab, not through Claude: Menu, **Presentation...**, then **Present** (arrow keys, Space, PageUp and PageDown, Home and End, a number then Enter, `N` notes, `B` black screen, `F` full screen, Esc to leave) or **Export PDF** (one page per slide). Viewers can present and export too; they cannot edit the deck. A link `.../diagram/LAB-12?present=<presentationId>&slide=2` starts the show at slide 2 for anyone who can open the board.
+- Deleting a frame leaves a "missing slide" in the deck (skipped when presenting and exporting); nothing breaks.
+
 ## 7. See the board in Claude (diagram_show)
 
 `diagram_show` draws a diagram, or a region of it, as a picture inside the conversation.

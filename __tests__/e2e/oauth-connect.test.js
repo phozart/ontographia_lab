@@ -4,7 +4,8 @@
  * user (login + consent). The dev server must run with:
  *   MCP_OAUTH_ENABLED=true NEXTAUTH_URL=$TEST_BASE_URL MCP_ALLOWED_ORIGINS=https://claude.ai
  *   OAUTH_TRUSTED_CLIENT_IDS=http://127.0.0.1:3268/client.json   (loopback http client ids are accepted outside production only)
- * and a THROWAWAY DATABASE (DATABASE_URL), with the QA accounts of .env.qa.local (QA_ADMIN_* is a platform admin).
+ * and a THROWAWAY DATABASE (DATABASE_URL), with the QA accounts of .env.qa.local (QA_ADMIN_* is a platform admin; QA_USER_* must be a NON-admin
+ * user, or the "all boards is not offered" test fails: seed-admin.js makes everyone an admin, so set role=user for QA_USER afterwards).
  * E2E_SHOTS_DIR saves screenshots.
  */
 const path = require('path');
@@ -47,7 +48,12 @@ describe('Connect Claude through OAuth (O2)', () => {
     });
     await new Promise((r) => clientServer.listen(CLIENT_PORT, '127.0.0.1', r));
     browser = await puppeteer.launch({ headless: process.env.HEADLESS !== 'false', args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
-  });
+    // A cold `next dev` compiles each route on its first hit (tens of seconds under load), which made the first tests time out
+    // waiting for the consent form. Touch the routes once so the tests measure behavior, not compilation.
+    for (const route of ['/login', '/oauth/authorize', '/api/oauth/consent', '/api/oauth/token', '/account', '/api/mcp', '/.well-known/oauth-authorization-server']) {
+      try { await fetch(`${BASE_URL}${route}`, { redirect: 'manual', headers: { accept: 'text/html' } }); } catch (e) { /* the route may not exist; compiling is all we want */ }
+    }
+  }, 240000);
   afterAll(async () => {
     for (const { page, id } of created) { try { await call(page, 'DELETE', `/api/diagrams/${id}`); } catch (e) { /* best effort */ } }
     if (browser) await browser.close();
@@ -116,7 +122,7 @@ describe('Connect Claude through OAuth (O2)', () => {
       await Promise.all([page.waitForFunction(() => window.location.pathname === '/oauth/authorize', { timeout: 30000 }), page.click('button[type="submit"]')]);
       await page.waitForNetworkIdle({ idleTime: 500 });
     }
-    await page.waitForSelector('form[action="/api/oauth/consent"]');
+    await page.waitForSelector('form[action="/api/oauth/consent"]', { timeout: 90000 });
     await page.waitForNetworkIdle({ idleTime: 500 }); // hydration
     const headers = responses.length ? responses[responses.length - 1].headers() : {};
     await decide(page, headers);

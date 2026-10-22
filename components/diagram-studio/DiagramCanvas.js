@@ -54,6 +54,7 @@ import { copyAsImage } from './export/copyAsImage';
 import { copyDocElement, exportDocElement, copyTableElement } from './elements/doc/docActions';
 import { requestDocImportFromDrop } from './elements/doc/useDocImport';
 import { getFrameDescendants, computeFrameMembershipChanges } from './utils/frameMembership';
+import { frameAspectOf, resizeWithAspect } from '../../lib/present/presentationModel';
 import FloatingBox from './ui/FloatingBox';
 import { RemoteHighlightLayer, RemoteHighlightChip, useHighlightLifecycle } from './ui/RemoteHighlight';
 import { AgentFocusLayer, useAgentFocus } from './ui/AgentIndicator';
@@ -2054,6 +2055,10 @@ export default function DiagramCanvas({
           newY = resizing.startPos.y + heightChange;
         }
 
+        if (resizing.aspect) {
+          const locked = resizeWithAspect(resizing.aspect, resizing.direction, { ...resizing.startPos, ...resizing.startSize }, { x: newX, y: newY, width: newWidth, height: newHeight });
+          ({ x: newX, y: newY, width: newWidth, height: newHeight } = locked);
+        }
         updateElement(resizing.elementId, {
           x: newX,
           y: newY,
@@ -2996,6 +3001,11 @@ export default function DiagramCanvas({
       // Ensure final size is on grid
       newWidth = snapToGrid(newWidth);
       newHeight = snapToGrid(newHeight);
+      // ADR-0007: a slide frame keeps its aspect ratio (the grid snap only sets the size the ratio is applied to)
+      if (resizing.aspect) {
+        const locked = resizeWithAspect(resizing.aspect, direction, { ...startPos, ...startSize }, { x: newX, y: newY, width: newWidth, height: newHeight });
+        ({ x: newX, y: newY, width: newWidth, height: newHeight } = locked);
+      }
 
       updateElement(elementId, {
         x: Math.max(0, newX),
@@ -3540,6 +3550,7 @@ export default function DiagramCanvas({
             startMouseY: e.clientY,
             startSize: { ...size },
             startPos: { x: element.x, y: element.y },
+            aspect: frameAspectOf(element), // ADR-0007: slide frames keep their ratio
           });
         }
       }

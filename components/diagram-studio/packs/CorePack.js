@@ -21,6 +21,8 @@ function FrameNode({ element, stencil, isSelected }) {
   const showTitle = element.data?.showTitle !== false;
   const bgColor = element.data?.backgroundColor || '#ffffff'; // White background by default
   const frameColor = element.color || '#64748b';
+  // ADR-0007: a frame with a slide shape reads as a slide: square corners, a solid hairline instead of the dashed outline
+  const isSlide = !!element.data?.aspect && element.data.aspect !== 'free';
 
   return (
     <div style={{
@@ -72,7 +74,7 @@ function FrameNode({ element, stencil, isSelected }) {
             width={width - 2}
             height={height - 2}
             fill={bgColor}
-            rx="8"
+            rx={isSlide ? 0 : 8}
           />
         )}
 
@@ -85,8 +87,8 @@ function FrameNode({ element, stencil, isSelected }) {
           fill="none"
           stroke={frameColor}
           strokeWidth="2"
-          strokeDasharray="8 4"
-          rx="8"
+          strokeDasharray={isSlide ? undefined : '8 4'}
+          rx={isSlide ? 0 : 8}
           opacity={isSelected ? 1 : 0.6}
         />
 
