@@ -45,10 +45,12 @@ const deckBoard = () => content([
   frame('fc', 12000, 0, SLIDE_W, SLIDE_H, 'Next steps'), note('c1', 12120, 300, 'Fix the payment form', 'fc', '#4FB3CE'),
 ], { presentations: [{ id: 'deck1', title: 'Deck', aspect: '16:9', slides: [{ id: 's1', frameId: 'fa' }, { id: 's2', frameId: 'fb' }, { id: 's3', frameId: 'fc' }] }] });
 
+// content nowhere near the canvas' opening view (agent-built boards start at 0,0; the canvas opens at 50000,50000)
+const originBoard = () => content(Array.from({ length: 200 }, (_, i) => ({ ...shape(`o${i}`, (i % 20) * 260, Math.floor(i / 20) * 200), x: 80 + (i % 20) * 260, y: 80 + Math.floor(i / 20) * 200 })));
 const smallBoard = () => content(Array.from({ length: 6 }, (_, i) => shape(`s${i}`, i * 200, 0)));
 
 describe('Board load performance: viewport culling', () => {
-  let browser; let context; let big; let wide; let deck; let small; let downloadDir;
+  let browser; let context; let big; let wide; let deck; let small; let origin; let downloadDir;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const call = (page, method, url, body) => page.evaluate(async (m, u, b) => {
     const r = await fetch(u, { method: m, headers: { 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined });
@@ -118,6 +120,7 @@ describe('Board load performance: viewport culling', () => {
     big = await mk('E2E perf 2000', seedContent(2000));
     wide = await mk('E2E perf export', exportBoard());
     deck = await mk('E2E perf deck', deckBoard());
+    origin = await mk('E2E perf origin', originBoard());
     small = await mk('E2E perf thumb', smallBoard());
     await page.close();
   });
@@ -125,7 +128,7 @@ describe('Board load performance: viewport culling', () => {
   afterAll(async () => {
     try {
       const page = await newPage();
-      for (const d of [big, wide, deck, small]) if (d) await call(page, 'DELETE', `/api/diagrams/${d.id}`);
+      for (const d of [big, wide, deck, small, origin]) if (d) await call(page, 'DELETE', `/api/diagrams/${d.id}`);
     } catch (e) { /* best effort */ }
     await browser.close();
   });
@@ -311,6 +314,20 @@ describe('Board load performance: viewport culling', () => {
     await page.keyboard.up('Control');
     await waitFor(async () => (await page.$('[data-testid="board-overview"]')) === null, 15000, 200);
     expect(await nodeCount(page)).toBeGreaterThan(5);
+    await page.close();
+  });
+
+  test('a board whose content is far from the opening view opens fitted to its content, not empty', async () => {
+    const page = await newPage();
+    await open(page, origin);
+    await sleep(800);
+    const n = await nodeCount(page);
+    expect(n).toBeGreaterThan(20);
+    const v = await view(page);
+    // the content (about 5,200 x 2,000 units) is inside the visible area
+    const sx = (80 + v.tx) * v.scale; const sy = (80 + v.ty) * v.scale;
+    expect(sx).toBeGreaterThanOrEqual(0); expect(sy).toBeGreaterThanOrEqual(0);
+    expect(sx).toBeLessThan(v.width);
     await page.close();
   });
 });

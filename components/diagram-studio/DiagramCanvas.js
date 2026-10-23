@@ -3,9 +3,10 @@
 // Handles rendering, pan/zoom, selection, drag, and connections
 
 import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
-import { cullWorldRect, visibleWorldRect, cullElements, cullConnections, boxIndex, shouldUseOverview, CULL_MIN_ELEMENTS } from '../../lib/render/viewportCulling';
+import { cullWorldRect, visibleWorldRect, cullElements, cullConnections, boxIndex, rectsIntersect, elementBox, shouldUseOverview, CULL_MIN_ELEMENTS } from '../../lib/render/viewportCulling';
 import { useCullingHold, notifyCullingCommitted } from './canvasCulling';
 import OverviewLayer from './OverviewLayer';
+import { computeFitForCanvas } from './viewportFit';
 import { generateId } from './utils/ids';
 import { createPortal } from 'react-dom';
 import {
@@ -5244,6 +5245,22 @@ export default function DiagramCanvas({
   }, []);
   const cullHold = useCullingHold();
   useEffect(() => { if (cullHold.full || cullHold.rect) notifyCullingCommitted(); });
+  // Opening a board whose content is nowhere near the stored view (agent-built boards start at 0,0 while the canvas opens at
+  // 50000,50000) must not show an empty canvas: once per board, fit the content when nothing is in view. Deep links
+  // (?focus / ?region) set their own view afterwards.
+  const openFitDoneRef = useRef(null);
+  useEffect(() => {
+    const id = diagram?.id;
+    if (!id || openFitDoneRef.current === id || !elements.length) return;
+    openFitDoneRef.current = id;
+    const box = containerRef.current;
+    const vis = box ? visibleWorldRect(viewport, { width: box.clientWidth, height: box.clientHeight }) : null;
+    if (!vis) return;
+    const sizeOf = (el) => packRegistry?.get?.(el.packId)?.stencils?.find((st) => st.id === el.type)?.defaultSize;
+    if (elements.some((el) => rectsIntersect(elementBox(el, sizeOf), vis))) return;
+    const fit = computeFitForCanvas(elements, { container: box, padding: 100 });
+    if (fit) setViewport(fit);
+  }, [diagram?.id, elements, viewport, packRegistry, setViewport]);
   const zOrdered = useMemo(() => [...visibleElements].sort(compareByZOrder), [visibleElements]);
   const sizeOfEl = useCallback((el) => packRegistry?.get?.(el.packId)?.stencils?.find((st) => st.id === el.type)?.defaultSize, [packRegistry]);
   // the snapped rectangle keeps its identity until the view moves half a viewport, so panning re-renders no list

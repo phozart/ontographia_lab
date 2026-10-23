@@ -109,3 +109,7 @@ Fit-all style zoom-out (ctrl+wheel to the minimum zoom), then 60 frames of pan; 
 | 5,000 | 60k DOM nodes, pan p95 1.8 s, one tab crash | 0 | 750 | 79 ms | 17 / 61 ms | 0.65 s (load 6) | 40 ms |
 
 The one slow frame in the 5,000 zoomed-out pan is the first image raster after the zoom; the median stays at one 60 Hz frame. Benchmark: `board-load-bench.js` now also reports `zoomOut`.
+
+## 8. Open view for boards far from the origin
+
+Agent-built boards (`map_structure`) put content at about 0..5,300, while the canvas always opens at world 50,000, 50,000. Before culling such a board mounted every node off-screen (the user saw an empty canvas until "Fit"); with culling no node was mounted at all. The canvas now fits the content once per board when no element intersects the opening view (`DiagramCanvas`, `computeFitForCanvas`, max scale 1); boards whose content is in view open exactly as before, and deep links set their own view afterwards. The overview only ever follows the zoom (below 0.15) or the number of nodes that would mount, never the board's extent at normal zoom. Tests that measure every node of a board larger than the screen pan across it in tiles (`text-t2` legacy board); there is no bypass flag.
