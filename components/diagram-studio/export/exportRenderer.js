@@ -96,7 +96,7 @@ export async function exportFromCanvas(format, options = {}) {
 
   return withHost(options, async (host, bounds) => {
     const backgroundColor = resolveBackground(options, format);
-    const fontEmbedCSS = await getFontEmbedCSS();
+    const fontEmbedCSS = await getFontEmbedCSS(document, host);
     const common = { width: bounds.width, height: bounds.height, backgroundColor, cacheBust: false, fontEmbedCSS };
     let content;
 
@@ -152,7 +152,7 @@ export async function renderPreview(options = {}, maxSide = 420) {
   return withHost(options, async (host, bounds) => {
     const pixelRatio = Math.min(1, (maxSide * 2) / Math.max(bounds.width, bounds.height));
     const backgroundColor = resolveBackground(options, options.previewFormat || 'png');
-    const fontEmbedCSS = await getFontEmbedCSS();
+    const fontEmbedCSS = await getFontEmbedCSS(document, host);
     const dataUrl = await htmlToImage.toPng(host, {
       fontEmbedCSS,
       width: bounds.width,

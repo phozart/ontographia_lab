@@ -49,3 +49,27 @@ describe('inlineFontUrls', () => {
     expect(out).toBe('');
   });
 });
+
+// ---- ADR-0008 T3: only the faces the text uses
+const { parseFaceMeta, selectFaces } = require('../../../components/diagram-studio/export/fontEmbed');
+
+describe('selectFaces', () => {
+  const face = (family, weight, extra = '') => ({ css: `@font-face { font-family: "${family}"; font-style: normal; font-weight: ${weight}; src: url(x.woff2); ${extra} }` });
+  const faces = [face('Inter', 400), face('Inter', 500), face('Inter', 600), face('Inter', 700), face('Inter', 500, 'unicode-range: U+0100-02BA, U+1E00-1E9F;'), face('Lato', 400)];
+  test('parses family, weight, style and unicode ranges', () => {
+    expect(parseFaceMeta(faces[4].css)).toEqual({ family: 'inter', weight: 500, style: 'normal', ranges: [[0x100, 0x2ba], [0x1e00, 0x1e9f]] });
+  });
+  test('takes the used weight of the used family, and nothing else', () => {
+    const out = selectFaces(faces, new Set(['inter|500|normal']), 'Billing');
+    expect(out).toHaveLength(1);
+    expect(parseFaceMeta(out[0].css).weight).toBe(500);
+  });
+  test('a unicode-range face is included only when the text has a character in its range', () => {
+    expect(selectFaces(faces, new Set(['inter|500|normal']), 'Łódź')).toHaveLength(2);
+  });
+  test('the nearest weight stands in for a missing one; unknown families are skipped; null usage means every face', () => {
+    expect(parseFaceMeta(selectFaces(faces, new Set(['inter|800|normal']), 'a')[0].css).weight).toBe(700);
+    expect(selectFaces(faces, new Set(['georgia|400|normal']), 'a')).toHaveLength(0);
+    expect(selectFaces(faces, null)).toHaveLength(faces.length);
+  });
+});

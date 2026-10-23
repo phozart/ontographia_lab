@@ -328,6 +328,17 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Not verified:** Windows and Safari fallbacks; a real claude.ai session; PNG/PDF export parity (T3).
 - **Tests:** unit and component (`textSlot`, `textT2Sizing`, `textT2Structure`, `textTitleSlots`, `packsTypeScale`, `connectionLabelText` x2, `tableCellText`, `textUml`, `textTogafItil`, `textProductCap`, `textCldErd`, updated `tableNode`, `reviewFixes`, `stencilTemplates`, `textBlock`), e2e `text-t2` (10 tests).
 
+## Slice T3 — Text parity: exports and `diagram_show` draw the canvas's lines (ADR-0008)
+
+- **PR title:** `feat(text): slice T3 exports and diagram_show on the shared text layout, font faces per export, and the cross-renderer parity suite`
+- **Refs:** `docs/architecture/adr/0008-text-layout-and-autosizing.md` sections 8, 11 and 12 (T3), as-built in section 18; `docs/architecture/investigations/board-load-performance.md` (thumbnails render from content). Personas: AI/MCP agent (`diagram_show` shows what the canvas shows), PM (exported decks and PNGs match the canvas), Solution Architect and CX/UX.
+- **Branch:** `feat/t3-text-parity`
+- **Files changed:** `lib/text/{svg,fit,policy}.js` (additive: `textLayoutToSvg`, `flowLines`, `forcesExternalLabel`), `lib/render/diagramSvg.js`, `components/diagram-studio/export/{ExportManager,exportRenderer,fontEmbed}.js`, `components/diagram-studio/present/exportDeck.js`, `components/diagram-studio/packs/labelSlots.js` (new) and the pack renderers that now read it (`UMLClassPack`, `ERDPack`, `TOGAFPack`, `ITILPack`, `ProductDesignPack`), tests and helpers (`__tests__/helpers/{textShowcase,t3Browser}.js`).
+- **Deviations from the design:** see ADR-0008 section 18.2 (the live-canvas export pipeline was already pinned by T1/T2 and is unchanged; system font plus `textLength` pinning for `<img>` SVG; doc cards and presets are flowed by the browser in the editor; connection label placement and shape fidelity stay as before). No new dependency, no migration.
+- **Verification:** 189 stencils x 10 variants x 2 sizes: pack renderer = `diagram_show` (jsdom), 1,890 nodes in 23 gallery boards: Chrome's DOM = layout = `diagram_show`; showcase board: canvas = exported SVG = `diagram_show`, 0 differences (15 before); an export embeds 4 font faces instead of 31; export of 500 elements not slower than main (5.7 to 5.9 s vs 6.7 to 8.0 s on a loaded machine).
+- **Not verified:** Windows and Safari fallbacks; `foreignObject` SVG in non-browser tools; a real claude.ai session.
+- **Tests:** unit (`textParity`, `textSvg`, `fontEmbed`, `ExportManager`, `diagramSvg`, `presentSvg`, `textParityPacks`), e2e (`text-parity`, `text-parity-gallery`; `doc-copy-export`, `slides`, `board-load-perf`, `text-layout`, `text-t2` re-run green).
+
 ## Slice P3 - PPTX export (ADR-0007)
 
 - **PR title:** `feat(present): slice P3 PowerPoint export with native text, tables and notes, and 2x pictures for connected groups`

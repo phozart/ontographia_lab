@@ -7,6 +7,7 @@ import { normalizeFields, visibleRows, ERD_HEADER_H, ERD_ROW_H, ERD_INDEX_H } fr
 import { ElementText, SlotText } from '../text/useTextLayout';
 import TextBlock, { OverflowBadge } from '../text/TextBlock';
 import { layoutForSlot } from '../../../lib/text/fit';
+import { erdHeaderSlot } from './labelSlots';
 import { stencils, connectionTypes } from './catalog/erd';
 
 // ============ STENCILS ============
@@ -326,22 +327,16 @@ const nodeProperties = [
 // Geometry of the entity card (px). The name header and every attribute row are text slots laid out by the shared module
 // (ADR-0008 T2): the header holds the name (own font, up to 8 lines, the card's header grows with it), each row is two
 // pinned mono 11 px blocks (name left, type right) that clamp with the badge, never cut silently.
-const BADGE_COL = { view: 52, junction: 76 }; // the VIEW / JUNCTION tag at the left of the header (same numbers as the text policy)
 const TYPE_SHARE = 0.4; // share of the row width the type column gets
-const NAME_PAD_X = 12;
 
 // The header of an entity: the name laid out in the header strip. Returns the layout and the header height, which grows
 // with the number of name lines (a 1 or 2 line name fits the 40 px strip).
-function useEntityHeader(element, label, innerW, badgeW, maxH) {
-  const w = Math.max(20, innerW - 2 * NAME_PAD_X - badgeW);
+function useEntityHeader(element, stencil, label) {
   return useMemo(() => {
-    const probe = layoutForSlot(element, { text: label, box: { x: 0, y: 0, width: w, height: 8 * 17.5 }, role: 'title', own: true, maxLines: 8, valign: 'top' });
-    const need = Math.ceil(probe.layout.lines.length * probe.layout.lineHeight) + 12;
-    const headerH = Math.min(Math.max(ERD_HEADER_H, need), Math.max(ERD_HEADER_H, maxH)); // never taller than the card leaves room for one row: a legacy small card clamps with the badge
-    const box = { x: NAME_PAD_X + badgeW, y: 0, width: w, height: headerH };
-    const { layout } = layoutForSlot(element, { text: label, box, role: 'title', own: true, maxLines: 8, valign: 'middle' });
-    return { layout, box, headerH };
-  }, [element, label, w, badgeW, maxH]);
+    const h = erdHeaderSlot(element, stencil, label); // labelSlots.js: the same header diagram_show draws in
+    const { layout } = layoutForSlot(element, { text: label, ...h.spec });
+    return { layout, box: h.spec.box, headerH: h.headerH };
+  }, [element, stencil, label]);
 }
 
 // A field row: a pk/fk tinted strip with the key icons, then the name and the type as slots in the row
@@ -403,8 +398,7 @@ function ERDEntityRenderer({ element, stencil }) {
   const isView = element.type === 'view';
   const bw = isWeakEntity ? 4 : 2; // the card's border; slots are positioned inside it
   const innerW = width - 2 * bw;
-  const badgeW = BADGE_COL[element.type] || 0;
-  const header = useEntityHeader(element, label || 'Untitled', innerW, badgeW, height - 2 * bw - ERD_ROW_H - 12);
+  const header = useEntityHeader(element, stencil, label || 'Untitled');
   const extra = header.headerH - ERD_HEADER_H; // a long name pushes the rows down
   const { shown, hidden } = visibleRows(height - extra, fields.length, indexes.length);
 

@@ -3,7 +3,7 @@
  */
 // Server-side SVG renderer for the diagram_show MCP App (spike AI-9): pure, self-contained, injection-safe.
 
-import { renderDiagramSvg, safeColor, escapeXml, wrapLabel, HIGHLIGHT_COLORS } from '../../lib/render/diagramSvg';
+import { renderDiagramSvg, safeColor, escapeXml, HIGHLIGHT_COLORS } from '../../lib/render/diagramSvg';
 import { PACK_CATALOG } from '../../components/diagram-studio/packs/catalog';
 import { COMPARE_COLORS } from '../../components/diagram-studio/ui/CompareOverlay';
 
@@ -96,13 +96,6 @@ describe('renderDiagramSvg', () => {
     }
   });
 
-  test('wrapLabel wraps, hard-breaks long words and ellipsizes overflow', () => {
-    expect(wrapLabel('one two three four', 90, 200, 13)).toEqual(['one two', 'three four']);
-    expect(wrapLabel('x'.repeat(30), 80, 200, 13).every((l) => l.length <= 9)).toBe(true);
-    const short = wrapLabel('a b c d e f g h i j k l', 40, 20, 13);
-    expect(short).toHaveLength(1);
-    expect(short[0].endsWith('…')).toBe(true);
-  });
 });
 
 // ---- AI-9a hardening ----
@@ -115,7 +108,7 @@ function assertWellFormedXml(svg) {
   const dom = new JSDOM(svg, { contentType: 'image/svg+xml' }); // throws on a parse error
   const doc = dom.window.document;
   expect(doc.documentElement.nodeName).toBe('svg');
-  const allowed = new Set(['svg', 'defs', 'marker', 'path', 'rect', 'g', 'text', 'tspan', 'ellipse', 'polygon', 'line']);
+  const allowed = new Set(['svg', 'defs', 'marker', 'path', 'rect', 'g', 'text', 'tspan', 'ellipse', 'polygon', 'line', 'title', 'circle']);
   for (const n of doc.querySelectorAll('*')) {
     expect(allowed.has(n.localName)).toBe(true);
     for (const a of n.attributes) expect(/^(on|href|xlink|src)/i.test(a.name)).toBe(false);

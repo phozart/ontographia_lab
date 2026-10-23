@@ -1,6 +1,7 @@
 // components/diagram-studio/packs/ITILPack.js
 // ITIL 4 IT Service Management Pack
 
+import { itilCmdbSpec } from './labelSlots';
 import { pickLabelColor } from './colorUtils';
 import { stencils, connectionTypes } from './catalog/itil';
 import { ElementText, SlotText } from '../text/useTextLayout';
@@ -199,7 +200,7 @@ function CMDBRenderer({ element, stencil }) {
       </div>
       {/* ds-allow-text-style: icon glyph, not text */}
       <span style={{ position: 'absolute', left: 8, top: 5, fontSize: 16, lineHeight: '20px' }}>{stencil?.icon || '🗄️'}</span>
-      <SlotText element={element} text={element.label || 'CMDB'} box={{ x: 32, y: 5, width: Math.max(20, width - 40), height: 20 }} role="title" maxLines={1} align="start" own color={element.textColor || 'var(--text)'} testId="title" />
+      <SlotText element={element} text={element.label || 'CMDB'} box={itilCmdbSpec(element, stencil).box} role="title" maxLines={1} align="start" own color={element.textColor || 'var(--text)'} testId="title" />
     </div>
   );
 }

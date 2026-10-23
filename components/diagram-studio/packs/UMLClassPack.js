@@ -9,6 +9,7 @@ import { ElementText, ListText } from '../text/useTextLayout';
 import TextBlock from '../text/TextBlock';
 import { policyFor } from '../../../lib/text/policy';
 import { layoutForSlot } from '../../../lib/text/fit';
+import { umlClassNameSpec, umlSystemBoundarySpec, umlSwimlaneSpec, umlLifelineHeadSpec } from './labelSlots';
 
 // ============ STENCILS ============
 
@@ -348,12 +349,9 @@ function UMLClassRenderer({ element, stencil }) {
   const color = element.color || stencil?.color || '#3b82f6';
   const fg = pickLabelColor(color);
 
-  // name compartment: wraps (auto-height), capped so the member compartments keep at least 45% of the node
-  const lh = 17.5;
-  // (the same rule the policy sizes by: the node grew by the extra lines, the member room stays the default)
-  const defH = stencil?.defaultSize?.height || H;
-  const maxNameLines = Math.max(1, Math.floor((H * 0.55 - 16 - stereoH) / lh), Math.floor((H - defH + 24 + 1) / lh));
-  const name = useSlot(element, { text: element.label || 'Unnamed', box: { x: 10, y: 8 + stereoH, width: Math.max(20, W - 20), height: maxNameLines * lh }, role: 'title', maxLines: maxNameLines, align: 'center', valign: 'top', own: true });
+  // name compartment: wraps (auto-height), capped so the member compartments keep at least 45% of the node (labelSlots.js: the
+  // same slot diagram_show and the SVG exporter draw in)
+  const name = useSlot(element, { text: element.label || 'Unnamed', ...umlClassNameSpec(element, stencil) });
   const stereo = useSlot(element, { text: stereoText ? `«${stereoText}»` : '', box: { x: 10, y: 6, width: Math.max(20, W - 20), height: 14 }, role: 'meta', maxLines: 1, align: 'center' });
   const headerH = Math.ceil(8 + stereoH + Math.max(1, name.layout.lines.length) * name.layout.lineHeight + 8);
 
@@ -484,7 +482,7 @@ function SystemBoundaryRenderer({ element, stencil }) {
   const { width: W } = sizeOf(element, stencil);
   const color = element.color || stencil?.color || '#64748b';
   const systemName = element.data?.systemName || element.label || 'System';
-  const title = useSlot(element, { text: systemName, box: { x: 10, y: 6, width: Math.max(20, W - 20), height: 20 }, role: 'title', maxLines: 1, align: 'start', own: true });
+  const title = useSlot(element, { text: systemName, ...umlSystemBoundarySpec(element, stencil) });
 
   return (
     <div className="uml-frame" style={{ borderColor: color }}>
@@ -564,7 +562,7 @@ function SwimlaneRenderer({ element, stencil }) {
   const { width: W } = sizeOf(element, stencil);
   const color = element.color || stencil?.color || '#e5e7eb';
   const responsible = element.data?.responsible || element.label || 'Lane';
-  const title = useSlot(element, { text: responsible, box: { x: 8, y: 2, width: Math.max(20, W - 16), height: 24 }, role: 'title', maxLines: 1, align: 'center', own: true });
+  const title = useSlot(element, { text: responsible, ...umlSwimlaneSpec(element, stencil) });
 
   return (
     <div className="uml-frame" style={{ borderColor: color }}>
@@ -634,7 +632,7 @@ function LifelineRenderer({ element, stencil }) {
   const color = element.color || stencil?.color || '#3b82f6';
   const objectName = element.data?.objectName || element.label || 'object';
   const className = element.data?.className || '';
-  const head = useSlot(element, { text: `${objectName}${className ? `:${className}` : ''}`, box: { x: 10, y: 8, width: Math.max(20, W - 20), height: 3 * 17.5 }, role: 'label', maxLines: 3, align: 'center', valign: 'top', own: true });
+  const head = useSlot(element, { text: `${objectName}${className ? `:${className}` : ''}`, ...umlLifelineHeadSpec(element, stencil) });
   const headH = Math.ceil(8 + Math.max(1, head.layout.lines.length) * head.layout.lineHeight + 8);
 
   return (
