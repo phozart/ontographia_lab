@@ -10,7 +10,7 @@ import { findStencilMeta } from '../packs/catalog';
 import { policyFor } from '../../../lib/text/policy';
 import { layoutForElement, layoutForExternal, layoutForTitle, layoutForSlot } from '../../../lib/text/fit';
 import { connectionLabelLayout } from '../../../lib/text/connectionLabel';
-import { textLayoutToSvg, FONT_STACK } from '../../../lib/text/svg';
+import { textLayoutToSvg, safeFill, escapeXml as escapeSvgText, FONT_STACK } from '../../../lib/text/svg';
 
 function hasLiveCanvas() {
   return typeof document !== 'undefined' && !!document.querySelector('.ds-canvas-inner');
@@ -383,13 +383,14 @@ export class ExportManager {
    * Render element as SVG
    */
   renderElementSVG(el, indent = '') {
-    const { id, type, label, x = 0, y = 0, size = {}, color = '#3b82f6' } = el;
+    const { id, type, label, x = 0, y = 0, size = {} } = el;
+    const color = safeFill(el.color, '#3b82f6'); // a stored colour never reaches an attribute unparsed
     const w = size.width || 100;
     const h = size.height || 50;
     const shape = el.shape || this.inferShape(type);
 
     const dataAttrs = this.includeDataAttributes
-      ? ` data-node-id="${id}" data-node-type="${type}"`
+      ? ` data-node-id="${this.escapeXml(id)}" data-node-type="${this.escapeXml(type)}"`
       : '';
 
     let svg = `${indent}<g${dataAttrs} transform="translate(${x}, ${y})">\n`;
@@ -445,7 +446,8 @@ export class ExportManager {
    * Render connection as SVG
    */
   renderConnectionSVG(conn, elements, indent = '') {
-    const { id, sourceId, targetId, type, label, color = '#374151' } = conn;
+    const { id, sourceId, targetId, type, label } = conn;
+    const color = safeFill(conn.color, '#374151');
 
     const source = elements.find(e => e.id === sourceId);
     const target = elements.find(e => e.id === targetId);
@@ -459,7 +461,7 @@ export class ExportManager {
     const path = `M ${sourceCenter.x} ${sourceCenter.y} L ${targetCenter.x} ${targetCenter.y}`;
 
     const dataAttrs = this.includeDataAttributes
-      ? ` data-connection-id="${id}" data-source="${sourceId}" data-target="${targetId}"`
+      ? ` data-connection-id="${this.escapeXml(id)}" data-source="${this.escapeXml(sourceId)}" data-target="${this.escapeXml(targetId)}"`
       : '';
 
     const markerEnd = this.shouldHaveArrow(type) ? ' marker-end="url(#arrow-end)"' : '';
@@ -529,16 +531,7 @@ export class ExportManager {
    * Escape XML special characters
    */
   escapeXml(str) {
-    if (!str) return '';
-    return String(str)
-      // C0 controls (except tab, LF, CR) and U+FFFE/U+FFFF are not allowed in XML 1.0
-      // eslint-disable-next-line no-control-regex
-      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+    return str ? escapeSvgText(str) : '';
   }
 
   /**
