@@ -55,6 +55,7 @@ export default function CrossingIndicators({
 }) {
   // Calculate all path points for orthogonal connections
   const connectionPaths = useMemo(() => {
+    const byId = new Map(elements.map(e => [e.id, e])); // (find() per connection was O(connections x elements))
     return connections.map(conn => {
       const lineStyle = conn.lineStyle || 'curved';
 
@@ -63,8 +64,8 @@ export default function CrossingIndicators({
         return { id: conn.id, points: [] };
       }
 
-      const source = elements.find(e => e.id === conn.sourceId);
-      const target = elements.find(e => e.id === conn.targetId);
+      const source = byId.get(conn.sourceId);
+      const target = byId.get(conn.targetId);
 
       const sourcePort = conn.sourcePort || 'right';
       const targetPort = conn.targetPort || 'left';

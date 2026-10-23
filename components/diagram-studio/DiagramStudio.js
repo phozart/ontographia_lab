@@ -115,13 +115,14 @@ function DiagramStudioInner({
   diagramName,
 }) {
   const { data: session } = useSession();
-  const { diagram, setDiagram, activePack, saveStatus, saveDiagram, elements, connections, addElement, updateElement, addConnection, undo, redo, selectAll, clearSelection, deleteSelected, activeTool, setActiveTool, selectedStencil, setSelectedStencil, drawingTool, drawingColor, drawingStrokeWidth, isDragging, isRotating, stickyNoteColor } = useDiagram();
+  const { diagram, setDiagram, activePack, saveStatus, saveDiagram, elements, connections, theme: boardTheme, addElement, updateElement, addConnection, undo, redo, selectAll, clearSelection, deleteSelected, activeTool, setActiveTool, selectedStencil, setSelectedStencil, drawingTool, drawingColor, drawingStrokeWidth, isDragging, isRotating, stickyNoteColor } = useDiagram();
   const { viewport, setViewport, zoomIn, zoomOut } = useDiagramViewport();
   useThumbnailCapture({
     diagramId: diagram?.id,
     lastSaved: saveStatus?.lastSaved,
     elements,
     connections,
+    theme: boardTheme,
     readOnly: profile?.editingPolicy?.readOnly,
   });
   const { selection, selectedElements, selectElements, selectConnection } = useDiagramSelection();

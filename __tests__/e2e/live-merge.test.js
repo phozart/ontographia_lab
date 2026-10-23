@@ -181,11 +181,11 @@ describe('Live pickup and merge (AI-2)', () => {
     const B = await newPage('b');
     await open(A);
     await A.click('[data-node-id="b"]', { count: 2, delay: 40 });
-    await A.waitForSelector('[data-node-id="b"] input', { timeout: 5000 });
+    await A.waitForSelector('[data-node-id="b"] textarea', { timeout: 5000 });
     await A.keyboard.type(' typed locally');
     await writeAsB(B, (els) => els.map((e) => (e.id === 'b' ? { ...e, label: 'Relabelled by B' } : e)));
     await sleep(5500); // longer than a poll interval: the pickup must wait for the open editor
-    const mid = await A.$eval('[data-node-id="b"] input', (i) => i.value);
+    const mid = await A.$eval('[data-node-id="b"] textarea', (i) => i.value);
     expect(mid).toContain('typed locally');
     expect(mid).not.toContain('Relabelled by B');
     await A.keyboard.press('Enter');

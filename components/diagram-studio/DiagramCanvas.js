@@ -2,7 +2,11 @@
 // Core canvas engine for DiagramStudio
 // Handles rendering, pan/zoom, selection, drag, and connections
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, memo } from 'react';
+import { cullWorldRect, visibleWorldRect, cullElements, cullConnections, boxIndex, rectsIntersect, elementBox, shouldUseOverview, CULL_MIN_ELEMENTS } from '../../lib/render/viewportCulling';
+import { useCullingHold, notifyCullingCommitted } from './canvasCulling';
+import OverviewLayer from './OverviewLayer';
+import { computeFitForCanvas } from './viewportFit';
 import { generateId } from './utils/ids';
 import { createPortal } from 'react-dom';
 import {
@@ -314,9 +318,9 @@ function Node({
   activePack,
   hasConnections, // Whether this element already has connections
   commentMode, // Whether comment mode is active
+  theme: diagramTheme, // board theme (a prop, not useDiagram(): a context subscription re-rendered every node on every viewport change)
 }) {
   // ADR-0007 P2: theme tokens ("@accent") in colour fields resolve through the board theme before anything is drawn
-  const diagramTheme = useDiagram()?.theme;
   const element = useMemo(() => resolveElementTokens(rawElement, diagramTheme), [rawElement, diagramTheme]);
   const pack = packRegistry?.get?.(element.packId);
   const stencil = pack?.stencils?.find(s => s.id === element.type);
@@ -976,6 +980,10 @@ function renderPorts(element, stencil) {
   });
 }
 
+// Memoized: props are primitives, the element object (stable between edits) and stable callbacks, so a pan or zoom
+// re-renders none of the mounted nodes.
+const MemoNode = memo(Node);
+
 // ============ GRID COMPONENT ============
 // Supports multiple grid styles: dots, lines, lines-wide, or none
 
@@ -1194,14 +1202,16 @@ export default function DiagramCanvas({
     remoteHighlight,
     clearRemoteHighlight,
     agents: boardAgents,
+    theme: boardTheme,
   } = useDiagram();
 
   // Connections flagged `autoPorts` follow the facing sides of their shapes; resolve
   // them once here so every consumer below sees the effective ports.
   const connections = useMemo(() => {
     if (!storedConnections.some(c => c.autoPorts)) return storedConnections;
+    const byId = new Map(elements.map(e => [e.id, e])); // (find() per autoPorts connection was O(connections x elements))
     const boundsOf = (id) => {
-      const el = elements.find(e => e.id === id);
+      const el = byId.get(id);
       if (!el || typeof el.x !== 'number') return null;
       const stencil = packRegistry?.get?.(el.packId)?.stencils?.find(st => st.id === el.type);
       const size = el.size || stencil?.defaultSize || { width: 120, height: 60 };
@@ -5215,6 +5225,122 @@ export default function DiagramCanvas({
     }
   }, [elements, connections, addElement, updateElement, removeElement, removeConnection, updateConnection, selectElement, selectConnection, setViewport, handleAddWaypoint, handleClearWaypoints, setShowConnectionToolbar, packRegistry, zoomToFitAll, resetZoom, onCopyClaudeLink, diagram, selection]);
 
+  // ============ VIEWPORT CULLING + STABLE NODE PROPS ============
+  // Only elements near the viewport are mounted (lib/render/viewportCulling): the rest cost nothing until you pan to them.
+  // Everything that clones the live DOM (exports, Copy as image, slides, present mode) suspends culling first
+  // (./canvasCulling). Boards under CULL_MIN_ELEMENTS are never culled.
+  const [areaSize, setAreaSize] = useState(() => (typeof window !== 'undefined' ? { width: window.innerWidth, height: window.innerHeight } : null));
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return undefined;
+    const measure = () => {
+      const w = node.clientWidth;
+      const h = node.clientHeight;
+      if (w > 0 && h > 0) setAreaSize((prev) => (prev && prev.width === w && prev.height === h ? prev : { width: w, height: h }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(node);
+    return () => ro.disconnect();
+  }, []);
+  const cullHold = useCullingHold();
+  useEffect(() => { if (cullHold.full || cullHold.rect) notifyCullingCommitted(); });
+  // Opening a board whose content is nowhere near the stored view (agent-built boards start at 0,0 while the canvas opens at
+  // 50000,50000) must not show an empty canvas: once per board, fit the content when nothing is in view. Deep links
+  // (?focus / ?region) set their own view afterwards.
+  const openFitDoneRef = useRef(null);
+  useEffect(() => {
+    const id = diagram?.id;
+    if (!id || openFitDoneRef.current === id || !elements.length) return;
+    openFitDoneRef.current = id;
+    const box = containerRef.current;
+    const vis = box ? visibleWorldRect(viewport, { width: box.clientWidth, height: box.clientHeight }) : null;
+    if (!vis) return;
+    const sizeOf = (el) => packRegistry?.get?.(el.packId)?.stencils?.find((st) => st.id === el.type)?.defaultSize;
+    if (elements.some((el) => rectsIntersect(elementBox(el, sizeOf), vis))) return;
+    const fit = computeFitForCanvas(elements, { container: box, padding: 100 });
+    if (fit) setViewport(fit);
+  }, [diagram?.id, elements, viewport, packRegistry, setViewport]);
+  const zOrdered = useMemo(() => [...visibleElements].sort(compareByZOrder), [visibleElements]);
+  const sizeOfEl = useCallback((el) => packRegistry?.get?.(el.packId)?.stencils?.find((st) => st.id === el.type)?.defaultSize, [packRegistry]);
+  // the snapped rectangle keeps its identity until the view moves half a viewport, so panning re-renders no list
+  const rawCullRect = cullHold.full ? null : cullWorldRect(visibleWorldRect(viewport, areaSize));
+  const [bandX, bandY, bandW, bandH] = rawCullRect ? [rawCullRect.x, rawCullRect.y, rawCullRect.width, rawCullRect.height] : [null, null, null, null];
+  const cullBand = useMemo(() => (bandX === null ? null : { x: bandX, y: bandY, width: bandW, height: bandH }), [bandX, bandY, bandW, bandH]);
+  // a capture (Copy as image of a frame, slides) holds one more world rectangle mounted on top of the viewport band
+  const cullRect = useMemo(() => (cullBand && cullHold.rect ? [cullBand, cullHold.rect] : cullBand), [cullBand, cullHold.rect]);
+  // ids that stay mounted wherever they are: what is selected (when few), dragged, edited or being connected
+  const cullKeepIds = useMemo(() => {
+    const keep = new Set();
+    if (selection.nodeIds.length <= 100) selection.nodeIds.forEach((id) => keep.add(id));
+    selection.connectionIds.forEach((id) => keep.add(id));
+    dragIds.forEach((id) => keep.add(id));
+    if (editingLabelId) keep.add(editingLabelId);
+    if (editingConnectionId) keep.add(editingConnectionId);
+    if (connectSource?.elementId) keep.add(connectSource.elementId);
+    return keep;
+  }, [selection.nodeIds, selection.connectionIds, dragIds, editingLabelId, editingConnectionId, connectSource]);
+  const nearElements = useMemo(
+    () => cullElements(zOrdered, cullRect, { sizeOf: sizeOfEl, keepIds: cullKeepIds }),
+    [zOrdered, cullRect, sizeOfEl, cullKeepIds]
+  );
+  // Level of detail: zoomed far out, or more nodes near the viewport than are sensible to mount, draws one static
+  // overview image instead (see OverviewLayer). Never while a capture holds the board mounted.
+  const overview = !!cullRect && elements.length >= CULL_MIN_ELEMENTS && !cullHold.full && !cullHold.rect && shouldUseOverview(viewport.scale, nearElements.length);
+  const mountedElements = useMemo(
+    () => (overview ? zOrdered.filter((el) => cullKeepIds.has(el.id)) : nearElements),
+    [overview, zOrdered, nearElements, cullKeepIds]
+  );
+  const boxById = useMemo(() => (cullRect ? boxIndex(elements, sizeOfEl) : null), [cullRect, elements, sizeOfEl]);
+  const mountedConnections = useMemo(() => {
+    if (!cullRect) return visibleConnections;
+    if (overview) return visibleConnections.filter((c) => cullKeepIds.has(c.id) || cullKeepIds.has(c.sourceId) || cullKeepIds.has(c.targetId));
+    return cullConnections(visibleConnections, boxById, cullRect, { keepIds: cullKeepIds, total: elements.length });
+  }, [cullRect, overview, visibleConnections, boxById, cullKeepIds, elements.length]);
+  // shared by every mounted connection (each used to scan all elements and look up stencils to find its obstacles)
+  const elementsById = useMemo(() => new Map(visibleElements.map((el) => [el.id, el])), [visibleElements]);
+  const obstacleRects = useMemo(() => {
+    const out = [];
+    for (const el of visibleElements) {
+      if (!el || el.type === 'frame') continue;
+      const stencil = packRegistry?.get?.(el.packId)?.stencils?.find((st) => st.id === el.type);
+      if (stencil?.isFrame) continue;
+      if (typeof el.x !== 'number' || typeof el.y !== 'number') continue;
+      const size = el.size || stencil?.defaultSize || { width: 120, height: 60 };
+      out.push({ id: el.id, x: el.x, y: el.y, width: size.width, height: size.height });
+    }
+    return out;
+  }, [visibleElements, packRegistry]);
+  const connectedIds = useMemo(() => {
+    const ids = new Set();
+    for (const c of connections || []) { ids.add(c.sourceId); ids.add(c.targetId); }
+    return ids;
+  }, [connections]);
+  // Identity-stable callbacks for the memoized nodes: they always call the latest handler (latest-ref pattern)
+  const latestNodeFns = useRef({});
+  latestNodeFns.current = { handleDragStart, handleNodeConnectionStart, handleNodeConnectionEnd, handleQuickCreate, onShowProperties, renderNode, selectElement, toggleElementSelection, updateElement, discardElement, elements, readOnly };
+  const nodeFns = useMemo(() => ({
+    onSelect: (id, shiftKey) => { const h = latestNodeFns.current; if (shiftKey) h.toggleElementSelection(id); else h.selectElement(id); },
+    onDragStart: (...a) => latestNodeFns.current.handleDragStart(...a),
+    onConnectStart: (...a) => latestNodeFns.current.handleNodeConnectionStart(...a),
+    onConnectEnd: (...a) => latestNodeFns.current.handleNodeConnectionEnd(...a),
+    onLabelChange: (id, label) => latestNodeFns.current.updateElement(id, { label }),
+    onAutoResize: (id, newSize) => latestNodeFns.current.updateElement(id, { size: newSize }),
+    onQuickCreate: (...a) => latestNodeFns.current.handleQuickCreate(...a),
+    onShowProperties: (...a) => latestNodeFns.current.onShowProperties?.(...a),
+    renderNode: (...a) => latestNodeFns.current.renderNode?.(...a),
+    onEditingLabelDone: (id, editing, cancelled) => {
+      const h = latestNodeFns.current;
+      setEditingLabelId(editing ? id : null);
+      if (editing) return;
+      const wasFresh = freshNodeIdsRef.current.delete(id);
+      if (cancelled && wasFresh && !h.readOnly) {
+        const el = h.elements.find((x) => x.id === id);
+        if (el && !(el.label || '').trim()) h.discardElement(id);
+      }
+    },
+  }), []);
+
   // ============ RENDER ============
 
   return (
@@ -5344,11 +5470,13 @@ export default function DiagramCanvas({
               })}
             </defs>
             {/* Render connections - filtered for collapsed nodes */}
-            {(visibleConnections || []).map(conn => (
+            {(mountedConnections || []).map(conn => (
               <Connection
                 key={conn.id}
                 connection={conn}
                 elements={visibleElements}
+                elementsById={elementsById}
+                obstacleRects={obstacleRects}
                 packRegistry={packRegistry}
                 isSelected={isConnectionSelected(conn.id)}
                 isHovered={hoveredConnectionId === conn.id}
@@ -5374,7 +5502,7 @@ export default function DiagramCanvas({
             ))}
             {/* Crossing indicators - render after connections */}
             <CrossingIndicators
-              connections={visibleConnections || []}
+              connections={mountedConnections || []}
               elements={visibleElements}
               packRegistry={packRegistry}
             />
@@ -5562,46 +5690,45 @@ export default function DiagramCanvas({
           </svg>
 
           {/* Nodes Layer - sorted by zIndex for proper layering, filtered for collapsed */}
-          {[...visibleElements].sort(compareByZOrder).map(element => (
-            <Node
+          {overview && (
+            <OverviewLayer
+              elements={zOrdered}
+              connections={visibleConnections}
+              theme={boardTheme}
+              viewport={viewport}
+              canvasRef={canvasRef}
+              selectedIds={selection.nodeIds}
+              sizeOf={sizeOfEl}
+              onSelect={(id, shift) => (shift ? toggleElementSelection(id) : selectElement(id))}
+            />
+          )}
+          {mountedElements.map(element => (
+            <MemoNode
               key={element.id}
               element={element}
               isSelected={isElementSelected(element.id)}
               isDragging={draggingElement === element.id}
               isCollapsed={element.collapsed && isMindMapElement(element)}
               collapsedChildCount={element.collapsedChildCount || 0}
-              onSelect={(id, shiftKey) => {
-                if (shiftKey) {
-                  toggleElementSelection(id);
-                } else {
-                  selectElement(id);
-                }
-              }}
-              onDragStart={handleDragStart}
-              onConnectStart={handleNodeConnectionStart}
-              onConnectEnd={handleNodeConnectionEnd}
-              onLabelChange={(id, label) => updateElement(id, { label })}
-              onAutoResize={(id, newSize) => updateElement(id, { size: newSize })}
-              onQuickCreate={handleQuickCreate}
+              onSelect={nodeFns.onSelect}
+              onDragStart={nodeFns.onDragStart}
+              onConnectStart={nodeFns.onConnectStart}
+              onConnectEnd={nodeFns.onConnectEnd}
+              onLabelChange={nodeFns.onLabelChange}
+              onAutoResize={nodeFns.onAutoResize}
+              onQuickCreate={nodeFns.onQuickCreate}
               packRegistry={packRegistry}
               readOnly={readOnly}
-              renderNode={renderNode}
+              renderNode={nodeFns.renderNode}
               isConnectMode={activeTool === 'connect'}
               isConnecting={isConnecting}
               isEditingLabel={editingLabelId === element.id}
-              onEditingLabelDone={(id, editing, cancelled) => {
-                setEditingLabelId(editing ? id : null);
-                if (editing) return;
-                const wasFresh = freshNodeIdsRef.current.delete(id);
-                if (cancelled && wasFresh && !readOnly) {
-                  const el = elements.find(x => x.id === id);
-                  if (el && !(el.label || '').trim()) discardElement(id);
-                }
-              }}
-              onShowProperties={onShowProperties}
+              onEditingLabelDone={nodeFns.onEditingLabelDone}
+              onShowProperties={nodeFns.onShowProperties}
               activePack={activePack}
-              hasConnections={connections?.some(c => c.sourceId === element.id || c.targetId === element.id) || false}
+              hasConnections={connectedIds.has(element.id)}
               commentMode={commentMode}
+              theme={boardTheme}
             />
           ))}
 

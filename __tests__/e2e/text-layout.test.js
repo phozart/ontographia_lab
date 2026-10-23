@@ -228,7 +228,9 @@ describe('Text layout and autosizing (ADR-0008 T1)', () => {
     }
     // the long labels that fit were given room by the server instead of being clipped
     const rectC140 = g.find((n) => n.type === 'rectangle' && n.label && n.label.startsWith('Aggregate'));
-    expect(rectC140.w).toBeGreaterThan(120);
+    // (an agent board opens fitted to its content, so the screen width is scaled: compare in board units)
+    const openScale = await page.$eval('.ds-canvas-inner', (n) => parseFloat(/scale\(([-\d.]+)\)/.exec(n.style.transform)[1]));
+    expect(rectC140.w / openScale).toBeGreaterThan(120);
     expect(rectC140.badge).toBe(false);
     await shot(page, 'text-agent-map-structure.png');
     await page.close();

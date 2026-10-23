@@ -11,6 +11,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import NotesIcon from '@mui/icons-material/Notes';
 import { buildExportHost } from '../export/captureCanvas';
+import { suspendCulling, isCanvasMounted } from '../canvasCulling';
+import { unionFrameRect } from './slideRect';
 import { frameBackground } from '../../../lib/present/themes';
 import { pruneToFrame } from './slideClone';
 import { actionForKey, actionForClick, actionForSwipe, moveIndex } from './presentKeys';
@@ -41,6 +43,19 @@ export default function PresentMode({ slides, deckTitle, index, onIndexChange, o
   const [typed, setTyped] = useState('');
   const [problem, setProblem] = useState(null);
   const [box, setBox] = useState({ w: 1280, h: 720 });
+  // the slides are cloned from the live canvas, which mounts only what is near the viewport (viewport culling):
+  // keep the slides' frames mounted for as long as we present, and clone only once the canvas has committed them
+  const [held, setHeld] = useState(() => !isCanvasMounted());
+  useEffect(() => {
+    let release = null;
+    let dead = false;
+    suspendCulling(unionFrameRect(slides.map((s) => s.frame))).then((r) => {
+      if (dead) { r(); return; }
+      release = r;
+      setHeld(true);
+    });
+    return () => { dead = true; if (release) release(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   stateRef.current = { index, count, onIndexChange, onExit, black, notesOn };
 
@@ -87,7 +102,7 @@ export default function PresentMode({ slides, deckTitle, index, onIndexChange, o
   // the slide itself: clone the live canvas, clipped to the frame; re-cloned when the board changes under us
   useEffect(() => {
     const stage = stageRef.current;
-    if (!stage || !slide?.frame) return undefined;
+    if (!held || !stage || !slide?.frame) return undefined;
     let built;
     try {
       built = buildExportHost({ scope: 'frame', frame: slide.frame, elements, connections, padding: 0, background: 'white' });
@@ -107,7 +122,7 @@ export default function PresentMode({ slides, deckTitle, index, onIndexChange, o
     host.style.setProperty('transform-origin', '0 0', 'important');
     host.style.setProperty('transform', `scale(${scale})`, 'important');
     return cleanup;
-  }, [slide?.frameId, slide?.frame, elements, connections, scale]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [held, slide?.frameId, slide?.frame, elements, connections, scale]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const showControls = useCallback(() => {
     setControls(true);

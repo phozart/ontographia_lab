@@ -2,6 +2,7 @@
 // Render the captured live canvas to PNG / JPEG / SVG / PDF blobs, plus a small preview.
 
 import { buildExportHost } from './captureCanvas';
+import { suspendCulling, rectOfFrame } from '../canvasCulling';
 import { getFontEmbedCSS } from './fontEmbed';
 import { clampPixelRatio, exportFilename, fitPdfPage } from './exportUtils';
 
@@ -42,14 +43,44 @@ export function nextFrames(n = 2) {
   });
 }
 
+/** The world rectangle the live canvas must mount for this export (null = the whole board). */
+function heldRectFor({ scope, frame, selection, elements = [] }) {
+  if (scope === 'frame' && frame) return rectOfFrame(frame);
+  if (scope === 'selection' && selection?.nodeIds?.length) {
+    const ids = new Set(selection.nodeIds);
+    const picked = elements.filter((e) => ids.has(e.id));
+    if (!picked.length) return null;
+    // a generous margin: stencil default sizes are not known here, and external labels / handles draw outside the box
+    const M = 800;
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const e of picked) {
+      const w = e.size?.width || 120; const h = e.size?.height || 60;
+      x0 = Math.min(x0, e.x || 0); y0 = Math.min(y0, e.y || 0); x1 = Math.max(x1, (e.x || 0) + w); y1 = Math.max(y1, (e.y || 0) + h);
+    }
+    return { x: x0 - M, y: y0 - M, width: x1 - x0 + 2 * M, height: y1 - y0 + 2 * M };
+  }
+  return null;
+}
+
 async function withHost(options, fn) {
-  const { host, bounds, cleanup } = buildExportHost(options);
+  // The clone is taken from the LIVE canvas DOM, which only mounts elements near the viewport (viewport culling):
+  // hold culling off for the whole board, or only for the frame when exporting one. A 'viewport' export needs nothing extra.
+  const release = options.scope === 'viewport' ? () => {} : await suspendCulling(heldRectFor(options));
+  let built;
+  try {
+    built = buildExportHost(options);
+  } catch (e) {
+    release();
+    throw e;
+  }
+  const { host, bounds, cleanup } = built;
   try {
     // Let fonts/images in the clone settle
     if (typeof document !== 'undefined' && document.fonts?.ready) await document.fonts.ready;
     return await fn(host, bounds);
   } finally {
     cleanup();
+    release();
   }
 }
 

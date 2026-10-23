@@ -50,6 +50,27 @@ describe('Text layout T2: the remaining packs, connection labels and tables', ()
     await page.waitForSelector(selector, { timeout: 90000 });
     await sleep(2500);
   }
+  /**
+   * Viewport culling mounts only the nodes near the view, so a board bigger than the screen is measured in tiles: pan across
+   * `w` x `h` world units from the opening view (the board's top-left) in steps of about one viewport and union the
+   * records by node id (no bypass flag is shipped for tests).
+   */
+  async function geometryAll(page, w, h) {
+    const all = new Map();
+    const area = await page.$eval('.ds-canvas-area', (a) => { const r = a.getBoundingClientRect(); return { l: r.left, t: r.top, w: r.width, h: r.height }; });
+    await page.mouse.move(area.l + area.w / 2, area.t + area.h / 2);
+    const stepX = Math.floor(area.w * 0.8); const stepY = Math.floor(area.h * 0.8);
+    const cols = Math.ceil(w / stepX) + 1; const rows = Math.ceil(h / stepY) + 1;
+    for (let r = 0; r < rows; r += 1) {
+      for (let c = 0; c < cols; c += 1) {
+        await sleep(250);
+        for (const rec of await geometry(page)) all.set(rec.id, rec);
+        if (c < cols - 1) await page.mouse.wheel({ deltaX: (r % 2 ? -1 : 1) * stepX, deltaY: 0 });
+      }
+      await page.mouse.wheel({ deltaX: 0, deltaY: stepY });
+    }
+    return [...all.values()];
+  }
   /** One record per node: its box, every text line's rect, font sizes, the block kind, and whether a clamp has its badge. */
   const geometry = (page) => page.evaluate(() => [...document.querySelectorAll('[data-node-id]')].map((n) => {
     const nr = n.getBoundingClientRect();
@@ -162,7 +183,7 @@ describe('Text layout T2: the remaining packs, connection labels and tables', ()
     const before = (await call(page, 'GET', `/api/diagrams/${legacy.id}`)).body;
     await open(page, legacy);
     await sleep(6000); // longer than an autosave debounce
-    const g = await geometry(page);
+    const g = await geometryAll(page, 5100, 4400);
     expect(g.length).toBe(els.length);
     checkNodes(g, 'legacy');
     for (const n of g) { const el = els.find((e) => e.id === n.id); expect([n.id, n.w]).toEqual([n.id, el.size.width]); } // rendering did not resize

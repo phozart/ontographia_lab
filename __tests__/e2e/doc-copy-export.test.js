@@ -212,7 +212,7 @@ describe('Doc copy and export', () => {
     await page.mouse.click(tb.x + 10, tb.y + 8, { button: 'right' });
     await page.waitForSelector('[data-testid="ctx-table-copy"]');
     await page.click('[data-testid="ctx-table-copy"]');
-    const clip = await waitFor(async () => { const c = await readClipboard(page); return /<table/.test(c['text/html'] || '') ? c : null; });
+    const clip = await waitFor(async () => { const c = await readClipboard(page); return /<th[^>]*>Risk<\/th>/.test(c['text/html'] || '') && /^Risk\t/.test(c['text/plain'] || '') ? c : null; }); // (both flavours of the NEW copy: the doc copy before it also has an HTML table, and a read can straddle the write)
     expect(clip['text/html']).toMatch(/<th[^>]*>Risk<\/th>/);
     expect(clip['text/html']).toContain(`${BASE_URL}/diagram/${diagram.short_id}?focus=auth`);
     expect(clip['text/plain'].split('\n')).toEqual(['Risk\tScore', 'Login\t3', "'=HYPERLINK(\"x\")\t5"]);
