@@ -328,3 +328,14 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Not verified:** Windows and Safari fallbacks; a real claude.ai session; PNG/PDF export parity (T3).
 - **Tests:** unit and component (`textSlot`, `textT2Sizing`, `textT2Structure`, `textTitleSlots`, `packsTypeScale`, `connectionLabelText` x2, `tableCellText`, `textUml`, `textTogafItil`, `textProductCap`, `textCldErd`, updated `tableNode`, `reviewFixes`, `stencilTemplates`, `textBlock`), e2e `text-t2` (10 tests).
 
+## Slice P3 - PPTX export (ADR-0007)
+
+- **PR title:** `feat(present): slice P3 PowerPoint export with native text, tables and notes, and 2x pictures for connected groups`
+- **Refs:** `docs/architecture/adr/0007-presentations-and-visual-primitives.md` sections 8.1, 8.3, 11 (P3), as-built in section 16; ADR-0008 section 8 (PPTX line breaks). Personas: Solution Architect and CX/UX (board to deck), Product Manager (share a deck), AI/MCP agent (decks it builds can be handed over as .pptx).
+- **Branch:** `feat/p3-pptx`
+- **Files changed:** `lib/present/pptx/{mapping,textRuns,compile,write,package}.js` (new), `components/diagram-studio/present/{exportPptx,PptxExportDialog,PresentationPanel,PresentationHost}.js`, `scripts/check-pptx-bundle.js`, `next.config.js` (client `IgnorePlugin` for `node:fs` / `node:https`), `package.json`, `package-lock.json`, ADR-0007 section 16, tests below.
+- **Dependency:** `pptxgenjs` 4.0.1, MIT, 5.2 MB installed; async chunks about 123.6 KB gzip (pptxgenjs 95.6 + jszip 28.0), writer chunk 10.6 KB gzip. `npm audit --omit=dev` reports `image-size` (via pptxgenjs, a Node-only file-sizing path that the browser build excludes and this code never reaches) among 5 findings; the other four (next, dompurify, ip-address) are pre-existing.
+- **Deviations from the design:** see ADR-0007 section 16 (Arial for Office-safe sans, package post-processing, the `next.config.js` change, row cap, `presentation_export` stays in P6).
+- **Not verified:** real PowerPoint, Keynote, Google Slides, LibreOffice (not installed).
+- **Tests:** unit `pptxMapping`, `pptxTextRuns`, `pptxExport`, `pptxPackage`, `pptxBundle`; component `pptxExportDialog`; e2e `pptx-export` plus slides and presets-themes.
+
