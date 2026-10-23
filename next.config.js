@@ -10,7 +10,7 @@ const nextConfig = {
   // Node" check that is false in a browser. Webpack cannot read the node: scheme in a client bundle, so those two requests are
   // ignored there (the import then throws if it were ever run, which the browser path never does).
   webpack(config, { isServer, webpack }) {
-    if (!isServer) config.plugins.push(new webpack.IgnorePlugin({ resourceRegExp: /^node:(fs|https)$/ }));
+    if (!isServer) config.plugins.push(new webpack.IgnorePlugin({ resourceRegExp: /^node:(fs|https)$/, contextRegExp: /pptxgenjs[\\/]dist/ }));
     return config;
   },
 

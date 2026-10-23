@@ -558,6 +558,8 @@ Status: **P1 to P3 are built; P4 to P6 are not.** New dependency (approved): **p
 4. Tables drop rows that do not fit the slide and end with "... N more rows on the board"; above 25 rows the dialog warns. Quote indentation is not exported (italic only). Charts and images are not in the deck yet (P4 and P5).
 5. A doc card is one rounded shape with text, not a card plus separate text.
 
+**Audit and pinning**: `npm audit` reports `image-size` via pptxgenjs. It is mapped to `false` in pptxgenjs's browser field and the server never imports pptxgenjs, so it is unreachable. The version is pinned to 4.0.1 because `package.js` assumes its bare `<a:p>` paragraphs (a test checks this). The `IgnorePlugin` for `node:` requests is scoped to `pptxgenjs/dist`, so our own client code importing `node:fs` still fails the build.
+
 **Bundle**: pptxgenjs sits in its own async chunks, 273 KB raw / 95.6 KB gzip plus jszip 96 KB / 28.0 KB gzip (about 123.6 KB gzip, as estimated); compile and writer are a third async chunk (26 KB raw, 10.6 KB gzip). No page lists them in the build manifest. `scripts/check-pptx-bundle.js` and `__tests__/scripts/pptxBundle.test.js` check this after a production build.
 
 **Verification**: Quick Look (Apple's Office renderer) showed the slides; LibreOffice is not installed here and driving Keynote timed out, so **PowerPoint, Keynote import, LibreOffice and Google Slides are still the manual checklist of section 11**. Quick Look places list bullets left of the text box (the same for plain pptxgenjs output), PowerPoint's rules put them at the box edge.

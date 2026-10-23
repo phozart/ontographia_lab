@@ -27,6 +27,25 @@ describe('dedupeParagraphProps', () => {
   });
 });
 
+describe('pptxgenjs 4.0.1 output shape (package.js assumes bare <a:p>)', () => {
+  test('the installed version is 4.0.1 and its slide XML opens paragraphs with a bare <a:p>', async () => {
+    const PptxGenJS = require('pptxgenjs');
+    expect(require('fs').readFileSync(require.resolve('pptxgenjs').replace(/dist.*$/, 'package.json'), 'utf8')).toMatch(/"version": "4\.0\.1"/);
+    const real = process.release;
+    Object.defineProperty(process, 'release', { value: { ...real, name: 'browser-like' }, configurable: true });
+    try {
+      const pres = new PptxGenJS();
+      pres.addSlide().addText([{ text: 'a', options: { breakLine: false } }, { text: 'b', options: {} }], { x: 1, y: 1, w: 2, h: 1 });
+      const files = unzipSync(await pres.write({ outputType: 'uint8array' }));
+      const xml = strFromU8(files['ppt/slides/slide1.xml']);
+      expect(xml).toMatch(/<a:p><a:pPr/);
+      expect(xml).not.toMatch(/<a:p [^>]*>/);
+    } finally {
+      Object.defineProperty(process, 'release', { value: real, configurable: true });
+    }
+  });
+});
+
 describe('fixPackage', () => {
   test('rewrites slide parts, keeps every other part byte for byte', () => {
     const slide = '<a:p><a:pPr a="1"/><a:r/><a:pPr a="1"/><a:r/></a:p>';

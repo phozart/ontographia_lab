@@ -74,6 +74,11 @@ describe('hyperlinks', () => {
     expect(safeLink('http://example.com/', ctx)).toBe('http://example.com/');
     expect(safeLink('mailto:a@b.co', ctx)).toBe('mailto:a@b.co');
   });
+  test('external links with a user name or password are dropped', () => {
+    expect(safeLink('https://user:pw@example.com/', ctx)).toBeNull();
+    expect(safeLink('http://user@example.com/', ctx)).toBeNull();
+    expect(safeLink('https://example.com/@x', ctx)).toBe('https://example.com/@x');
+  });
   test('lab links become absolute lab URLs', () => {
     expect(safeLink('/diagram/LAB-7', ctx)).toBe('https://lab.example.com/diagram/LAB-7');
     expect(safeLink('/diagram/LAB-7?focus=a,b', ctx)).toBe('https://lab.example.com/diagram/LAB-7?focus=a,b');
@@ -99,6 +104,12 @@ describe('text safety, notes and file name', () => {
     expect(xmlSafe('a\u0000b\u0008c\u000bd￾e')).toBe('abcde');
     expect(xmlSafe('Tab\tand\nline <b>not html</b> & "quotes"')).toBe('Tab\tand\nline <b>not html</b> & "quotes"');
     expect(xmlSafe(undefined)).toBe('');
+  });
+  test('xmlSafe turns lone surrogates into U+FFFD and keeps real pairs', () => {
+    expect(xmlSafe('a\ud800b')).toBe('a\ufffdb');
+    expect(xmlSafe('a\udc00b')).toBe('a\ufffdb');
+    expect(xmlSafe('x\ud83d')).toBe('x\ufffd');
+    expect(xmlSafe('ok \ud83d\ude42')).toBe('ok \ud83d\ude42');
   });
   test('notes are plain text, control and bidi characters stripped, capped at 10 KB', () => {
     expect(safeNotes('Say hi‮ now\u0000')).toBe('Say hi now');

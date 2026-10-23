@@ -42,7 +42,7 @@ describe('pptxgenjs is lazy (source)', () => {
 
   test('the library is a pinned production dependency', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
-    expect(pkg.dependencies.pptxgenjs).toMatch(/^\^?4\.\d+\.\d+$/);
+    expect(pkg.dependencies.pptxgenjs).toBe('4.0.1') // pinned: package.js assumes 4.0.1's bare <a:p> output;
   });
 });
 
