@@ -6,6 +6,14 @@ const nextConfig = {
   output: 'standalone',
   outputFileTracingRoot: path.join(__dirname, './'),
 
+  // pptxgenjs (ADR-0007 P3, loaded by dynamic import on export only) names node:fs and node:https behind a runtime "is this
+  // Node" check that is false in a browser. Webpack cannot read the node: scheme in a client bundle, so those two requests are
+  // ignored there (the import then throws if it were ever run, which the browser path never does).
+  webpack(config, { isServer, webpack }) {
+    if (!isServer) config.plugins.push(new webpack.IgnorePlugin({ resourceRegExp: /^node:(fs|https)$/, contextRegExp: /pptxgenjs[\\/]dist/ }));
+    return config;
+  },
+
   // OAuth discovery documents (ADR-0005, Q-OA8). The handlers answer 404 unless MCP_OAUTH_ENABLED is on.
   async rewrites() {
     return [

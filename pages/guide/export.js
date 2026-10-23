@@ -298,7 +298,7 @@ export default function ExportImportPage() {
           <li>Open the diagram you want to export</li>
           <li>Click the menu icon (☰) in the top-left corner</li>
           <li>Select <strong style={{ color: 'white' }}>Export...</strong> from the menu</li>
-          <li>Choose your desired format (PNG, SVG, JPEG, PDF, or JSON)</li>
+          <li>Choose your desired format (PNG, SVG, JPEG, PDF, or JSON). For a PowerPoint file, open Presentation from the title menu and choose Export PPTX.</li>
           <li>Configure export options (background, scale, selection)</li>
           <li>Click <strong style={{ color: 'white' }}>Export</strong></li>
         </Box>

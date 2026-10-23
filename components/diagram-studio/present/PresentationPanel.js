@@ -73,13 +73,13 @@ function NotesField({ value, disabled, onCommit, label }) {
  * @param {{open: boolean, onClose: () => void, content: {elements: object[], connections: object[], presentations: object[]},
  *          activeId: string|null, onActiveChange: (id: string|null) => void, canEdit: boolean, selectedFrameIds: string[],
  *          patchPresentation: Function, addElement: Function, removeElement: Function, getLiveElements: () => object[], onPresent: (presentationId: string, index: number) => void,
- *          onExportPdf: (presentationId: string) => void, onExportPng: (presentationId: string, slideId: string) => void,
+ *          onExportPdf: (presentationId: string) => void, onExportPptx: (presentationId: string) => void, onExportPng: (presentationId: string, slideId: string) => void,
  *          onRevealFrame: (frame: object) => void, exporting: null | {done: number, total: number}, onCancelExport: () => void,
  *          exportError: string|null, exportNote?: string|null}} props
  */
 export default function PresentationPanel({
   open, onClose, content, activeId, onActiveChange, canEdit, selectedFrameIds, patchPresentation, addElement, removeElement, getLiveElements,
-  onPresent, onExportPdf, onExportPng, onRevealFrame, exporting, onCancelExport, exportError, exportNote,
+  onPresent, onExportPdf, onExportPptx, onExportPng, onRevealFrame, exporting, onCancelExport, exportError, exportNote,
   theme, onApplyTheme, onAddSlideWithLayout, onApplyLayout, onAddText,
 }) {
   const panelRef = useRef(null);
@@ -170,6 +170,7 @@ export default function PresentationPanel({
           <div className="pp-actions">
             <button type="button" className="pp-btn primary" data-testid="pp-present" onClick={() => onPresent(deck.id, 0)} disabled={playable.length === 0}>Present</button>
             <button type="button" className="pp-btn" data-testid="pp-export-pdf" onClick={() => (playable.length > PDF_WARN_SLIDES ? setConfirmBig(true) : onExportPdf(deck.id))} disabled={playable.length === 0 || !!exporting}>Export PDF</button>
+            <button type="button" className="pp-btn" data-testid="pp-export-pptx" onClick={() => onExportPptx?.(deck.id)} disabled={playable.length === 0 || !!exporting} title="Export a PowerPoint file with editable text, tables and shapes">Export PPTX</button>
           </div>
         )}
         {confirmBig && deck && (

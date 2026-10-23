@@ -1,6 +1,6 @@
 # ADR-0007 — Presentations and visual primitives (slides, present mode, PPTX/PDF export, deck tools for Claude)
 
-- Status: **Accepted** (2026-10-22, owner approved all recommended defaults). **P1 and P2 are built** (sections 14 and 15); P3 to P6 are not.
+- Status: **Accepted** (2026-10-22, owner approved all recommended defaults). **P1, P2 and P3 are built** (sections 14, 15 and 16); P4 to P6 are not.
 - Builds on: frames with explicit membership (`utils/frameMembership.js`), the live-canvas export pipeline (`export/captureCanvas.js`, `exportRenderer.js`), Table (AI-4) and Doc (AI-5) elements, the server SVG renderer (`lib/render/diagramSvg.js`, AI-9a), the MCP write path `agentWrite` → `applyContentChange`, and sharing (ADR-0003, slice 5). It changes no accepted decision.
 - Owner request (2026-10-22): "a create presentation option would also be good through Claude … more options to add things on the visuals; more like a Canva/Figma style … or like Claude natively already does [its visual artifacts], but then putting it there together visually next to each other so that it could also be exported to a PPT."
 - Personas: **AI/MCP agent** (builds the deck), **Solution Architect** (architecture review decks from maps and ADR docs), **CX/UX** (research readouts: findings doc, affinity map, evidence table side by side), **PM** (roadmap and KPI updates from tables).
@@ -535,3 +535,35 @@ Status: **P1 and P2 are built; P3 to P6 are not.** No new npm dependency and no 
 **Not verified**: a real claude.ai session building the deck (needs the deployed connector); Safari and Firefox rendering of the fonts and the table CSS scale; boards with hundreds of slides. The visual check ran in headless Chrome at 1379 x 985 against a throwaway database.
 
 **Tests**: `presentTheme`, `presentFrameBackground`, `presentTextPreset`, `presentTextLayout`, `presentContentValidation`, `presentLayouts`, `presentCompose`, `presentOps`, `presentSvg`, `presentThemeIntegration`, `presentSlideBuild`, `presentAlignToSlide`, `mcpSlideCompose`, the updated `mcpServer`, `mcpAgentActivity` and `claudeSkill`, components `textPresetNode`, `designControls`, `deckActionsP2`, `tableScale`, `docDisplayFull`, `shapeStyle`, db (`diagramRepositoryAgentEdit`: one version and one audit row per P2 call, refused calls write nothing, restore brings back the old theme) and `__tests__/e2e/presets-themes.test.js` (layout, apply layout, title / body / number presets, theme switch, present, PDF; and a real MCP agent building a 5-slide themed deck presented slide by slide).
+
+## 16. As built: slice P3 (2026-10-23)
+
+Status: **P1 to P3 are built; P4 to P6 are not.** New dependency (approved): **pptxgenjs 4.0.1** (MIT; brings jszip and, for Node-only paths, image-size and https). No migration.
+
+**What P3 contains**
+
+- **Export** (browser only, no server file): "Export PPTX" in the Presentation panel opens a dialog (`present/PptxExportDialog.js`) with the slide count, skipped slides, the **Office-safe fonts** option (on by default), the fidelity limits and per-deck warnings; then `present/exportPptx.js` compiles, captures and writes. `presentation_export` (the deep link) stays in P6, as section 11 says.
+- **Pure core** under `lib/present/pptx/`: `compile.js` (the slide IR, section 8.1), `textRuns.js` (markdown to paragraphs and runs, with the engine's line breaks), `write.js` (IR to .pptx; pptxgenjs is injected), `mapping.js` (units, colours, fonts, link allow-list, notes, file name), `package.js` (post-processing). Unit-tested in Node by writing real files and reading the XML back.
+- **Native and editable**: text presets (explicit soft line breaks from `lib/text` through the same wrap call as the canvas, `fit: none`, box 4% wider and at least the canvas height plus 8%), core rectangle / circle / diamond with fill, border, radius and opacity, sticky notes, nested frames and sections as boxes with a title, tables (header row, select-chip fills, number alignment, boolean marks), docs (card as one rounded shape with title and text, or `display: full` as a text box; cut at the box height with an ellipsis and the doc link in the notes), dividers, speaker notes, the first title (else heading) text as the slide's **title placeholder**.
+- **Pictures**: every other pack, every connector, and every element a connector touches: one **2x transparent PNG per connected component**, captured from the live canvas clone (the PDF/PNG export path) with only that cluster kept, placed at its box (alt text lists the labels).
+- **Theme**: slide background and every token colour resolve through the board theme. Fonts: Office-safe maps all sans families to **Arial**, Source Serif 4 to **Georgia**, IBM Plex Mono to **Courier New**; off keeps the theme family names.
+- **Slide size**: 16:9 is 13.333 x 7.5 in, 4:3 is 10 x 7.5, 1:1 is 7.5 x 7.5; other ratios fit inside 13.333 x 7.5. PowerPoint has one slide size per file, so slides of another shape are scaled to fit and centred (a warning says so).
+- **Security**: all text goes in as text (pptxgenjs escapes it; XML-invalid control characters are stripped), links pass the doc allow-list plus absolute lab URLs (`/diagram/...` and `#el=` become `https://<lab>/diagram/<id>...`), notes strip control and bidi characters and are capped at 10 KB, the file name is sanitized, table cells are never formulas.
+
+**Deviations from the design**
+
+1. Office-safe sans is **Arial** only (the sketch said Aptos/Calibri/Arial): Arial exists on Windows, macOS, Keynote and Google Slides and is the closest width to the Inter-class faces. Aptos is not on older Office.
+2. pptxgenjs 4.0.1 writes `<a:pPr>` in front of every run; `package.js` keeps the first per paragraph so PowerPoint does not ask to repair the file (fflate, already a dependency, reads and rewrites the zip).
+3. `next.config.js` gained a client-only `IgnorePlugin` for `node:fs` and `node:https`: pptxgenjs names them behind a runtime "is this Node" check and webpack cannot read the `node:` scheme.
+4. Tables drop rows that do not fit the slide and end with "... N more rows on the board"; above 25 rows the dialog warns. Quote indentation is not exported (italic only). Charts and images are not in the deck yet (P4 and P5).
+5. A doc card is one rounded shape with text, not a card plus separate text.
+
+**Audit and pinning**: `npm audit` reports `image-size` via pptxgenjs. It is mapped to `false` in pptxgenjs's browser field and the server never imports pptxgenjs, so it is unreachable. The version is pinned to 4.0.1 because `package.js` assumes its bare `<a:p>` paragraphs (a test checks this). The `IgnorePlugin` for `node:` requests is scoped to `pptxgenjs/dist`, so our own client code importing `node:fs` still fails the build.
+
+**Bundle**: pptxgenjs sits in its own async chunks, 273 KB raw / 95.6 KB gzip plus jszip 96 KB / 28.0 KB gzip (about 123.6 KB gzip, as estimated); compile and writer are a third async chunk (26 KB raw, 10.6 KB gzip). No page lists them in the build manifest. `scripts/check-pptx-bundle.js` and `__tests__/scripts/pptxBundle.test.js` check this after a production build.
+
+**Verification**: Quick Look (Apple's Office renderer) showed the slides; LibreOffice is not installed here and driving Keynote timed out, so **PowerPoint, Keynote import, LibreOffice and Google Slides are still the manual checklist of section 11**. Quick Look places list bullets left of the text box (the same for plain pptxgenjs output), PowerPoint's rules put them at the box edge.
+
+**Not verified**: opening in real PowerPoint (repair prompt), Keynote, Google Slides; boards with hundreds of slides; fonts missing on the recipient's machine.
+
+**Tests**: `pptxMapping`, `pptxTextRuns` (line parity with `textLayout`), `pptxExport` (IR and a real package, hostile input), `pptxPackage`, component `pptxExportDialog`, `pptxBundle` (source and build), and the browser test `__tests__/e2e/pptx-export.test.js` (dialog, download, native table and text, real 2x UML picture, five-slide deck, fonts option, a viewer).
