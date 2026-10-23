@@ -9,6 +9,14 @@ const nextConfig = {
   // pptxgenjs (ADR-0007 P3, loaded by dynamic import on export only) names node:fs and node:https behind a runtime "is this
   // Node" check that is false in a browser. Webpack cannot read the node: scheme in a client bundle, so those two requests are
   // ignored there (the import then throws if it were ever run, which the browser path never does).
+  // Same rule for Turbopack, which `next build` uses by default (the production Docker build): in browser bundles the two
+  // built-ins resolve to an empty module.
+  turbopack: {
+    resolveAlias: {
+      'node:fs': { browser: './lib/emptyModule.js' },
+      'node:https': { browser: './lib/emptyModule.js' },
+    },
+  },
   webpack(config, { isServer, webpack }) {
     if (!isServer) config.plugins.push(new webpack.IgnorePlugin({ resourceRegExp: /^node:(fs|https)$/, contextRegExp: /pptxgenjs[\\/]dist/ }));
     return config;
