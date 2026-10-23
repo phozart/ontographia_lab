@@ -10,6 +10,7 @@ import { resolveDeck, isFrameElement } from '../../../lib/present/presentationMo
 import { downloadExport } from '../export/ExportManager';
 import PresentationPanel from './PresentationPanel';
 import PresentMode from './PresentMode';
+import PptxExportDialog from './PptxExportDialog';
 import { exportDeckPdf, exportSlidePng } from './exportDeck';
 import { clampIndex, addNewSlide, applyLayoutToFrame, addPresetText } from './deckActions';
 import {
@@ -67,8 +68,11 @@ export default function PresentationHost({ containerRef }) {
   const abortRef = useRef(null);
   const linkTried = useRef(null);
   const [notice, setNotice] = useState(null);
+  const [pptxFor, setPptxFor] = useState(null); // presentation id whose PowerPoint export dialog is open
+  const boardUrl = typeof window !== 'undefined' && diagram ? `${window.location.origin}/diagram/${diagram.short_id || diagram.id}` : '';
 
   const content = useMemo(() => ({ elements, connections, presentations: presentations || [] }), [elements, connections, presentations]);
+  const contentWithTheme = useMemo(() => ({ ...content, theme }), [content, theme]);
   const selectedFrameIds = useMemo(
     () => (selection?.nodeIds || []).filter((id) => isFrameElement(elements.find((e) => e.id === id))),
     [selection, elements]
@@ -176,6 +180,7 @@ export default function PresentationHost({ containerRef }) {
         getLiveElements={() => elementsRef.current}
         onPresent={(presentationId, i) => startPresenting(presentationId, i)}
         onExportPdf={(id) => runExport(id)}
+        onExportPptx={(id) => setPptxFor(id)}
         onExportPng={(id, slideId) => runExport(id, slideId)}
         onRevealFrame={reveal}
         exporting={exporting}
@@ -187,6 +192,14 @@ export default function PresentationHost({ containerRef }) {
         onAddSlideWithLayout={(layout) => addNewSlide({ patchPresentation, addElement, presentations, activeId: state.activeId, elements: elementsRef.current, layout })}
         onApplyLayout={(layout) => applyLayoutToFrame({ frame: elements.find((e) => e.id === selectedFrameIds[0]), elements: elementsRef.current, layout, addElement, updateElement, removeElement })}
         onAddText={(preset) => addPresetText({ preset, frame: elements.find((e) => e.id === selectedFrameIds[0]) || null, elements: elementsRef.current, addElement, center: viewportCenter() })}
+      />
+      <PptxExportDialog
+        open={!!pptxFor}
+        onClose={() => setPptxFor(null)}
+        content={contentWithTheme}
+        presentationId={pptxFor}
+        boardUrl={boardUrl}
+        onDownload={downloadExport}
       />
       {presenting && deck && (
         <PresentMode
