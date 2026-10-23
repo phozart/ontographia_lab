@@ -1,6 +1,7 @@
 // components/diagram-studio/packs/TOGAFPack.js
 // TOGAF/ArchiMate Enterprise Architecture pack
 
+import { togafContainerSpec } from './labelSlots';
 import { stencils, connectionTypes } from './catalog/togaf';
 import { ElementText, SlotText } from '../text/useTextLayout';
 
@@ -847,7 +848,7 @@ function ArchiMateNode({ element, stencil, isSelected }) {
         <SlotText
           element={element}
           text={label}
-          box={{ x: iconLeft + (hasIcon ? iconSize + 6 : 0), y: type === 'node' ? 8 : 4, width: Math.max(20, width - iconLeft - (hasIcon ? iconSize + 6 : 0) - 8), height: 22 }}
+          box={togafContainerSpec(element, stencil).box}
           role="title"
           maxLines={1}
           align="start"

@@ -1,6 +1,7 @@
 // components/diagram-studio/packs/ProductDesignPack.js
 // Product Design canvas pack with structured canvas templates
 
+import { personaNameSpec } from './labelSlots';
 import { withBelowLabel } from './NodeLabels';
 import { stencils, connectionTypes } from './catalog/product-design';
 import { useMemo } from 'react';
@@ -884,17 +885,11 @@ function ZoneNode({ element, stencil }) {
 // the persona's name (emphasis, up to 3 lines) and the one-line role under it, centered as one block next to the avatar
 function PersonaText({ element, stencil, label }) {
   const policy = policyFor('product-design', stencil);
-  const { width, height } = element.size || stencil?.defaultSize || { width: 720, height: 120 };
-  const w = Math.max(20, width - policy.inset.l - policy.inset.r);
-  const nameLayout = useMemo(() => layoutForSlot(element, { text: label, box: { x: 0, y: 0, width: w, height: 80 }, role: 'emphasis', maxLines: policy.maxLines, align: 'start', valign: 'top', own: true }).layout, [element, label, w, policy.maxLines]);
-  const roleH = 18;
-  const gap = 4;
-  const nameH = Math.max(nameLayout.height, 22);
-  const top = Math.max(4, (height - (nameH + gap + roleH)) / 2);
+  const slots = useMemo(() => personaNameSpec(element, stencil, label, policy), [element, stencil, label, policy]);
   return (
     <>
-      <SlotText element={element} text={label} box={{ x: policy.inset.l, y: top, width: w, height: nameH }} role="emphasis" maxLines={policy.maxLines} align="start" valign="top" own color={element.textColor || '#1e40af'} testId="name" />
-      <SlotText element={element} text={element.data?.role || 'Role / Segment'} box={{ x: policy.inset.l, y: top + nameH + gap, width: w, height: roleH }} role="meta" maxLines={1} align="start" valign="top" color="#3b82f6" testId="role" />
+      <SlotText element={element} text={label} box={slots.name.box} role="emphasis" maxLines={policy.maxLines} align="start" valign="top" own color={element.textColor || '#1e40af'} testId="name" />
+      <SlotText element={element} text={element.data?.role || 'Role / Segment'} box={slots.role.box} role="meta" maxLines={1} align="start" valign="top" color="#3b82f6" testId="role" />
     </>
   );
 }

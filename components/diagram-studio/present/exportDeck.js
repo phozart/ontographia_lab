@@ -35,11 +35,12 @@ export function pdfPageSize(frameWidth, frameHeight) {
 
 const backgroundOf = frameBackground;
 
-async function captureSlide(htmlToImage, slide, { elements, connections, fontEmbedCSS, scale, theme }) {
+async function captureSlide(htmlToImage, slide, { elements, connections, scale, theme }) {
   const { host, bounds, cleanup } = buildExportHost({ scope: 'frame', frame: slide.frame, elements, connections, padding: 0, background: 'white' });
   try {
     pruneToFrame(host, slide.frame);
     if (typeof document !== 'undefined' && document.fonts?.ready) await document.fonts.ready;
+    const fontEmbedCSS = await getFontEmbedCSS(document, host); // only the faces this slide's text uses
     const pixelRatio = clampPixelRatio(bounds.width, bounds.height, scale);
     const dataUrl = await htmlToImage.toPng(host, {
       width: bounds.width, height: bounds.height, pixelRatio, backgroundColor: backgroundOf(slide.frame, theme), cacheBust: false, fontEmbedCSS,
@@ -67,7 +68,6 @@ export async function exportDeckPdf({ slides, elements, connections, title, them
   if (!slides.length) throw new Error('There are no slides to export. Add slides, or show hidden ones.');
   const htmlToImage = await import('html-to-image');
   const { jsPDF } = await import('jspdf');
-  const fontEmbedCSS = await getFontEmbedCSS();
   // slides are cloned from the live canvas, which mounts only what is near the viewport: keep the slides' frames mounted
   const release = await suspendCulling(unionFrameRect(slides.map((s) => s.frame)));
   try {
@@ -75,7 +75,7 @@ export async function exportDeckPdf({ slides, elements, connections, title, them
   for (let i = 0; i < slides.length; i += 1) {
     if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
     onProgress?.(i, slides.length);
-    const shot = await captureSlide(htmlToImage, slides[i], { elements, connections, fontEmbedCSS, scale, theme });
+    const shot = await captureSlide(htmlToImage, slides[i], { elements, connections, scale, theme });
     const page = pdfPageSize(shot.width, shot.height);
     if (!doc) {
       doc = new jsPDF({ orientation: page.width >= page.height ? 'landscape' : 'portrait', unit: 'pt', format: [page.width, page.height], compress: true });
@@ -98,11 +98,10 @@ export async function exportDeckPdf({ slides, elements, connections, title, them
 /** One slide as a PNG (2x by default, clamped like every export). */
 export async function exportSlidePng({ slide, elements, connections, title, theme, scale = 2, number }) {
   const htmlToImage = await import('html-to-image');
-  const fontEmbedCSS = await getFontEmbedCSS();
   const release = await suspendCulling(rectOfFrame(slide.frame));
   let shot;
   try {
-    shot = await captureSlide(htmlToImage, slide, { elements, connections, fontEmbedCSS, scale, theme });
+    shot = await captureSlide(htmlToImage, slide, { elements, connections, scale, theme });
   } finally {
     release();
   }

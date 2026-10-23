@@ -51,7 +51,9 @@ describe('text presets', () => {
   test('alignment and italic are honoured', () => {
     const svg = render([text('x', 'quote', { fontSize: 40, data: { text: { preset: 'quote', markdown: 'x', align: 'center' } } })]);
     expect(svg).toContain('font-style="italic"');
-    expect(svg).toContain('text-anchor="middle"');
+    // centered: the pinned line sits in the middle of the 400 px box that starts at x = 40
+    const m = /<tspan x="([\d.]+)" y="[\d.]+" textLength="([\d.]+)"/.exec(svg);
+    expect(Math.abs(Number(m[1]) + Number(m[2]) / 2 - 240)).toBeLessThan(1);
   });
   test('hostile text and colours are escaped and never reach attributes', () => {
     const svg = render([text('<script>alert(1)</script> "quoted"', 'body', { data: { text: { preset: 'body', markdown: '\\<script>alert(1)\\</script> "quoted"', color: '#ff0000' } } })]);

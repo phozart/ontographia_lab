@@ -6,6 +6,11 @@ import { buildExportEnvelope, sanitizeFilename } from './diagramJson';
 import { exportFromCanvas } from './exportRenderer';
 import { renderTableSvg } from '../../../lib/table/tableSvg';
 import { tableOf } from '../../../lib/table/tableModel';
+import { findStencilMeta } from '../packs/catalog';
+import { policyFor } from '../../../lib/text/policy';
+import { layoutForElement, layoutForExternal, layoutForTitle, layoutForSlot } from '../../../lib/text/fit';
+import { connectionLabelLayout } from '../../../lib/text/connectionLabel';
+import { textLayoutToSvg, FONT_STACK } from '../../../lib/text/svg';
 
 function hasLiveCanvas() {
   return typeof document !== 'undefined' && !!document.querySelector('.ds-canvas-inner');
@@ -147,6 +152,7 @@ export class ExportManager {
     // Build SVG content
     let svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg"
+     font-family="${FONT_STACK}"
      width="${width}"
      height="${height}"
      viewBox="${minX} ${minY} ${width} ${height}"
@@ -397,7 +403,8 @@ export class ExportManager {
         safeColor: (v, fallback) => (typeof v === 'string' && /^#[0-9a-f]{3,8}$/i.test(v) ? v : fallback),
         maxRows: 500,
       });
-      const title = label ? `${indent}  <text x="2" y="-8" font-family="sans-serif" font-size="14" font-weight="600" fill="#334155">${this.escapeXml(label)}</text>\n` : '';
+      const tl = label ? layoutForSlot(el, { text: label, box: { x: 2, y: -26, width: Math.max(20, w - 4), height: 22 }, role: 'title', mode: 'fixed', maxLines: 1, align: 'start', valign: 'middle' }) : null;
+      const title = tl ? `${indent}  ${textLayoutToSvg(tl.layout, { x: tl.box.x, y: tl.box.y }, { fill: '#334155', box: tl.box })}\n` : '';
       return `${svg}${title}${indent}  ${drawn.svg}\n${indent}</g>\n`;
     }
 
@@ -420,10 +427,14 @@ export class ExportManager {
         svg += `${indent}  <rect width="${w}" height="${h}" rx="6" fill="${color}" fill-opacity="0.2" stroke="${color}" stroke-width="2"/>\n`;
     }
 
-    // Label
+    // Label: the lines of the shared text layout (lib/text), the same ones the canvas draws, in the stencil's text slot
     if (label) {
-      const textY = h / 2;
-      svg += `${indent}  <text x="${w / 2}" y="${textY}" text-anchor="middle" dominant-baseline="middle" font-family="sans-serif" font-size="13" fill="#374151">${this.escapeXml(label)}</text>\n`;
+      const stencil = findStencilMeta(type, el.packId)?.stencil;
+      const policy = policyFor(el.packId, stencil || { id: type });
+      const sel = { ...el, size: { width: w, height: h } };
+      const lay = policy.slot === 'external' ? layoutForExternal(sel, policy, label) : policy.slot === 'title' ? layoutForTitle(sel, policy, label) : layoutForElement(sel, policy, label);
+      const fill = policy.slot === 'inside' ? '#374151' : '#334155';
+      svg += `${indent}  ${textLayoutToSvg(lay.layout, { x: lay.box.x, y: lay.box.y }, { fill, family: el.fontFamily || '', box: lay.box })}\n`;
     }
 
     svg += `${indent}</g>\n`;
@@ -457,11 +468,15 @@ export class ExportManager {
     let svg = `${indent}<g${dataAttrs}>\n`;
     svg += `${indent}  <path d="${path}" fill="none" stroke="${color}" stroke-width="2"${strokeDasharray}${markerEnd}/>\n`;
 
-    // Connection label
+    // Connection label: measured lines plus padding, centered on the midpoint (lib/text/connectionLabel)
     if (label) {
       const midX = (sourceCenter.x + targetCenter.x) / 2;
       const midY = (sourceCenter.y + targetCenter.y) / 2;
-      svg += `${indent}  <text x="${midX}" y="${midY - 8}" text-anchor="middle" font-family="sans-serif" font-size="11" fill="${color}">${this.escapeXml(label)}</text>\n`;
+      const m = connectionLabelLayout(label);
+      const rx = midX - m.width / 2;
+      const ry = midY - m.height / 2;
+      svg += `${indent}  <rect x="${rx}" y="${ry}" width="${m.width}" height="${m.height}" rx="4" fill="#ffffff" fill-opacity="0.92"/>\n`;
+      svg += `${indent}  ${textLayoutToSvg(m.layout, { x: rx + m.textBox.x, y: ry + m.textBox.y }, { fill: color })}\n`;
     }
 
     svg += `${indent}</g>\n`;
