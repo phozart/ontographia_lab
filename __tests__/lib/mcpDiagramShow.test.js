@@ -123,9 +123,9 @@ describe('diagram_show', () => {
   test('a focus link shows that region and links back with the same focus', async () => {
     const r = await show(await connect(), { focus: { link: 'https://anything.example/diagram/LAB-0?focus=fr1' }, highlight: 'none' });
     expect(r.structuredContent.focus).toMatchObject({ kind: 'elements', matched: 3 }) // a frame id in a link expands to its members;
-    expect(r.structuredContent.rendered).toEqual({ elements: 3, connections: 1 });
+    expect(r.structuredContent.rendered).toEqual({ elements: 3, connections: 1, detail: 'full' });
     expect(r.structuredContent.openUrl).toBe('https://lab.example.com/diagram/LAB-0?focus=fr1,n1,n2');
-    expect(view(r).svg).not.toContain('data-id="loose"');
+    expect(view(r).svg).not.toContain('>Loose<');
   });
 
   test('highlight auto: marks the latest agent change (slice-8 diff of the version before -> the agent version)', async () => {
@@ -139,7 +139,7 @@ describe('diagram_show', () => {
     const v = view(r);
     expect(v.highlight).toMatchObject({ summary: { added: 4, changed: 1, removed: 1 } });
     expect(v.highlightBox).toEqual({ x: 20, y: 20, width: 980, height: 380 }); // n1..loose plus the ghost of "old"
-    expect(v.svg).toContain('stroke-dasharray="7 5"'); // removed ghost
+    expect(v.svg).toContain("stroke-dasharray='7 5'"); // removed ghost
   });
 
   test('highlight auto skips an agent change that later edits superseded; last-agent-change forces it; none skips the lookup', async () => {
@@ -182,10 +182,31 @@ describe('diagram_show', () => {
     };
     repo.getContent.mockResolvedValue({ content: big, description: '' });
     const r = await show(await connect({ versions: fakeVersions({ agent: false }) }), { id: A });
-    expect(JSON.stringify(r).length).toBeLessThan(120000);
-    expect(r.structuredContent.tooLarge || r.structuredContent.truncated).toBeTruthy();
-    expect(text(r)).toMatch(/too large|Not drawn/);
+    expect(JSON.stringify(r).length).toBeLessThan(130000);
+    // ADR-0009: a large board is drawn (full fidelity gzipped, or the overview), never "too large" at this size
+    const v = view(r);
+    expect(v.svg || v.svgz).toBeTruthy();
+    expect(r.structuredContent.tooLarge).toBeUndefined();
   });
+
+  test('ADR-0009 budget ladder: 2,000 elements full (gzip), 6,000 as an overview with regions, all under the inline limit', async () => {
+    const { largeBoard } = require('../helpers/showFidelityBoard');
+    for (const [n, detail] of [[2000, 'full'], [6000, 'overview']]) {
+      repo.getContent.mockResolvedValue({ content: largeBoard(n), description: '' });
+      const r = await show(await connect({ versions: fakeVersions({ agent: false }) }), { id: A });
+      expect(JSON.stringify(r).length).toBeLessThan(130000);
+      expect(r.structuredContent.rendered.detail).toBe(detail);
+      const v = view(r);
+      expect(typeof v.svgz).toBe('string');
+      const svg = require('zlib').gunzipSync(Buffer.from(v.svgz, 'base64')).toString('utf8');
+      expect(svg).toMatch(/^<svg xmlns/);
+      if (detail === 'overview') {
+        expect(v.regions.length).toBeGreaterThan(10);
+        expect(v.regions[0]).toMatchObject({ kind: 'frame', frameId: 'fr0' });
+        expect(text(r)).toMatch(/overview/);
+      }
+    }
+  }, 60000);
 
   test('labOrigin only accepts http(s) origins', () => {
     expect(labOrigin('https://lab.example.com/some/path')).toBe('https://lab.example.com');
@@ -237,7 +258,7 @@ describe('diagram_show AI-9a: authz parity, text fallback, view hardening', () =
     const r = await show(await connect({ versions: fakeVersions({ head: CONTENT }) }), { id: A });
     expect(r.structuredContent.highlight).toMatchObject({ skipped: true, versionNumber: 4 });
     expect(view(r).highlight).toBeNull();
-    expect(view(r).svg).not.toMatch(/stroke-width="3"/);
+    expect(view(r).svg).not.toMatch(/stroke-width=['"]3['"]/);
     expect(text(r)).toMatch(/followed by other edits/);
   });
 
