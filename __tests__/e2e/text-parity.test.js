@@ -18,7 +18,8 @@ const { headlessMode } = require('../helpers/headless');
 require('dotenv').config({ path: path.join(__dirname, '..', '..', '.env.qa.local') });
 const { showcaseContent } = require('../helpers/textShowcase');
 const { canvasBlocks, blocksOfSvgText, flowedLines } = require('../helpers/t3Browser');
-const { renderDiagramSvg } = require('../../lib/render/diagramSvg');
+const { renderShowSvg } = require('../../lib/render/showSvg');
+const { PACK_ART } = require('../../lib/render/packArt');
 
 jest.setTimeout(600000);
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3002';
@@ -123,12 +124,12 @@ describe('Text parity: canvas, export and diagram_show (ADR-0008 T3)', () => {
     await view.close();
     const view2 = await context.newPage();
     await view2.setViewport({ width: 1379, height: 985 });
-    const show = renderDiagramSvg(boardContent, { maxElements: 5000, maxConnections: 10000, maxBytes: Infinity, ids: true });
+    const show = renderShowSvg(boardContent, { art: PACK_ART, ids: true });
     keep('diagram_show.svg', show.svg);
     await view2.setContent(`<html><body style="margin:0;background:#fff"><img id="i" style="width:1379px" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(show.svg)}"></body></html>`);
     await sleep(500);
     await shot(view2, '5-diagram_show.png');
-    const thumb = renderDiagramSvg(boardContent, { maxElements: 5000, maxConnections: 10000, maxBytes: Infinity });
+    const thumb = renderShowSvg(boardContent, { art: PACK_ART });
     await view2.setContent(`<html><body style="margin:0;background:#fff"><img id="i" style="width:320px;image-rendering:auto" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(thumb.svg)}"></body></html>`);
     await sleep(300);
     await view2.setViewport({ width: 340, height: 260 });
