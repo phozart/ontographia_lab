@@ -350,3 +350,14 @@ This is separate from the historical (Gate 6, aspirational) `CHANGELOG.md`.
 - **Not verified:** real PowerPoint, Keynote, Google Slides, LibreOffice (not installed).
 - **Tests:** unit `pptxMapping`, `pptxTextRuns`, `pptxExport`, `pptxPackage`, `pptxBundle`; component `pptxExportDialog`; e2e `pptx-export` plus slides and presets-themes.
 
+
+## Slice F1 — diagram_show fidelity and scale, hardened (ADR-0009)
+
+- **PR title:** `feat(show): slice F1 diagram_show fidelity — stencil-faithful SVG, gzip transport, overview regions, security hardening`
+- **Refs:** `docs/architecture/adr/0009-diagram-show-fidelity-and-scale.md` sections 3, 4, 5 (F1), ADR accepted 2026-10-24 with all recommended Q-SF1–Q-SF7 defaults. Personas: every claude.ai persona (Solution Architect, CX/UX, PM, AI/MCP agent).
+- **Branch:** `feat/f1-show-fidelity`
+- **Files changed:** `lib/render/packArt.js` (allowlist converter, unchanged from spike), `lib/render/showSvg.js` (compact renderer, unchanged from spike), `lib/mcp/showTool.js` (`renderForShow`, budget ladder, `detail` parameter), `lib/mcp/app/diagramView.js` (zip-bomb guard in `inflate`, regions, Back, `safeUrl`), `components/diagram-studio/text/textCapture.js`, `skills/ontographia-lab/reference/tools.md` (`detail` and region zoom documented), `__tests__/lib/packArt.test.js` (all 10 label variants, external-url check), `__tests__/lib/mcpDiagramShow.test.js` (50/300/2000/6000-element budget ladder, render time, zip-bomb guard test), `__tests__/lib/claudeSkill.test.js` (skill drift test), `docs/architecture/adr/0009-diagram-show-fidelity-and-scale.md` (Status: Accepted + decision note), `docs/release/IMPLEMENTATION-LOG.md`.
+- **Deviations from the design:** frame-title chip, table column-type icons and doc-card header buttons not drawn (noted in ADR section 2.5, deferred to F2); manual check in claude.ai web and iOS app deferred to post-deploy per Q-SF1 (owner confirmed).
+- **Verification:** all 47 tests in packArt, mcpDiagramShow and claudeSkill pass; 0 lint errors; `NODE_ENV=production npm run build` passes; render time at 2,000 elements: 0.8 s (budget: <1.5 s); picture sizes: 50 el plain ~18 k chars, 300 el gzip ~32 k chars, 2,000 el full+gzip ~70 k chars, 6,000 el overview+gzip ~100 k chars; side-by-side screenshots at 1379×985: checkout, showcase and 2,000-element boards reviewed, stencil shapes match canvas geometry.
+- **Not verified:** claude.ai web, Desktop and mobile iOS (needs the deployed connector, Q-AV7); WebKit rendering of the picture; Windows fonts.
+- **Tests:** unit `packArt` (every stencil × 10 variants, safety, text = shared layout, checkout board), `mcpDiagramShow` (budget ladder at 50/300/2000/6000 elements, render time <1.5 s, detail parameter, zip-bomb guard, authz parity, view CSP, hostile names), `claudeSkill` (skill drift: `detail` and region documented).

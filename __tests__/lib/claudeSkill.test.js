@@ -76,4 +76,12 @@ describe('ontographia-lab skill', () => {
     }
     for (const p of prompts) expect(mentioned.has(p)).toBe(true);
   });
+
+  test('ADR-0009 F1 skill drift: diagram_show reference documents detail and region zoom (must update when the tool gains new parameters)', () => {
+    const toolsRef = fs.readFileSync(path.join(DIR, 'reference', 'tools.md'), 'utf8');
+    // detail parameter (Q-SF3)
+    expect(toolsRef).toMatch(/diagram_show[\s\S]{0,500}detail/);
+    // region zoom / overview vocabulary
+    expect(toolsRef).toMatch(/overview|region/i);
+  });
 });

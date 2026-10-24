@@ -8,7 +8,8 @@
 // rules are in styles/diagram-studio.css (.ds-text, .ds-text-badge). Left-to-right text is ONE text node (lines joined by
 // newlines under white-space: pre), so a label is a div and a text node; right-to-left lines get a block span each.
 
-import { memo, useState } from 'react';
+import { memo, useContext, useState } from 'react';
+import { TextCaptureContext } from './textCapture';
 
 // The overflow badge: hover shows the title, keyboard focus shows the full text in a popover (rendered only while focused,
 // so a board full of clamped labels carries no hidden popover DOM).
@@ -32,7 +33,10 @@ export function OverflowBadge({ text, pill }) {
 }
 
 function TextBlockImpl({ layout, box, color, fontFamily, fontStyle, textDecoration, offsetX = 0, offsetY = 0, rotate, pill, className, testId, hideBadge }) {
+  const capture = useContext(TextCaptureContext);
   if (!layout || !box) return null;
+  // server-side SVG rendering (lib/render/packArt.js): hand over the layout, draw a placeholder
+  if (capture) return <i data-cap={capture({ layout, box, color, fontFamily, fontStyle, textDecoration, offsetX, offsetY, rotate, hideBadge, testId })} />;
   const { lines, lineHeight, fontSize, weight, overflow } = layout;
   // Only per-node values are inline (position, width, size, first-line offset, color). Everything static is in the
   // stylesheet, the weight is a class, and the lines flow as blocks (no per-line style), so a 5,000-element board writes

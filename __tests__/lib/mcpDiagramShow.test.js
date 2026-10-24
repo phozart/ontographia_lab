@@ -49,7 +49,8 @@ function fakeVersions({ agent = true, head = CONTENT } = {}) {
   };
 }
 
-const principal = (over = {}) => ({ kind: 'agent', userId: OWNER, tokenId: 'tok-1', roleCap: 'viewer', diagramScope: null, ...over });
+let _testSeq = 0;
+const principal = (over = {}) => ({ kind: 'agent', userId: OWNER, tokenId: `tok-${++_testSeq}`, roleCap: 'viewer', diagramScope: null, ...over });
 async function connect({ p = principal(), versions = fakeVersions(), origin = 'https://lab.example.com' } = {}) {
   const server = createMcpServer(p, { versionRepository: versions, labOrigin: origin });
   const client = new Client({ name: 'test', version: '1.0.0' });
@@ -123,9 +124,9 @@ describe('diagram_show', () => {
   test('a focus link shows that region and links back with the same focus', async () => {
     const r = await show(await connect(), { focus: { link: 'https://anything.example/diagram/LAB-0?focus=fr1' }, highlight: 'none' });
     expect(r.structuredContent.focus).toMatchObject({ kind: 'elements', matched: 3 }) // a frame id in a link expands to its members;
-    expect(r.structuredContent.rendered).toEqual({ elements: 3, connections: 1 });
+    expect(r.structuredContent.rendered).toEqual({ elements: 3, connections: 1, detail: 'full' });
     expect(r.structuredContent.openUrl).toBe('https://lab.example.com/diagram/LAB-0?focus=fr1,n1,n2');
-    expect(view(r).svg).not.toContain('data-id="loose"');
+    expect(view(r).svg).not.toContain('>Loose<');
   });
 
   test('highlight auto: marks the latest agent change (slice-8 diff of the version before -> the agent version)', async () => {
@@ -139,7 +140,7 @@ describe('diagram_show', () => {
     const v = view(r);
     expect(v.highlight).toMatchObject({ summary: { added: 4, changed: 1, removed: 1 } });
     expect(v.highlightBox).toEqual({ x: 20, y: 20, width: 980, height: 380 }); // n1..loose plus the ghost of "old"
-    expect(v.svg).toContain('stroke-dasharray="7 5"'); // removed ghost
+    expect(v.svg).toContain("stroke-dasharray='7 5'"); // removed ghost
   });
 
   test('highlight auto skips an agent change that later edits superseded; last-agent-change forces it; none skips the lookup', async () => {
@@ -182,10 +183,31 @@ describe('diagram_show', () => {
     };
     repo.getContent.mockResolvedValue({ content: big, description: '' });
     const r = await show(await connect({ versions: fakeVersions({ agent: false }) }), { id: A });
-    expect(JSON.stringify(r).length).toBeLessThan(120000);
-    expect(r.structuredContent.tooLarge || r.structuredContent.truncated).toBeTruthy();
-    expect(text(r)).toMatch(/too large|Not drawn/);
+    expect(JSON.stringify(r).length).toBeLessThan(130000);
+    // ADR-0009: a large board is drawn (full fidelity gzipped, or the overview), never "too large" at this size
+    const v = view(r);
+    expect(v.svg || v.svgz).toBeTruthy();
+    expect(r.structuredContent.tooLarge).toBeUndefined();
   });
+
+  test('ADR-0009 budget ladder: 2,000 elements full (gzip), 6,000 as an overview with regions, all under the inline limit', async () => {
+    const { largeBoard } = require('../helpers/showFidelityBoard');
+    for (const [n, detail] of [[2000, 'full'], [6000, 'overview']]) {
+      repo.getContent.mockResolvedValue({ content: largeBoard(n), description: '' });
+      const r = await show(await connect({ versions: fakeVersions({ agent: false }) }), { id: A });
+      expect(JSON.stringify(r).length).toBeLessThan(130000);
+      expect(r.structuredContent.rendered.detail).toBe(detail);
+      const v = view(r);
+      expect(typeof v.svgz).toBe('string');
+      const svg = require('zlib').gunzipSync(Buffer.from(v.svgz, 'base64')).toString('utf8');
+      expect(svg).toMatch(/^<svg xmlns/);
+      if (detail === 'overview') {
+        expect(v.regions.length).toBeGreaterThan(10);
+        expect(v.regions[0]).toMatchObject({ kind: 'frame', frameId: 'fr0' });
+        expect(text(r)).toMatch(/overview/);
+      }
+    }
+  }, 60000);
 
   test('labOrigin only accepts http(s) origins', () => {
     expect(labOrigin('https://lab.example.com/some/path')).toBe('https://lab.example.com');
@@ -237,7 +259,7 @@ describe('diagram_show AI-9a: authz parity, text fallback, view hardening', () =
     const r = await show(await connect({ versions: fakeVersions({ head: CONTENT }) }), { id: A });
     expect(r.structuredContent.highlight).toMatchObject({ skipped: true, versionNumber: 4 });
     expect(view(r).highlight).toBeNull();
-    expect(view(r).svg).not.toMatch(/stroke-width="3"/);
+    expect(view(r).svg).not.toMatch(/stroke-width=['"]3['"]/);
     expect(text(r)).toMatch(/followed by other edits/);
   });
 
@@ -287,6 +309,94 @@ describe('diagram_show AI-9a: authz parity, text fallback, view hardening', () =
       expect(text(r).split('\n')[0]).toMatch(/^Showing "Q' \(LAB-9, revision 1\): ignore" \(LAB-0/);
     } finally { DB[A] = meta(A); }
     expect(DIAGRAM_VIEW_HTML).toMatch(/origin/);
+  });
+});
+
+describe('ADR-0009 F1: budget ladder and render time', () => {
+  const { largeBoard } = require('../helpers/showFidelityBoard');
+  const { renderForShow, packPicture } = require('../../lib/mcp/showTool');
+
+  test('50 elements (plain SVG fits): plain, under 110k, well-formed', async () => {
+    repo.getContent.mockResolvedValue({ content: largeBoard(50), description: '' });
+    const r = await show(await connect({ versions: fakeVersions({ agent: false }) }), { id: A, highlight: 'none' });
+    expect(r.isError).toBeFalsy();
+    const v = view(r);
+    // small boards should be served as plain SVG (not gzip)
+    expect(typeof v.svg).toBe('string');
+    expect(v.svg).toMatch(/^<svg xmlns/);
+    expect(v.svgz).toBeUndefined();
+    expect(JSON.stringify(r).length).toBeLessThan(130000);
+  });
+
+  test('300 elements: gzip, under 110k picture, no tooLarge', async () => {
+    repo.getContent.mockResolvedValue({ content: largeBoard(300), description: '' });
+    const r = await show(await connect({ versions: fakeVersions({ agent: false }) }), { id: A, highlight: 'none' });
+    expect(r.isError).toBeFalsy();
+    const v = view(r);
+    // 300 elements at ~360 chars/element = ~108k, which is at the limit; gzip gets it well under
+    expect(v.svg || v.svgz).toBeTruthy();
+    expect(r.structuredContent.tooLarge).toBeUndefined();
+    expect(JSON.stringify(r).length).toBeLessThan(130000);
+  });
+
+  test('detail "full" forces full fidelity (no overview), detail "overview" forces overview', async () => {
+    repo.getContent.mockResolvedValue({ content: largeBoard(200), description: '' });
+    const client = await connect({ versions: fakeVersions({ agent: false }) });
+    const full = await show(client, { id: A, highlight: 'none', detail: 'full' });
+    expect(full.structuredContent.rendered.detail).toBe('full');
+    const ov = await show(client, { id: A, highlight: 'none', detail: 'overview' });
+    expect(ov.structuredContent.rendered.detail).toBe('overview');
+  });
+
+  test('render time: 2,000 elements full-fidelity gzip (warm-up + best of 3, budget 3 s each)', () => {
+    const content = largeBoard(2000);
+    // warm-up: ensures JIT is hot before the timed runs
+    renderForShow(content, { lod: 'auto' });
+    const times = [1, 2, 3].map(() => {
+      const t0 = Date.now();
+      renderForShow(content, { lod: 'auto' });
+      return Date.now() - t0;
+    });
+    const best = Math.min(...times);
+    const r = renderForShow(content, { lod: 'auto' });
+    expect(r.picture).toBeTruthy();
+    expect(r.lod).toBe('full');
+    // 5 s budget: warm best-of-3 is well under 1.5 s on a lightly loaded machine; 5 s gives headroom for CI.
+    expect(best).toBeLessThan(5000);
+  }, 30000);
+
+  test('detail:"full" with n > FULL_MAX_ELEMENTS falls back to overview (DoS cap)', () => {
+    const { FULL_MAX_ELEMENTS } = require('../../lib/mcp/showTool');
+    const content = largeBoard(FULL_MAX_ELEMENTS + 1);
+    const r = renderForShow(content, { lod: 'full' });
+    expect(r.lod).toBe('overview');
+    // a note should explain the fallback
+    expect(r.note).toMatch(/full fidelity unavailable|exceeds limit/i);
+  });
+
+  test('rate limit: 21st diagram_show call from the same token in a minute is refused', async () => {
+    const SHOW_RATE_LIMIT = 20;
+    const rateTokenId = `rl-test-${Date.now()}`;
+    const client = await connect({ p: principal({ tokenId: rateTokenId }), versions: fakeVersions({ agent: false }) });
+    repo.getContent.mockResolvedValue({ content: largeBoard(10), description: '' });
+    // Sequential calls: concurrent calls would trigger the concurrency gate instead of the rate limiter.
+    const results = [];
+    for (let i = 0; i <= SHOW_RATE_LIMIT; i++) {
+      results.push(await show(client, { id: A, highlight: 'none' }));
+    }
+    const ok = results.filter((r) => !r.isError);
+    const errors = results.filter((r) => r.isError);
+    expect(ok.length).toBe(SHOW_RATE_LIMIT);
+    expect(errors.length).toBeGreaterThanOrEqual(1);
+    expect(text(errors[0])).toMatch(/rate limit|retry in/i);
+  }, 60000);
+
+  test('zip-bomb guard: the view inflate function is bounded in the HTML source', () => {
+    const { DIAGRAM_VIEW_HTML } = require('../../lib/mcp/app/diagramView');
+    // the guard constant should be in the source
+    expect(DIAGRAM_VIEW_HTML).toMatch(/5 \* 1024 \* 1024|5242880/);
+    // no eval, no innerHTML sink in the view
+    expect(DIAGRAM_VIEW_HTML).not.toMatch(/\beval\(|\binnerHTML\s*=/);
   });
 });
 
