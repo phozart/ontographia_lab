@@ -39,13 +39,19 @@ describe('packArt: every stencil converts completely', () => {
     test(`${pack.id}: no unhandled markup, strict XML`, () => {
       const problems = [];
       for (const stencil of pack.stencils) {
-        for (const [vid, label] of VARIANTS.slice(0, 4)) {
+        for (const [vid, label] of VARIANTS) {
           const el = { id: 'n1', type: stencil.id, packId: pack.id, label, x: 0, y: 0, size: { ...(stencil.defaultSize || { width: 120, height: 80 }) }, color: stencil.color, layerId: 'default', properties: {}, data: { ...(stencil.defaultData || {}), ...(DATA[pack.id] || {}) } };
           const r = drawingOf(el, stencil);
           if (!r) continue; // drawn by the server itself (frames, tables, docs) or by the generic renderer
           if (r.unhandled.length) problems.push(`${stencil.id}/${vid}: ${r.unhandled.join(', ')}`);
           const doc = parse(`<svg xmlns="http://www.w3.org/2000/svg"><defs>${r.defs}</defs>${r.art}${r.text}</svg>`);
           if (doc.getElementsByTagName('parsererror').length) problems.push(`${stencil.id}/${vid}: not XML`);
+          // no external url() references in any attribute
+          for (const node of doc.getElementsByTagName('*')) {
+            for (const a of node.attributes) {
+              if (/url\((?!#)/i.test(a.value)) problems.push(`${stencil.id}/${vid}: external url in ${a.name}`);
+            }
+          }
         }
       }
       expect(problems).toEqual([]);

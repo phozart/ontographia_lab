@@ -1,6 +1,7 @@
 # ADR-0009: diagram_show fidelity and scale (the board in Claude looks like the lab, at any size)
 
-- Status: **Proposed** (2026-10-23). Spike on branch `spike/show-fidelity` (draft PR).
+- Status: **Accepted** (2026-10-24). Spike approved with all recommended defaults (Q-SF1 through Q-SF7). Slices F1–F4 approved; F5 deferred. Implemented in PR #72 (`feat/f1-show-fidelity`).
+- Decision (2026-10-24): all open-question defaults approved as recommended — gzip+base64 transport (Q-SF1, requires Safari/iOS ≥16.4; plain SVG used whenever it fits); no drop shadows (Q-SF2); `detail: auto|full|overview` exposed (Q-SF3, default `auto`); region zoom by frame bbox (Q-SF4); no raster fallback (Q-SF5); picture budget 110k chars (Q-SF6); no pack rewrite now (Q-SF7).
 - Owner request (2026-10-23): Claude's board view must look like the lab; the owner uses claude.ai as the main surface. Today `diagram_show` draws generic rectangles and circles in saturated colours, no stencil shapes (sticky notes, cylinders, actors, UML compartments, ERD rows, icons), connection labels at the port midpoint, and gives up (`svg: null`, `tooLarge`) at about 500 elements (ADR-0008 18.5).
 - Builds on: [ai-canvas-via-mcp.md](../investigations/ai-canvas-via-mcp.md) section 10 (`diagram_show`, AI-9a: picture in `_meta`, `<img>` data URL, strict CSP), ADR-0008 (one shared text layout; T3 drew the same lines in `diagram_show`), ADR-0007 (themes, `resolveElementTokens`).
 - Personas: **every persona that works from claude.ai** (Solution Architect, CX/UX, PM) sees the board they built; **AI/MCP agent**: one call shows the result of its edits, whatever the board size.

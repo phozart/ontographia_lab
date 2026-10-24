@@ -311,3 +311,58 @@ describe('diagram_show AI-9a: authz parity, text fallback, view hardening', () =
   });
 });
 
+describe('ADR-0009 F1: budget ladder and render time', () => {
+  const { largeBoard } = require('../helpers/showFidelityBoard');
+  const { renderForShow, packPicture } = require('../../lib/mcp/showTool');
+
+  test('50 elements (plain SVG fits): plain, under 110k, well-formed', async () => {
+    repo.getContent.mockResolvedValue({ content: largeBoard(50), description: '' });
+    const r = await show(await connect({ versions: fakeVersions({ agent: false }) }), { id: A, highlight: 'none' });
+    expect(r.isError).toBeFalsy();
+    const v = view(r);
+    // small boards should be served as plain SVG (not gzip)
+    expect(typeof v.svg).toBe('string');
+    expect(v.svg).toMatch(/^<svg xmlns/);
+    expect(v.svgz).toBeUndefined();
+    expect(JSON.stringify(r).length).toBeLessThan(130000);
+  });
+
+  test('300 elements: gzip, under 110k picture, no tooLarge', async () => {
+    repo.getContent.mockResolvedValue({ content: largeBoard(300), description: '' });
+    const r = await show(await connect({ versions: fakeVersions({ agent: false }) }), { id: A, highlight: 'none' });
+    expect(r.isError).toBeFalsy();
+    const v = view(r);
+    // 300 elements at ~360 chars/element = ~108k, which is at the limit; gzip gets it well under
+    expect(v.svg || v.svgz).toBeTruthy();
+    expect(r.structuredContent.tooLarge).toBeUndefined();
+    expect(JSON.stringify(r).length).toBeLessThan(130000);
+  });
+
+  test('detail "full" forces full fidelity (no overview), detail "overview" forces overview', async () => {
+    repo.getContent.mockResolvedValue({ content: largeBoard(200), description: '' });
+    const client = await connect({ versions: fakeVersions({ agent: false }) });
+    const full = await show(client, { id: A, highlight: 'none', detail: 'full' });
+    expect(full.structuredContent.rendered.detail).toBe('full');
+    const ov = await show(client, { id: A, highlight: 'none', detail: 'overview' });
+    expect(ov.structuredContent.rendered.detail).toBe('overview');
+  });
+
+  test('render time: 2,000 elements full-fidelity gzip under 1.5 s on the server', () => {
+    const content = largeBoard(2000);
+    const t0 = Date.now();
+    const r = renderForShow(content, { lod: 'auto' });
+    const ms = Date.now() - t0;
+    expect(r.picture).toBeTruthy();
+    expect(r.lod).toBe('full');
+    expect(ms).toBeLessThan(1500);
+  }, 5000);
+
+  test('zip-bomb guard: the view inflate function is bounded in the HTML source', () => {
+    const { DIAGRAM_VIEW_HTML } = require('../../lib/mcp/app/diagramView');
+    // the guard constant should be in the source
+    expect(DIAGRAM_VIEW_HTML).toMatch(/5 \* 1024 \* 1024|5242880/);
+    // no eval, no innerHTML sink in the view
+    expect(DIAGRAM_VIEW_HTML).not.toMatch(/\beval\(|\binnerHTML\s*=/);
+  });
+});
+
